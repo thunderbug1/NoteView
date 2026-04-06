@@ -1,0 +1,569 @@
+/* ============================================
+   NoteView - Reusable Components
+   ============================================ */
+
+/* Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+/* Badge color variants */
+.badge.work {
+    background: #dbeafe;
+    color: #1e40af;
+    border-color: #bfdbfe;
+}
+
+.badge.personal {
+    background: #fce7f3;
+    color: #9f1239;
+    border-color: #fbcfe8;
+}
+
+.badge.ideas {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.badge.todos {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #a7f3d0;
+}
+
+/* Buttons */
+.block-action-btn {
+    padding: 0.35rem 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.block-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.block-action-btn.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.block-action-btn.primary:hover {
+    background: var(--accent-hover);
+}
+
+/* Tag Groups (Radio Behavior) */
+.tag-group {
+    margin-bottom: 1.25rem;
+}
+
+.tag-group:last-child {
+    margin-bottom: 0;
+}
+
+.section-header .property-select {
+    padding: 0.2rem 0.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+}
+
+.tag-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.tag-radio-option {
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.tag-radio-option .tag-badge {
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-block;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.tag-radio-option.selected .tag-badge {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.tag-radio-option:hover .tag-badge {
+    opacity: 0.8;
+}
+
+/* Hide radio indicator, label and count */
+.tag-radio-indicator,
+.tag-label,
+.tag-count {
+    display: none;
+}
+
+/* "All" Option */
+.tag-radio-option.all-option {
+    font-style: italic;
+}
+
+.tag-radio-option.all-option .tag-label {
+    color: var(--text-muted);
+}
+
+.delete-tag-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    margin-left: 0.25rem;
+    opacity: 0.5;
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+#contextTagGroup.editing-tags .delete-tag-btn {
+    display: inline-block;
+}
+
+.delete-tag-btn:hover {
+    color: var(--accent);
+    opacity: 1;
+}
+
+.add-new-context-tag {
+    opacity: 0.8;
+}
+
+.add-new-context-tag .tag-badge {
+    border-style: dashed;
+    background: transparent;
+}
+
+/* General Modals */
+.tag-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.tag-modal {
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    width: 300px;
+    max-width: 90vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.tag-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.tag-modal-header h3 {
+    font-size: 0.9rem;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.close-modal {
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.close-modal:hover {
+    color: var(--text-primary);
+}
+
+/* Add Tag Button */
+.add-tag-btn {
+    background: transparent;
+    border: 1px dashed var(--border);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-tag-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* Tag Input */
+.tag-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Tag Modal Body (general) */
+.tag-modal-body {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tag-modal-input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 0.75rem;
+}
+
+.tag-modal-body input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.tag-modal-body input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.tag-modal-add-btn {
+    padding: 0.5rem 1rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.tag-modal-add-btn:hover {
+    background: var(--accent-hover);
+}
+
+.tag-modal-list {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.tag-modal-item {
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.tag-modal-item:hover {
+    background: var(--bg-hover);
+}
+
+.tag-modal-item.selected {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.tag-modal-item .tag-checkbox {
+    display: inline-block;
+    width: 1.2em;
+    margin-right: 0.5rem;
+    font-weight: bold;
+}
+
+.tag-modal-footer {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.tag-modal-save-btn {
+    padding: 0.5rem 1.25rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.tag-modal-save-btn:hover {
+    background: var(--accent-hover);
+}
+
+.tag-modal-item.non-matching-context {
+    opacity: 0.5;
+    background: var(--bg-secondary);
+}
+
+.tag-modal-create {
+    padding: 0.75rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+/* Directory Picker */
+.directory-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.picker-content {
+    text-align: center;
+    max-width: 400px;
+}
+
+.picker-content h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.picker-content > p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+}
+
+.select-folder-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 2rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-md);
+}
+
+.select-folder-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Loading & States */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-muted);
+}
+
+.empty-state::before {
+    content: '';
+    display: block;
+    margin: 0 auto 1rem;
+    width: 48px;
+    height: 48px;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='16' y1='13' x2='8' y2='13'/%3E%3Cline x1='16' y1='17' x2='8' y2='17'/%3E%3Cpolyline points='10 9 9 9 8 9'/%3E%3C/svg%3E") no-repeat center / contain;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='16' y1='13' x2='8' y2='13'/%3E%3Cline x1='16' y1='17' x2='8' y2='17'/%3E%3Cpolyline points='10 9 9 9 8 9'/%3E%3C/svg%3E") no-repeat center / contain;
+    opacity: 0.4;
+}
+
+/* Task Context Menu */
+.task-context-menu {
+    position: fixed;
+    z-index: 10000;
+    top: 0; left: 0;
+    width: 200px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 0.85rem;
+    padding: 0.5rem 0;
+    overflow: hidden;
+    animation: fadeInMenu 0.1s ease-out;
+}
+
+@keyframes fadeInMenu {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.task-context-menu .menu-section {
+    padding: 0;
+}
+
+.task-context-menu .menu-title {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.task-context-menu .menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0.8rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.task-context-menu .menu-item:hover {
+    background: var(--bg-hover);
+}
+
+.task-context-menu .menu-item.active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.task-context-menu .menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.4rem 0;
+}
+
+/* Floating Action Button */
+.fab {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    outline: none;
+}
+
+.fab:hover {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.fab:active {
+    transform: translateY(0) scale(0.95);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.fab svg {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+[data-theme="dark"] .fab {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Undo/Redo Controls */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.undo-redo-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.icon-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.icon-btn:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+.icon-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.icon-btn svg {
+    pointer-events: none;
+}
