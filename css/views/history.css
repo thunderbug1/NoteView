@@ -1,0 +1,133 @@
+/* ============================================
+   NoteView - History & Diff Modals
+   ============================================ */
+
+.history-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.4);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+}
+
+.history-modal-container {
+    background: var(--bg-primary);
+    width: 90vw;
+    height: 90vh;
+    max-width: 1400px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    overflow: hidden;
+}
+
+.history-sidebar {
+    width: 300px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+}
+
+.history-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-timeline {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.history-commit-item {
+    padding: 0.85rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    transition: all 0.15s ease;
+    background: var(--bg-primary);
+    border: 1px solid transparent;
+}
+
+.history-commit-item.selected {
+    border-color: var(--accent);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.commit-msg {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.history-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+}
+
+.history-actions {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.restore-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.diff-editor-container {
+    flex: 1;
+    overflow: auto;
+}
+
+/* Timeline Diff Modal */
+.tl-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.tl-modal {
+    width: 90%;
+    max-width: 900px;
+    height: 80vh;
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tl-modal-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.tl-modal-body {
+    flex: 1;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}

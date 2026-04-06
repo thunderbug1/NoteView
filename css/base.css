@@ -1,0 +1,148 @@
+/* ============================================
+   NoteView - Base Styles & Theme
+   ============================================ */
+
+/* Reset & Base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Colors - Light Theme */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-tertiary: #f1f5f9;
+    --bg-hover: #e2e8f0;
+
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --text-color: #0f172a;
+
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-light: rgba(59, 130, 246, 0.08);
+    --accent-color: #3b82f6;
+
+    --border: #e2e8f0;
+    --border-light: #cbd5e1;
+
+    /* CodeMirror colors */
+    --code-bg: #f1f5f9;
+    --code-color: #0f172a;
+
+    /* Badge Colors */
+    --badge-work-bg: #dbeafe;
+    --badge-work-text: #1d4ed8;
+    --badge-work-border: #bfdbfe;
+
+    --badge-personal-bg: #d1fae5;
+    --badge-personal-text: #047857;
+    --badge-personal-border: #a7f3d0;
+
+    --badge-ideas-bg: #fef3c7;
+    --badge-ideas-text: #b45309;
+    --badge-ideas-border: #fde68a;
+
+    --badge-todos-bg: #fee2e2;
+    --badge-todos-text: #b91c1c;
+    --badge-todos-border: #fecaca;
+
+    --badge-time-bg: #ede9fe;
+    --badge-time-text: #6d28d9;
+    --badge-time-border: #ddd6fe;
+
+    --badge-default-bg: #f1f5f9;
+    --badge-default-text: #475569;
+    --badge-default-border: #e2e8f0;
+
+    /* Spacing */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-full: 9999px;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    /* Colors - Dark Theme */
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --bg-hover: #475569;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-color: #f8fafc;
+
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-light: rgba(96, 165, 250, 0.15);
+    --accent-color: #60a5fa;
+
+    --border: #334155;
+    --border-light: #475569;
+
+    /* CodeMirror colors */
+    --code-bg: #1e293b;
+    --code-color: #e2e8f0;
+
+    /* Badge Colors */
+    --badge-work-bg: rgba(29, 78, 216, 0.2);
+    --badge-work-text: #93c5fd;
+    --badge-work-border: rgba(96, 165, 250, 0.3);
+
+    --badge-personal-bg: rgba(4, 120, 87, 0.2);
+    --badge-personal-text: #6ee7b7;
+    --badge-personal-border: rgba(52, 211, 153, 0.3);
+
+    --badge-ideas-bg: rgba(180, 83, 9, 0.2);
+    --badge-ideas-text: #fcd34d;
+    --badge-ideas-border: rgba(251, 191, 36, 0.3);
+
+    --badge-todos-bg: rgba(185, 28, 28, 0.2);
+    --badge-todos-text: #fca5a5;
+    --badge-todos-border: rgba(248, 113, 113, 0.3);
+
+    --badge-time-bg: rgba(109, 40, 217, 0.2);
+    --badge-time-text: #c4b5fd;
+    --badge-time-border: rgba(167, 139, 250, 0.3);
+
+    --badge-default-bg: #334155;
+    --badge-default-text: #cbd5e1;
+    --badge-default-border: #475569;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-light);
+}
