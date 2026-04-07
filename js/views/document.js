@@ -927,15 +927,47 @@ const DocumentView = {
         while ((match = linkRegex.exec(text)) !== null) {
             const matchFrom = from + match.index;
             const matchTo = matchFrom + match[0].length;
-            
+
             let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
             if (!overlaps) {
-                builder.push(Decoration.mark({ class: 'md-link-text' }).range(matchFrom, matchTo));
                 if (hideSyntax) {
-                    const openEnd = matchFrom + 1; // `[`
-                    const closeStart = openEnd + match[1].length; // `]`
-                    builder.push(Decoration.replace({}).range(matchFrom, openEnd));
-                    builder.push(Decoration.replace({}).range(closeStart, matchTo));
+                    builder.push(Decoration.replace({
+                        widget: new widgets.LinkWidget(match[1], match[2], matchFrom, matchTo)
+                    }).range(matchFrom, matchTo));
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-link-text' }).range(matchFrom, matchTo));
+                }
+                usedRanges.push({ from: matchFrom, to: matchTo });
+            }
+        }
+
+        // Bare URLs
+        const bareUrlRegex = /https?:\/\/\S+/g;
+        while ((match = bareUrlRegex.exec(text)) !== null) {
+            const matchFrom = from + match.index;
+            const matchTo = matchFrom + match[0].length;
+
+            let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
+            if (!overlaps) {
+                if (hideSyntax) {
+                    // Strip trailing punctuation that's unlikely to be part of the URL
+                    let url = match[0];
+                    while (/[.,;:!?)\]>}]/.test(url) && url.length > 1) {
+                        url = url.slice(0, -1);
+                    }
+                    const urlTo = matchFrom + url.length;
+                    if (urlTo < matchTo) {
+                        // Part of the match is trailing punctuation — only replace the URL portion
+                        builder.push(Decoration.replace({
+                            widget: new widgets.LinkWidget(url, url, matchFrom, urlTo)
+                        }).range(matchFrom, urlTo));
+                    } else {
+                        builder.push(Decoration.replace({
+                            widget: new widgets.LinkWidget(url, url, matchFrom, matchTo)
+                        }).range(matchFrom, matchTo));
+                    }
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-link-text' }).range(matchFrom, matchTo));
                 }
                 usedRanges.push({ from: matchFrom, to: matchTo });
             }

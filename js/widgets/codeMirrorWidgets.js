@@ -108,6 +108,36 @@ function createCodeMirrorWidgets(documentView) {
         ignoreEvent() { return true; }
     }
 
+    class LinkWidget extends WidgetType {
+        constructor(text, url, from, to) {
+            super();
+            this.text = text;
+            this.url = url;
+            this.from = from;
+            this.to = to;
+        }
+        eq(other) {
+            return other.text === this.text && other.url === this.url && other.from === this.from;
+        }
+        toDOM(view) {
+            const a = document.createElement("a");
+            a.className = "md-link-text";
+            a.href = this.url;
+            a.textContent = this.text;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.onclick = (e) => {
+                e.stopPropagation();
+            };
+            a.onmousedown = (e) => {
+                // Allow the link to open normally, prevent CodeMirror from stealing focus
+                e.stopPropagation();
+            };
+            return a;
+        }
+        ignoreEvent() { return true; }
+    }
+
     class AddDeadlineWidget extends WidgetType {
         constructor(from, to) {
             super();
@@ -241,6 +271,7 @@ function createCodeMirrorWidgets(documentView) {
     return {
         CheckboxWidget,
         BadgeWidget,
+        LinkWidget,
         AddDeadlineWidget,
         AddAssigneeWidget,
         AddPriorityWidget,
