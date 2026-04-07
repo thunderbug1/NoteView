@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1a1b26"/>
+  <g transform="translate(80, 60)">
+    <!-- Notepad body -->
+    <rect x="20" y="20" width="312" height="372" rx="16" fill="#24283b" stroke="#414868" stroke-width="4"/>
+    <!-- Header bar -->
+    <rect x="20" y="20" width="312" height="52" rx="16" fill="#414868"/>
+    <rect x="20" y="56" width="312" height="16" fill="#414868"/>
+    <!-- Lines -->
+    <rect x="52" y="96" width="248" height="8" rx="4" fill="#565f89"/>
+    <rect x="52" y="128" width="200" height="8" rx="4" fill="#565f89"/>
+    <rect x="52" y="160" width="268" height="8" rx="4" fill="#565f89"/>
+    <rect x="52" y="192" width="180" height="8" rx="4" fill="#565f89"/>
+    <rect x="52" y="224" width="240" height="8" rx="4" fill="#565f89"/>
+    <rect x="52" y="256" width="160" height="8" rx="4" fill="#565f89"/>
+    <rect x="52" y="288" width="220" height="8" rx="4" fill="#565f89"/>
+    <rect x="52" y="320" width="140" height="8" rx="4" fill="#565f89"/>
+    <!-- Pencil -->
+    <g transform="translate(240, 280) rotate(-45)">
+      <rect x="0" y="0" width="24" height="120" rx="4" fill="#ff9e64"/>
+      <rect x="0" y="0" width="24" height="24" rx="4" fill="#e0af68"/>
+      <polygon points="4,120 20,120 12,145" fill="#9aa5ce"/>
+    </g>
+  </g>
+</svg>
