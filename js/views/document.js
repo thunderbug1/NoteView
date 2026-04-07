@@ -8,6 +8,7 @@ const DocumentView = {
     // Track CodeMirror editor instances by block ID
     editors: new Map(),
     newBlockContent: '',
+    pendingNewTags: null,
     saveTimeouts: new Map(), // blockId -> timeoutId
     originalContents: new Map(), // blockId -> original content for change detection
     // Store widget class for access in closures
@@ -77,6 +78,13 @@ const DocumentView = {
         }
         this._splitHandler = this.handleSplitMarkerClick.bind(this);
         container.addEventListener('mousedown', this._splitHandler);
+
+        // Add event delegation for tag button click
+        if (this._tagHandler) {
+            container.removeEventListener('click', this._tagHandler);
+        }
+        this._tagHandler = this.handleTagClick.bind(this);
+        container.addEventListener('click', this._tagHandler);
 
         this.attachEventListeners();
     },
@@ -196,16 +204,6 @@ const DocumentView = {
             this.createEditor(cmContainer, blockId, initialContent);
         });
 
-        // Tag management
-        container.querySelectorAll('.add-tag-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const blockId = e.currentTarget.dataset.id;
-                if (blockId && blockId !== 'new') {
-                    App.showTagModal(blockId);
-                }
-            });
-        });
-
         // History
         container.querySelectorAll('.history-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -227,6 +225,17 @@ const DocumentView = {
         const blockId = deleteBtn.dataset.id;
         if (blockId && blockId !== 'new') {
             App.deleteBlock(blockId);
+        }
+    },
+
+    handleTagClick(e) {
+        const tagBtn = e.target.closest('.add-tag-btn');
+        if (!tagBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const blockId = tagBtn.dataset.id;
+        if (blockId) {
+            App.showTagModal(blockId);
         }
     },
 
@@ -968,9 +977,14 @@ const DocumentView = {
         try {
             // Take snapshot of content to save
             const contentToSave = this.newBlockContent || initialContent;
-            
-            // 1. Create the block in the store
-            const newBlock = await Store.createBlock(contentToSave);
+
+            // 1. Create the block in the store, applying any pending tags
+            const extraMeta = {};
+            if (this.pendingNewTags && this.pendingNewTags.length > 0) {
+                extraMeta.tags = this.pendingNewTags;
+            }
+            const newBlock = await Store.createBlock(contentToSave, extraMeta);
+            this.pendingNewTags = null;
 
             // 2. Update DOM of the currently active placeholder
             const currentBlock = document.querySelector('.block[data-id="new"]');

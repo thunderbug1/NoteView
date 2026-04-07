@@ -624,9 +624,36 @@ const App = {
         };
 
         const saveChanges = async () => {
-            if (blockId && blockId !== 'new') {
-                const newTags = Array.from(selectedTags).sort();
+            const newTags = Array.from(selectedTags).sort();
 
+            if (blockId === 'new') {
+                // Store pending tags for the new note placeholder
+                DocumentView.pendingNewTags = newTags;
+
+                // Add any new tags to the context UI
+                for (const tag of newTags) {
+                    if (!allTags.includes(tag)) {
+                        SelectionManager.addContextTagToUI(tag);
+                    }
+                }
+
+                // Update the badge display on the new note placeholder
+                const newBlock = document.querySelector('.block[data-id="new"]');
+                if (newBlock) {
+                    const tagsDiv = newBlock.querySelector('.block-tags');
+                    if (tagsDiv) {
+                        const addBtn = tagsDiv.querySelector('.add-tag-btn');
+                        const badgesHtml = newTags.map(tag => `<span class="badge">${Common.capitalizeFirst(tag)}</span>`).join('');
+                        // Remove existing badges, keep the + Tag button
+                        tagsDiv.querySelectorAll('.badge').forEach(b => b.remove());
+                        if (addBtn) {
+                            addBtn.insertAdjacentHTML('beforebegin', badgesHtml);
+                        } else {
+                            tagsDiv.insertAdjacentHTML('afterbegin', badgesHtml);
+                        }
+                    }
+                }
+            } else if (blockId) {
                 // Only save if tags actually changed
                 if (JSON.stringify(newTags) !== JSON.stringify([...initialTags].sort())) {
                     await this.updateBlockProperty(blockId, 'tags', newTags);
