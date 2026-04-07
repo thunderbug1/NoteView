@@ -368,3 +368,9 @@
     text-align: center;
     color: #ef4444;
 }
+
+@media (max-width: 768px) {
+    .tl-refresh-btn {
+        bottom: 5rem;
+    }
+}
