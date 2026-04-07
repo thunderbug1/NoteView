@@ -287,7 +287,7 @@ const Store = {
                 }
                 const transaction = this.db.transaction(['undoRedoState'], 'readwrite');
                 const store = transaction.objectStore('undoRedoState');
-                const request = store.put(state, 'stacks');
+                const request = store.put(state, state.sessionId);
 
                 request.onsuccess = () => resolve();
                 request.onerror = () => {
@@ -307,7 +307,7 @@ const Store = {
     },
 
     // Get undo/redo state from IndexedDB
-    async getUndoRedoState() {
+    async getUndoRedoState(sessionId) {
         if (!this.db) await this.initDB();
         if (!this.db) return null; // If initDB failed, return null
 
@@ -318,7 +318,7 @@ const Store = {
                 }
                 const transaction = this.db.transaction(['undoRedoState'], 'readonly');
                 const store = transaction.objectStore('undoRedoState');
-                const request = store.get('stacks');
+                const request = store.get(sessionId);
 
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);

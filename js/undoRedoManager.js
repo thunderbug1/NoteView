@@ -21,7 +21,13 @@ const UndoRedoManager = {
      * Initialize the manager
      */
     init() {
-        this.sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const stored = sessionStorage.getItem('undoRedoSessionId');
+        if (stored) {
+            this.sessionId = stored;
+        } else {
+            this.sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            sessionStorage.setItem('undoRedoSessionId', this.sessionId);
+        }
     },
 
     /**
@@ -437,7 +443,7 @@ const UndoRedoManager = {
     async loadState() {
         console.log('UndoRedoManager: Loading state...');
         try {
-            const state = await Store.getUndoRedoState();
+            const state = await Store.getUndoRedoState(this.sessionId);
             console.log('UndoRedoManager: State loaded:', state);
             // State might be null if object store doesn't exist yet (DB upgrade)
             if (state && state.sessionId === this.sessionId) {
