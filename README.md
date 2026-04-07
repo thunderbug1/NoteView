@@ -87,6 +87,8 @@ The entire app runs in your browser. No account, no server, no cloud. It uses th
 2. Click **Open Vault** and select a folder where your markdown notes will live
 3. Start writing
 
+If you are importing an older markdown collection, see [LEGACY_NOTES_GUIDE.md](LEGACY_NOTES_GUIDE.md) for a storage format and migration guide tailored to NoteView's current file model.
+
 ## Project Structure
 
 ```
