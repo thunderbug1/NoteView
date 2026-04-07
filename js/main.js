@@ -154,6 +154,37 @@ const App = {
     },
 
     setupEventListeners() {
+        // Mobile sidebar slide
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+
+        function openSidebar() {
+            sidebar.classList.add('sidebar-open');
+            overlay.classList.add('active');
+            document.body.classList.add('sidebar-open');
+        }
+        function closeSidebar() {
+            sidebar.classList.remove('sidebar-open');
+            overlay.classList.remove('active');
+            document.body.classList.remove('sidebar-open');
+        }
+
+        overlay?.addEventListener('click', closeSidebar);
+
+        // Touch swipe for sidebar
+        let touchStartX = 0, touchStartY = 0;
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+        document.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+            if (Math.abs(dx) < 50 || dy > 30) return;
+            if (dx > 0 && touchStartX < 40) openSidebar();
+            if (dx < 0 && sidebar.classList.contains('sidebar-open')) closeSidebar();
+        });
+
         // Deselect / defocus editor when clicking anywhere outside a CM editor —
         // this covers both the gap between blocks/sidebar AND the block's own padding area.
         // #main is stable and never re-rendered, so this listener is attached once.

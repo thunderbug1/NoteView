@@ -256,3 +256,12 @@
 .content-modal .delete-btn {
     opacity: 0.6;
 }
+
+@media (max-width: 768px) {
+    .tag-modal.content-modal {
+        width: 95vw;
+        max-width: 800px;
+        height: auto;
+        max-height: 90vh;
+    }
+}

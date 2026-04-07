@@ -76,3 +76,9 @@
     color: var(--text-primary);
     word-break: break-word;
 }
+
+@media (max-width: 768px) {
+    .kanban-column {
+        flex: 0 0 250px;
+    }
+}
