@@ -142,15 +142,45 @@ const SelectionManager = {
      */
     getAllContextTags() {
         const tags = new Set();
-        document.querySelectorAll('#contextTags .tag-radio-option').forEach(opt => {
-            if (opt.dataset.tag && !['allTodos', 'openTodos', 'blockedTodos', 'unblockedTodos', 'untagged'].includes(opt.dataset.tag)) {
-                tags.add(opt.dataset.tag);
-            }
-        });
         Store.blocks.forEach(b => {
             (b.tags || []).forEach(t => tags.add(t));
         });
         return Array.from(tags).sort();
+    },
+
+    /**
+     * Render the vault-derived context tags in the sidebar
+     */
+    renderContextSidebar() {
+        const container = document.getElementById('contextTags');
+        if (!container) return;
+
+        const allTags = this.getAllContextTags();
+
+        if (allTags.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:4px 8px;">No tags found in this vault</div>';
+            return;
+        }
+
+        container.innerHTML = allTags.map(tag => {
+            const isSelected = this.selections.context.has(tag);
+            const selClass = isSelected ? 'selected' : '';
+
+            return `
+                <div class="tag-radio-option ${selClass}" data-group="context" data-tag="${tag}">
+                    <span class="tag-badge">${this.getTagDisplayName(tag)}</span>
+                </div>
+            `;
+        }).join('');
+
+        container.querySelectorAll('.tag-radio-option').forEach(option => {
+            option.addEventListener('click', () => {
+                const tag = option.dataset.tag;
+                const wasSelected = option.classList.contains('selected');
+                this.toggleContextTag(tag, wasSelected);
+                App.render();
+            });
+        });
     },
 
     /**
@@ -228,6 +258,8 @@ const SelectionManager = {
                 if (bDate.getFullYear() === now.getFullYear() && bDate.getMonth() === now.getMonth()) hasThisMonth = true;
             }
         });
+
+        this.renderContextSidebar();
 
         // Optimized update: only modify opacity, don't re-render entire DOM
         document.querySelectorAll('.tag-radio-option').forEach(option => {
@@ -318,67 +350,6 @@ const SelectionManager = {
                 App.render();
             });
         });
-    },
-
-    /**
-     * Add a new context tag to the UI
-     * @param {string} tag - Tag to add
-     */
-    addContextTagToUI(tag) {
-        if (['alltodos', 'opentodos', 'blockedtodos', 'unblockedtodos', 'untagged'].includes(tag.toLowerCase())) return;
-
-        const exists = Array.from(document.querySelectorAll('#contextTags .tag-radio-option'))
-            .some(opt => opt.dataset.tag === tag);
-
-        if (!exists) {
-            const container = document.getElementById('contextTags');
-            if (!container) return;
-            const newOption = document.createElement('div');
-            newOption.className = 'tag-radio-option';
-            newOption.dataset.group = 'context';
-            newOption.dataset.tag = tag;
-            newOption.innerHTML = `<span class="tag-badge">${this.getTagDisplayName(tag)} <button class="delete-tag-btn" title="Delete tag">&times;</button></span>`;
-
-            newOption.addEventListener('click', (e) => {
-                if (e.target.closest('.delete-tag-btn') || newOption.classList.contains('add-new-context-tag')) return;
-                const wasSelected = newOption.classList.contains('selected');
-                this.toggleContextTag(tag, wasSelected);
-                App.render();
-            });
-
-            container.appendChild(newOption);
-        }
-    },
-
-    /**
-     * Prompt user and remove a tag from all blocks
-     * @param {string} tag - Tag to remove
-     */
-    async promptAndRemoveTag(tag) {
-        const input = prompt(`To absolutely delete the tag '${tag}' and remove it from ALL notes, type the exact tag name below:`);
-        if (input !== tag) {
-            if (input !== null) alert("Tag name didn't match. Aborting delete.");
-            return;
-        }
-
-        let updatedCount = 0;
-        for (const block of Store.blocks) {
-            if (block.tags && block.tags.includes(tag)) {
-                block.tags = block.tags.filter(t => t !== tag);
-                updatedCount++;
-                await Store.saveBlock(block);
-            }
-        }
-
-        if (this.selections.context.has(tag)) {
-            this.selections.context.delete(tag);
-        }
-
-        const options = document.querySelectorAll(`#contextTags .tag-radio-option[data-tag="${tag}"]`);
-        options.forEach(opt => opt.remove());
-
-        alert(`Tag '${tag}' removed from ${updatedCount} note(s).`);
-        await App.render();
     }
 };
 

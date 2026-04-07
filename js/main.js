@@ -263,37 +263,6 @@ const App = {
             });
         });
 
-        // Edit context tags
-        const contextGroup = document.getElementById('contextTagGroup');
-        if (contextGroup) {
-            contextGroup.addEventListener('click', async (e) => {
-                if (e.target.closest('#editContextTagsBtn')) {
-                    contextGroup.classList.toggle('editing-tags');
-                    const isEditing = contextGroup.classList.contains('editing-tags');
-                    const addBtn = contextGroup.querySelector('.add-new-context-tag');
-                    if (addBtn) addBtn.style.display = isEditing ? 'block' : 'none';
-                    return;
-                }
-                
-                const deleteBtn = e.target.closest('.delete-tag-btn');
-                if (deleteBtn) {
-                    const option = deleteBtn.closest('.tag-radio-option');
-                    const tag = option.dataset.tag;
-                    SelectionManager.promptAndRemoveTag(tag);
-                    return;
-                }
-                
-                if (e.target.closest('.add-new-context-tag')) {
-                    const name = prompt('Enter name for new tag:');
-                    if (name) {
-                        const cleanName = name.trim().toLowerCase();
-                        if (cleanName) SelectionManager.addContextTagToUI(cleanName);
-                    }
-                    return;
-                }
-            });
-        }
-
         // FAB listener
         const fab = document.getElementById('fabNewNote');
         if (fab) {
@@ -630,13 +599,6 @@ const App = {
                 // Only save if tags actually changed
                 if (JSON.stringify(newTags) !== JSON.stringify([...initialTags].sort())) {
                     await this.updateBlockProperty(blockId, 'tags', newTags);
-
-                    // Add any new tags to the context UI
-                    for (const tag of newTags) {
-                        if (!allTags.includes(tag)) {
-                            SelectionManager.addContextTagToUI(tag);
-                        }
-                    }
                 }
             }
             modal.close();
