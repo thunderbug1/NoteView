@@ -458,22 +458,26 @@ const Store = {
     },
 
     // Create new block
-    async createBlock(content = '') {
+    async createBlock(content = '', extraMetadata = {}) {
         const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}`;
         const block = {
             id,
             content,
-            tags: SelectionManager.getActiveTags(),
-            creationDate: new Date().toISOString(),
-            lastUpdated: new Date().toISOString()
+            tags: extraMetadata.tags || SelectionManager.getActiveTags(),
+            creationDate: extraMetadata.creationDate || new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            ...extraMetadata
         };
+        // Ensure id, content, tags, creationDate, lastUpdated are not overridden badly
+        block.id = id;
+        block.content = content;
         // Initial create always commits? Or only on blur?
         // Let's stick to commit: true for creation to ensure it exists in git history.
-        await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}` });
+        await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: extraMetadata.skipUndo });
         this.blocks.push(block);
 
         // Record command AFTER creation
-        if (!UndoRedoManager.isExecuting) {
+        if (!UndoRedoManager.isExecuting && !extraMetadata.skipUndo) {
             await UndoRedoManager.executeCommand({
                 type: 'create',
                 blockId: block.id,
@@ -576,11 +580,11 @@ const Store = {
     // Override saveBlock to invalidate cache
     // Save block to disk and optionally commit to git
     async saveBlock(block, options = {}) {
-        const { commit = false, commitMessage = null, ...updates } = options;
+        const { commit = false, commitMessage = null, skipUndo = false, ...updates } = options;
 
         // Capture state before save for undo/redo
         const existingBlock = this.blocks.find(b => b.id === block.id);
-        const isUpdate = !!existingBlock && !UndoRedoManager.isExecuting;
+        const isUpdate = !!existingBlock && !UndoRedoManager.isExecuting && !skipUndo;
         
         // Take a deep copy of the block BEFORE applying updates
         const beforeState = isUpdate ? JSON.parse(JSON.stringify(existingBlock)) : null;
