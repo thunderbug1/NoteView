@@ -41,7 +41,7 @@ const DocumentView = {
         container.innerHTML = sorted.map(block => `
             <article class="block" data-id="${block.id}">
                 <div class="block-split-marker" data-id="${block.id}" title="Split note here">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="M10 8l4 4-4 4"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
                 </div>
                 ${this.renderBlockMetadata(block)}
                 <div class="block-editor">
@@ -52,7 +52,7 @@ const DocumentView = {
         `).join('') + `
             <article class="block empty" data-id="new">
                 <div class="block-split-marker" data-id="new" title="Split note here">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="M10 8l4 4-4 4"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
                 </div>
                 <div class="block-tags">
                     ${this.getSelectedContextBadge()}
@@ -644,18 +644,44 @@ const DocumentView = {
                         const marker = document.querySelector(`.block-split-marker[data-id="${blockId}"]`);
                         if (marker) {
                             if (update.view.hasFocus) {
-                                const head = update.state.selection.main.head;
-                                const lineBlock = update.view.lineBlockAt(head);
+                                const sel = update.state.selection.main;
+                                const isExtract = !sel.empty && sel.from !== sel.to;
+                                
+                                const startBlock = update.view.lineBlockAt(sel.from);
+                                const endBlock = update.view.lineBlockAt(sel.to);
+                                
                                 const scroller = update.view.scrollDOM;
                                 const blockEl = container.closest('.block');
+                                
                                 if (blockEl) {
                                     const contentTop = scroller.getBoundingClientRect().top;
                                     const blockRectTop = blockEl.getBoundingClientRect().top;
-                                    const relativeTop = contentTop - blockRectTop + lineBlock.top - scroller.scrollTop;
-                                    const iconTop = relativeTop + (lineBlock.height / 2) - 10;
+                                    
+                                    const relativeTopStart = contentTop - blockRectTop + startBlock.top - scroller.scrollTop;
+                                    const iconTopStart = relativeTopStart + (startBlock.height / 2) - 9;
                                     
                                     marker.style.display = 'flex';
-                                    marker.style.top = `${iconTop}px`;
+                                    marker.style.top = `${iconTopStart}px`;
+                                    
+                                    const scissorSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>';
+                                    
+                                    if (isExtract) {
+                                        const relativeTopEnd = contentTop - blockRectTop + endBlock.top - scroller.scrollTop;
+                                        const iconTopEnd = relativeTopEnd + (endBlock.height / 2) - 9;
+                                        const h = Math.max(18, iconTopEnd - iconTopStart + 18);
+                                        
+                                        marker.style.height = `${h}px`;
+                                        marker.style.flexDirection = 'column';
+                                        marker.style.justifyContent = 'space-between';
+                                        marker.innerHTML = scissorSvg + scissorSvg;
+                                        marker.title = "Extract block";
+                                    } else {
+                                        marker.style.height = '18px';
+                                        marker.style.flexDirection = 'row';
+                                        marker.style.justifyContent = 'center';
+                                        marker.innerHTML = scissorSvg;
+                                        marker.title = "Split note here";
+                                    }
                                 }
                             } else {
                                 marker.style.display = 'none';
