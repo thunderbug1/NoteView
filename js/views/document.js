@@ -40,6 +40,9 @@ const DocumentView = {
         // Build HTML for blocks - use div containers for CodeMirror
         container.innerHTML = sorted.map(block => `
             <article class="block" data-id="${block.id}">
+                <div class="block-split-marker" data-id="${block.id}" title="Split note here">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="M10 8l4 4-4 4"/></svg>
+                </div>
                 ${this.renderBlockMetadata(block)}
                 <div class="block-editor">
                     <div class="codemirror-container" data-id="${block.id}">${escapeHtml(block.content || '')}</div>
@@ -48,6 +51,9 @@ const DocumentView = {
             </article>
         `).join('') + `
             <article class="block empty" data-id="new">
+                <div class="block-split-marker" data-id="new" title="Split note here">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16"/><path d="M10 8l4 4-4 4"/></svg>
+                </div>
                 <div class="block-tags">
                     ${this.getSelectedContextBadge()}
                 </div>
@@ -65,7 +71,29 @@ const DocumentView = {
         this._deleteHandler = this.handleDeleteClick.bind(this);
         container.addEventListener('click', this._deleteHandler);
 
+        // Add event delegation for split marker click
+        if (this._splitHandler) {
+            container.removeEventListener('mousedown', this._splitHandler);
+        }
+        this._splitHandler = this.handleSplitMarkerClick.bind(this);
+        container.addEventListener('mousedown', this._splitHandler);
+
         this.attachEventListeners();
+    },
+
+    handleSplitMarkerClick(e) {
+        const marker = e.target.closest('.block-split-marker');
+        if (!marker) return;
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const blockId = marker.dataset.id;
+        const view = this.editors.get(blockId);
+        if (!view) return;
+
+        const head = view.state.selection.main.head;
+        const line = view.state.doc.lineAt(head);
+        this.handleSplitNote(view, line.from, line.to);
     },
 
     waitForCodeMirror() {
@@ -200,6 +228,127 @@ const DocumentView = {
         if (blockId && blockId !== 'new') {
             App.deleteBlock(blockId);
         }
+    },
+
+    async handleSplitNote(view, from, to) {
+        // Find the block ID of the current editor
+        let editorContainer = view.dom.closest('.codemirror-container');
+        if (!editorContainer) return;
+        const blockId = editorContainer.dataset.id;
+        let originalBlock = Store.blocks.find(b => b.id === blockId);
+        if (!originalBlock && blockId !== 'new') return;
+
+        const doc = view.state.doc;
+        const selection = view.state.selection.main;
+        
+        let extractedContent = '';
+        let newOriginalContent = '';
+
+        if (!selection.empty && selection.from !== selection.to) {
+            // Cut specific selected selection lines
+            const startLine = view.state.doc.lineAt(selection.from);
+            const endLine = view.state.doc.lineAt(selection.to);
+            
+            extractedContent = view.state.sliceDoc(startLine.from, endLine.to);
+            
+            // Reattach surrounding doc, being careful around newlines so we don't leave blank lines
+            const before = view.state.sliceDoc(0, startLine.from);
+            const after = view.state.sliceDoc(endLine.to);
+            
+            // Eat the newline if possible
+            if (before.endsWith('\n') && after.startsWith('\n')) {
+                newOriginalContent = before + after.substring(1);
+            } else {
+                newOriginalContent = before + after;
+            }
+            
+        } else {
+            // Split from the specified clicked line downwards
+            newOriginalContent = view.state.sliceDoc(0, from);
+            extractedContent = view.state.sliceDoc(from);
+        }
+
+        // Clean up text
+        newOriginalContent = newOriginalContent.trimEnd() + '\n';
+        extractedContent = extractedContent.trim();
+        if (!extractedContent) return; // Nothing to split
+
+        // Update the original block first
+        view.dispatch({
+            changes: { from: 0, to: view.state.doc.length, insert: newOriginalContent }
+        });
+        
+        let beforeState = null;
+        if (originalBlock && !UndoRedoManager.isExecuting) {
+            beforeState = JSON.parse(JSON.stringify(originalBlock));
+        }
+
+        if (blockId !== 'new') {
+            this.handleContentChange(blockId, newOriginalContent);
+            clearTimeout(this.saveTimeouts.get(blockId));
+            App.saveBlockContent(blockId, newOriginalContent, { commit: true, skipUndo: true });
+            this.originalContents.set(blockId, newOriginalContent);
+        } else {
+            this.handleContentChange('new', newOriginalContent);
+        }
+
+        // Create new block
+        const newBlockParams = {
+            content: extractedContent,
+            skipUndo: true
+        };
+        // Inherit creationDate and tags if present
+        if (originalBlock) {
+            newBlockParams.creationDate = originalBlock.creationDate;
+            newBlockParams.tags = originalBlock.tags ? [...originalBlock.tags] : [];
+        }
+
+        const newBlock = await Store.createBlock(newBlockParams.content, newBlockParams);
+        
+        // Add manual undo/redo tracking chunk
+        if (beforeState && !UndoRedoManager.isExecuting) {
+            const diff = UndoRedoManager.createDiff(beforeState, Store.blocks.find(b => b.id === blockId));
+            await UndoRedoManager.executeCommand({
+                type: 'batch',
+                description: 'Split Note',
+                commands: [
+                    { type: 'update', blockId: blockId, before: diff.before, after: diff.after },
+                    { type: 'create', blockId: newBlock.id, blockData: { ...newBlock } }
+                ]
+            });
+        }
+        
+        // Save scroll position relative to the block
+        let scrollOffset = 0;
+        const blockElement = document.querySelector(`.block[data-id="${blockId}"]`);
+        if (blockElement) {
+            scrollOffset = blockElement.getBoundingClientRect().top;
+        }
+        
+        // Save the cursor position where the split happened
+        const cursorRestorePos = from;
+
+        // Re-render blocks so the newly generated note spawns in the DOM
+        App.render();
+
+        // Restore scroll position and cursor AFTER CodeMirror finishes rebuilding (since render uses setTimeout)
+        setTimeout(() => {
+            if (blockId !== 'new') {
+                const newBlockElement = document.querySelector(`.block[data-id="${blockId}"]`);
+                if (newBlockElement) {
+                    const newOffset = newBlockElement.getBoundingClientRect().top;
+                    window.scrollBy(0, newOffset - scrollOffset);
+                }
+                
+                // Re-focus original editor and restore the cursor near where it was split
+                const newView = this.editors.get(blockId);
+                if (newView) {
+                    newView.focus();
+                    const safePos = Math.min(cursorRestorePos, newView.state.doc.length);
+                    newView.dispatch({ selection: { anchor: safePos, head: safePos } });
+                }
+            }
+        }, 15);
     },
 
     showTaskMenu(x, y, view, from, to, currentState) {
@@ -487,10 +636,33 @@ const DocumentView = {
                     },
                     ".cm-line:hover .md-add-deadline, .cm-line:hover .md-add-action": {
                         display: 'inline-flex'
-                    }
+                    },
                 }),
-                // Listen for content changes
+                // Listen for content changes and cursor movements
                 EditorView.updateListener.of((update) => {
+                    if (update.selectionSet || update.focusChanged || update.docChanged || update.geometryChanged) {
+                        const marker = document.querySelector(`.block-split-marker[data-id="${blockId}"]`);
+                        if (marker) {
+                            if (update.view.hasFocus) {
+                                const head = update.state.selection.main.head;
+                                const lineBlock = update.view.lineBlockAt(head);
+                                const scroller = update.view.scrollDOM;
+                                const blockEl = container.closest('.block');
+                                if (blockEl) {
+                                    const contentTop = scroller.getBoundingClientRect().top;
+                                    const blockRectTop = blockEl.getBoundingClientRect().top;
+                                    const relativeTop = contentTop - blockRectTop + lineBlock.top - scroller.scrollTop;
+                                    const iconTop = relativeTop + (lineBlock.height / 2) - 10;
+                                    
+                                    marker.style.display = 'flex';
+                                    marker.style.top = `${iconTop}px`;
+                                }
+                            } else {
+                                marker.style.display = 'none';
+                            }
+                        }
+                    }
+
                     if (update.docChanged) {
                         const content = update.state.doc.toString();
                         if (content !== '' && !content.endsWith('\n')) {
@@ -629,7 +801,7 @@ const DocumentView = {
             }
         }
 
-        // 2. Inline Fields (e.g. [due:: 2026-03-25], [dependsOn:: ^id])
+        // 3. Inline Fields (e.g. [due:: 2026-03-25], [dependsOn:: ^id])
         const inlineFieldRegex = /\[(due|dependsOn|assignee|priority)::\s*([^\]]+)\]/g;
         let fieldMatch;
         while ((fieldMatch = inlineFieldRegex.exec(text)) !== null) {

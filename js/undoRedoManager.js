@@ -91,6 +91,9 @@ const UndoRedoManager = {
                 case 'delete':
                     await this.undoDelete(command);
                     break;
+                case 'batch':
+                    await this.undoBatch(command);
+                    break;
             }
 
             // Push to redo stack
@@ -129,6 +132,9 @@ const UndoRedoManager = {
                     break;
                 case 'delete':
                     await this.redoDelete(command);
+                    break;
+                case 'batch':
+                    await this.redoBatch(command);
                     break;
             }
 
@@ -307,6 +313,79 @@ const UndoRedoManager = {
     },
 
     /**
+     * Undo a batch of commands
+     */
+    async undoBatch(command) {
+        for (let i = command.commands.length - 1; i >= 0; i--) {
+            const sub = command.commands[i];
+            switch (sub.type) {
+                case 'create': await this.undoCreate(sub); break;
+                case 'update': await this.undoUpdate(sub); break;
+                case 'delete': await this.undoDelete(sub); break;
+            }
+        }
+    },
+
+    /**
+     * Redo a batch of commands
+     */
+    async redoBatch(command) {
+        for (let i = 0; i < command.commands.length; i++) {
+            const sub = command.commands[i];
+            switch (sub.type) {
+                case 'create': await this.redoCreate(sub); break;
+                case 'update': await this.redoUpdate(sub); break;
+                case 'delete': await this.redoDelete(sub); break;
+            }
+        }
+    },
+    async undoDelete(command) {
+        const block = command.blockData;
+        if (block) {
+            // Create file
+            await Store.saveBlock(block, { commit: false });
+
+            // Add back to Store.blocks at the correct position (sorted by id)
+            const insertIndex = Store.blocks.findIndex(b => b.id > block.id);
+            if (insertIndex === -1) {
+                Store.blocks.push(block);
+            } else {
+                Store.blocks.splice(insertIndex, 0, block);
+            }
+
+            // Update contacts and cache
+            Store.extractContacts();
+            Store._filteredBlocksCache.invalidate();
+            SelectionManager.updateTagCounts();
+        }
+    },
+
+    /**
+     * Redo a delete command - removes the block again
+     */
+    async redoDelete(command) {
+        const block = Store.blocks.find(b => b.id === command.blockId);
+        if (block) {
+            // Remove from Store.blocks
+            const index = Store.blocks.findIndex(b => b.id === command.blockId);
+            Store.blocks.splice(index, 1);
+
+            // Delete file
+            const fileName = block.filename || `${block.id}.md`;
+            try {
+                await Store.directoryHandle.removeEntry(fileName);
+            } catch (e) {
+                console.error('Failed to delete file during redo delete:', e);
+            }
+
+            // Update contacts and cache
+            Store.extractContacts();
+            Store._filteredBlocksCache.invalidate();
+            SelectionManager.updateTagCounts();
+        }
+    },
+
+    /**
      * Create a diff between two block states (for update commands)
      * Only stores fields that actually changed
      */
@@ -410,6 +489,10 @@ const UndoRedoManager = {
      * Get human-readable description of a command
      */
     getCommandDescription(command) {
+        if (command.type === 'batch') {
+            return command.description || 'Batch operation';
+        }
+
         const block = Store.blocks.find(b => b.id === command.blockId);
         const blockTitle = block && block.content
             ? block.content.split('\n')[0].substring(0, 30)

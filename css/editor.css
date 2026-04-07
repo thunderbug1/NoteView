@@ -30,6 +30,23 @@
     border-top: 1px solid var(--border);
 }
 
+.block-split-marker {
+    display: none;
+    position: absolute;
+    left: -28px;
+    width: 20px;
+    cursor: pointer;
+    color: var(--text-muted, #94a3b8);
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    z-index: 10;
+}
+
+.block-split-marker:hover {
+    color: var(--accent, #3b82f6);
+}
+
 /* Save indicator */
 .save-indicator {
     position: absolute;
@@ -55,7 +72,7 @@
 .codemirror-container {
     width: 100%;
     min-height: 0;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 1rem 0.5rem 1.5rem;
     background: transparent;
     border-radius: var(--radius-md);
 }
