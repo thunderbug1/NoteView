@@ -682,17 +682,7 @@ const Store = {
 
             // Contact filter
             if (contactSelection) {
-                const searchContactLower = contactSelection.toLowerCase();
-                
-                // Check if mentioned
-                const mentionRegex = new RegExp(`(?:^|\\s)@${searchContactLower}(?!\\S)`, 'i');
-                const hasMention = mentionRegex.test(block.content || '');
-                
-                // Check if assigned
-                const assigneeRegex = new RegExp(`\\[assignee::\\s*@?${searchContactLower}\\]`, 'i');
-                const hasAssignment = assigneeRegex.test(block.content || '');
-                
-                if (!hasMention && !hasAssignment) {
+                if (!ContactHelper.hasContact(block.content || '', contactSelection)) {
                     return false;
                 }
             }

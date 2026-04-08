@@ -61,7 +61,9 @@ Find what you need fast with multi-layered filtering:
 - **Tags** — Organize notes with frontmatter tags, click to filter
 - **Computed tags** — Smart collections like `allTodos`, `openTodos`, `blockedTodos`, `unblockedTodos`, `unassigned`
 - **Time filters** — Show notes from today, this week, or this month
-- **Contacts** — Filter by @mentions and assignees
+- **People** — Filter by @mentions in notes or tasks, plus task assignees
+
+For example, you can write `I need to talk about this with @alice` inside a note or task without assigning Alice, and the People filter will still find it. When you type `@` in the editor, NoteView suggests known people automatically.
 - **Search** — Real-time full-text search across all notes
 
 ### No Lock-In

@@ -395,13 +395,71 @@ const DocumentView = {
         return idStr;
     },
 
+    getMentionSuggestions(blockId) {
+        const allContacts = Array.from(Store.contacts.keys());
+        if (allContacts.length === 0) return [];
+
+        const block = Store.blocks.find(b => b.id === blockId);
+        const referenceContext = new Set();
+
+        if (block?.tags?.length) {
+            block.tags.forEach(tag => referenceContext.add(tag));
+        } else {
+            SelectionManager.getActiveTags().forEach(tag => referenceContext.add(tag));
+        }
+
+        return allContacts.sort((a, b) => {
+            const aTags = Store.contacts.get(a) || new Set();
+            const bTags = Store.contacts.get(b) || new Set();
+            const aMatchCount = Array.from(referenceContext).filter(tag => aTags.has(tag)).length;
+            const bMatchCount = Array.from(referenceContext).filter(tag => bTags.has(tag)).length;
+
+            if (aMatchCount !== bMatchCount) return bMatchCount - aMatchCount;
+            return a.localeCompare(b);
+        });
+    },
+
+    createMentionCompletionSource(container) {
+        return (context) => {
+            const word = context.matchBefore(/@[a-zA-Z0-9_]*/);
+            if (!word) return null;
+
+            const beforeChar = word.from > 0
+                ? context.state.sliceDoc(word.from - 1, word.from)
+                : '';
+            const atBoundary = word.from === 0 || /\s|\(|\[|\{|"|'/.test(beforeChar);
+            if (!atBoundary) return null;
+
+            if (word.from === word.to && !context.explicit) return null;
+
+            const typedQuery = word.text.slice(1).toLowerCase();
+            const suggestions = this.getMentionSuggestions(container.dataset.id)
+                .filter(contact => contact.toLowerCase().includes(typedQuery))
+                .map(contact => ({
+                    label: `@${contact}`,
+                    type: 'variable',
+                    apply: `@${contact}`
+                }));
+
+            if (suggestions.length === 0) {
+                return null;
+            }
+
+            return {
+                from: word.from,
+                options: suggestions,
+                validFor: /^@[a-zA-Z0-9_]*$/
+            };
+        };
+    },
+
     createEditor(container, blockId, initialContent) {
         if (!window.CodeMirror) {
             console.error('CodeMirror not loaded');
             return;
         }
 
-        const { EditorView, basicSetup, markdown, languages, Decoration, ViewPlugin, StateField, WidgetType, keymap, Prec, indentWithTab, placeholder } = window.CodeMirror;
+        const { EditorView, EditorState, basicSetup, markdown, languages, Decoration, ViewPlugin, StateField, WidgetType, keymap, Prec, indentWithTab, placeholder } = window.CodeMirror;
 
         // We no longer use simple Widget replacement for everything.
         // We will use Decoration.mark to style, and Decoration.replace to hide syntax.
@@ -411,6 +469,7 @@ const DocumentView = {
         const handleContentChange = (content) => self.handleContentChange(container.dataset.id, content);
         const createNewBlock = () => self.createNewBlock();
         const newBlockContentGetter = () => self.newBlockContent;
+        const mentionCompletionSource = this.createMentionCompletionSource(container);
 
         // Function to create decorations from document state
         function createDecorations(state, hasFocus) {
@@ -455,6 +514,7 @@ const DocumentView = {
                 basicSetup,
                 markdown({ codeLanguages: languages }),
                 keymap.of([indentWithTab]),
+                EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }]),
                 EditorView.lineWrapping,
                 livePreviewPlugin,
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),
@@ -473,6 +533,28 @@ const DocumentView = {
                     },
                     ".cm-focused": {
                         outline: 'none'
+                    },
+                    ".cm-tooltip.cm-tooltip-autocomplete": {
+                        border: '1px solid var(--border-color, #e2e8f0)',
+                        backgroundColor: 'var(--bg-primary, #ffffff)',
+                        borderRadius: '10px',
+                        boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
+                        overflow: 'hidden'
+                    },
+                    ".cm-tooltip-autocomplete ul": {
+                        fontFamily: 'inherit',
+                        padding: '4px'
+                    },
+                    ".cm-tooltip-autocomplete li": {
+                        borderRadius: '8px',
+                        padding: '6px 10px'
+                    },
+                    ".cm-tooltip-autocomplete li[aria-selected]": {
+                        backgroundColor: 'var(--bg-hover, #f1f5f9)',
+                        color: 'var(--text-primary, #0f172a)'
+                    },
+                    ".cm-completionLabel": {
+                        color: 'var(--text-primary, #0f172a)'
                     },
                     ".cm-foldGutter": {
                         width: '15px'

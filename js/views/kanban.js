@@ -45,12 +45,16 @@ const KanbanView = {
     extractTasks(blocks) {
         const tasks = TaskParser.parseTasksFromBlocks(blocks);
         const contextSelection = SelectionManager.selections?.context;
+        const contactSelection = SelectionManager.selections?.contact;
 
-        if (!contextSelection || contextSelection.size === 0) {
+        if ((!contextSelection || contextSelection.size === 0) && !contactSelection) {
             return tasks;
         }
 
         return tasks.filter(task => {
+            if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
+                return false;
+            }
             if (contextSelection.has('openTodos') && !TaskParser.isOpenTask(task)) {
                 return false;
             }

@@ -147,6 +147,7 @@ const TimelineView = {
                     events.push({
                         type: 'removed',
                         taskText: prevTask.text,
+                        badges: prevTask.badges || [],
                         oldState: prevTask.state,
                         newState: null,
                         timestamp: commit.timestamp,
@@ -241,9 +242,7 @@ const TimelineView = {
             
             // Contact filter
             if (contactSelection) {
-                const block = Store.blocks.find(b => b.id === event.blockId);
-                if (!block) return false;
-                if (!ContactHelper.hasContact(block.content, contactSelection)) return false;
+                if (!ContactHelper.hasEventContact(event, contactSelection)) return false;
             }
             
             // Search filter
