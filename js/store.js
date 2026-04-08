@@ -50,6 +50,7 @@ const Store = {
     DB_VERSION: 2,
     STORE_NAME: 'handles',
     VIEW_PREFERENCES_STORAGE_KEY: 'noteview-view-preferences',
+    CURRENT_VIEW_STORAGE_KEY: 'noteview-current-view',
 
     // Check browser support
     isSupported() {
@@ -362,6 +363,7 @@ const Store = {
 
         await this.initDB();
         this.loadViewPreferences();
+        this.loadCurrentView();
 
         // Load shortcuts
         const savedShortcuts = await this.getShortcuts();
@@ -402,6 +404,51 @@ const Store = {
 
         // No saved handle or permission denied — caller must show picker via user gesture
         return false;
+    },
+
+    loadCurrentView() {
+        try {
+            const savedView = localStorage.getItem(this.CURRENT_VIEW_STORAGE_KEY);
+            const allowedViews = new Set(['document', 'timeline', 'kanban', 'settings']);
+
+            this.currentView = allowedViews.has(savedView) ? savedView : 'document';
+            console.log('[Store] loadCurrentView', {
+                savedView,
+                resolvedView: this.currentView
+            });
+        } catch (error) {
+            console.warn('Could not load current view:', error);
+            this.currentView = 'document';
+        }
+
+        return this.currentView;
+    },
+
+    saveCurrentView() {
+        try {
+            localStorage.setItem(this.CURRENT_VIEW_STORAGE_KEY, this.currentView);
+            console.log('[Store] saveCurrentView', {
+                currentView: this.currentView
+            });
+        } catch (error) {
+            console.warn('Could not save current view:', error);
+        }
+
+        return this.currentView;
+    },
+
+    setCurrentView(view) {
+        const allowedViews = new Set(['document', 'timeline', 'kanban', 'settings']);
+        console.log('[Store] setCurrentView:before', {
+            requestedView: view,
+            currentView: this.currentView
+        });
+        this.currentView = allowedViews.has(view) ? view : 'document';
+        this.saveCurrentView();
+        console.log('[Store] setCurrentView:after', {
+            currentView: this.currentView
+        });
+        return this.currentView;
     },
 
     async openDirectory(handle) {

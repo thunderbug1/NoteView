@@ -125,16 +125,31 @@ const App = {
     },
 
     async completeInitialization() {
+        console.log('[App] completeInitialization:start', {
+            isInitialized: this.isInitialized,
+            currentView: Store.currentView,
+            blockCount: Store.blocks.length
+        });
         if (this.isInitialized) {
+            SelectionManager.init();
             SelectionManager.updateTagCounts();
             this.render();
+            console.log('[App] completeInitialization:reenter', {
+                currentView: Store.currentView,
+                context: Array.from(SelectionManager.selections.context)
+            });
             return;
         }
         this.isInitialized = true;
         await GitRemote.init();
         this.setupEventListeners();
+        SelectionManager.init();
         SelectionManager.updateTagCounts();
         this.render();
+        console.log('[App] completeInitialization:done', {
+            currentView: Store.currentView,
+            context: Array.from(SelectionManager.selections.context)
+        });
     },
 
     showError(message) {
@@ -246,11 +261,11 @@ const App = {
                     // Time tags: mutually exclusive (radio behavior)
                     if (wasSelected && tag !== '') {
                         // Click selected tag to deselect
-                        SelectionManager.selections.time = '';
+                        SelectionManager.setTimeSelection('');
                         option.classList.remove('selected');
                     } else {
                         // Select this tag, deselect others
-                        SelectionManager.selections.time = tag;
+                        SelectionManager.setTimeSelection(tag);
                         document.querySelectorAll(`.tag-radio-option[data-group="time"]`).forEach(opt => {
                             opt.classList.remove('selected');
                         });
@@ -259,10 +274,10 @@ const App = {
                 } else if (group === 'contact') {
                     // Contact tags: single select (radio behavior) like time, but can be cleared
                     if (wasSelected) {
-                        SelectionManager.selections.contact = '';
+                        SelectionManager.setContactSelection('');
                         option.classList.remove('selected');
                     } else {
-                        SelectionManager.selections.contact = tag;
+                        SelectionManager.setContactSelection(tag);
                         document.querySelectorAll(`.tag-radio-option[data-group="contact"]`).forEach(opt => {
                             opt.classList.remove('selected');
                         });
@@ -270,19 +285,7 @@ const App = {
                     }
                 } else {
                     // Context tags: multi-select (checkbox behavior)
-                    if (wasSelected) {
-                        SelectionManager.selections.context.delete(tag);
-                    } else {
-                        if (tag === 'untagged') {
-                            // If selecting "untagged", clear all other context tags
-                            SelectionManager.selections.context.clear();
-                        } else {
-                            // If selecting any other tag, remove "untagged"
-                            SelectionManager.selections.context.delete('untagged');
-                        }
-                        SelectionManager.selections.context.add(tag);
-                    }
-                    SelectionManager.updateSelectionUI();
+                    SelectionManager.toggleContextTag(tag, wasSelected);
                 }
 
                 this.render();
@@ -375,7 +378,11 @@ const App = {
     },
 
     setView(view) {
-        Store.currentView = view;
+        console.log('[App] setView', {
+            requestedView: view,
+            previousView: Store.currentView
+        });
+        Store.setCurrentView(view);
 
         // Note: Don't invalidate timeline cache when switching away
         // The timeline cache should persist as long as git history hasn't changed
@@ -386,6 +393,9 @@ const App = {
         SelectionManager.updateSelectionUI();
         SortManager.updateSidebar();
         this.render();
+        console.log('[App] setView:done', {
+            currentView: Store.currentView
+        });
     },
 
     render() {
