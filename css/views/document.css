@@ -135,6 +135,45 @@
     max-height: 85vh;
 }
 
+.tag-modal.large-paste-modal {
+    width: 620px;
+    max-width: calc(100vw - 2rem);
+}
+
+.large-paste-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.large-paste-summary p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.large-paste-preview {
+    margin: 0;
+    max-height: 180px;
+    overflow: auto;
+    padding: 0.9rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+}
+
+.large-paste-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
 .content-modal .tag-modal-body {
     flex: 1;
     min-height: 0;
@@ -194,6 +233,145 @@
 
 .content-modal .cm-editor {
     height: 100%;
+}
+
+.content-modal.fenced-block-modal {
+    width: min(960px, calc(100vw - 2rem));
+    height: min(720px, calc(100vh - 2rem));
+}
+
+.fenced-block-modal .tag-modal-body {
+    padding: 1.25rem 1.5rem 1.5rem;
+    gap: 1rem;
+}
+
+.fenced-block-modal-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.fenced-block-modal-content {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    overflow: auto;
+    padding: 1rem 1.1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.md-fenced-block-source {
+    display: inline-block;
+    width: 100%;
+    margin: 0.2rem 0;
+    padding: 0.2rem 0.35rem;
+    border-left: 2px solid var(--border);
+    background: color-mix(in srgb, var(--bg-secondary) 84%, transparent);
+}
+
+.cm-line.md-fenced-block-hidden-line {
+    display: none;
+}
+
+.cm-line.md-fenced-block-summary-line {
+    padding: 0;
+}
+
+.md-fenced-block-preview {
+    display: block;
+    width: 100%;
+    margin: 0.45rem 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.md-fenced-block-preview.kind-log {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+}
+
+.md-fenced-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg-primary) 60%, var(--bg-secondary));
+}
+
+.md-fenced-block-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.md-fenced-block-kind {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.7rem;
+    padding: 0 0.55rem;
+    border-radius: var(--radius-full);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.md-fenced-block-count {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.md-fenced-block-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.md-fenced-block-btn {
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-radius: var(--radius-full);
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.md-fenced-block-btn.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.md-fenced-block-body {
+    margin: 0;
+    max-height: 180px;
+    overflow: auto;
+    padding: 0.9rem 0.95rem 1rem;
+    color: var(--text-primary);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 88%, transparent), var(--bg-primary));
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
 }
 
 /* History Button */

@@ -11,10 +11,16 @@ const DocumentView = {
     pendingNewTags: null,
     saveTimeouts: new Map(), // blockId -> timeoutId
     originalContents: new Map(), // blockId -> original content for change detection
+    fencedBlockThresholds: {
+        lines: 12,
+        chars: 800,
+        previewLines: 6
+    },
     // Store widget class for access in closures
     MarkdownWidgetClass: null,
     // Task menus (initialized on first use)
     _taskMenus: null,
+    _cmWidgets: null,
 
     /**
      * Get or initialize task menus
@@ -375,6 +381,198 @@ const DocumentView = {
         return this._cmWidgets;
     },
 
+    shouldPromptForLargePaste(text) {
+        if (!text || typeof text !== 'string') {
+            return false;
+        }
+
+        const normalized = text.replace(/\r\n/g, '\n');
+        const lineCount = normalized.split('\n').length;
+        const trimmed = normalized.trim();
+
+        if (!trimmed || this.isFencedContent(trimmed)) {
+            return false;
+        }
+
+        return lineCount >= this.fencedBlockThresholds.lines || normalized.length >= this.fencedBlockThresholds.chars;
+    },
+
+    isFencedContent(text) {
+        return /^```[^\n`]*\n[\s\S]*\n```$/.test(text.trim());
+    },
+
+    summarizePastedText(text) {
+        const normalized = text.replace(/\r\n/g, '\n');
+        const lines = normalized.split('\n');
+
+        return {
+            chars: normalized.length,
+            lines: lines.length,
+            preview: lines.slice(0, 4).join('\n').trim()
+        };
+    },
+
+    showLargePasteModal(text) {
+        const summary = this.summarizePastedText(text);
+        const preview = summary.preview || '(empty)';
+
+        return new Promise((resolve) => {
+            let resolved = false;
+            const finish = (value) => {
+                if (resolved) return;
+                resolved = true;
+                resolve(value);
+            };
+
+            const modal = Modal.create({
+                title: 'Large Paste Detected',
+                modalClass: 'tag-modal large-paste-modal',
+                content: `
+                    <div class="large-paste-summary">
+                        <p>You pasted ${summary.lines} lines and ${summary.chars} characters. Insert it as a collapsible block?</p>
+                        <pre class="large-paste-preview">${escapeHtml(preview)}</pre>
+                    </div>
+                    <div class="large-paste-actions">
+                        <button class="settings-btn secondary" data-action="normal">Paste Normally</button>
+                        <button class="settings-btn secondary" data-action="log">Paste As Log Block</button>
+                        <button class="settings-btn primary" data-action="code">Paste As Code Block</button>
+                    </div>
+                `,
+                onClose: () => finish(null)
+            });
+
+            modal.querySelectorAll('[data-action]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const action = button.dataset.action;
+                    finish(action);
+                    modal.close();
+                });
+            });
+        });
+    },
+
+    normalizePastedText(text) {
+        return text.replace(/\r\n/g, '\n').replace(/\u0000/g, '');
+    },
+
+    buildFencedPaste(view, text, kind) {
+        const normalized = this.normalizePastedText(text);
+        const selection = view.state.selection.main;
+        const beforeChar = selection.from > 0 ? view.state.sliceDoc(selection.from - 1, selection.from) : '';
+        const afterChar = selection.to < view.state.doc.length ? view.state.sliceDoc(selection.to, selection.to + 1) : '';
+        const prefix = beforeChar && beforeChar !== '\n' ? '\n' : '';
+        const suffix = afterChar && afterChar !== '\n' ? '\n' : '';
+        const infoString = kind === 'log' ? 'log' : 'code';
+        const body = normalized.endsWith('\n') ? normalized : `${normalized}\n`;
+
+        return `${prefix}\`\`\`${infoString}\n${body}\`\`\`${suffix}`;
+    },
+
+    insertTextAtSelection(view, text) {
+        const selection = view.state.selection.main;
+        const anchor = selection.from + text.length;
+        view.dispatch({
+            changes: { from: selection.from, to: selection.to, insert: text },
+            selection: { anchor, head: anchor },
+            scrollIntoView: true
+        });
+        view.focus();
+    },
+
+    async handleLargePaste(view, text) {
+        const action = await this.showLargePasteModal(text);
+        if (!action) {
+            view.focus();
+            return;
+        }
+
+        if (action === 'normal') {
+            this.insertTextAtSelection(view, this.normalizePastedText(text));
+            return;
+        }
+
+        this.insertTextAtSelection(view, this.buildFencedPaste(view, text, action));
+    },
+
+    getFencedBlocks(text) {
+        const fencedBlocks = [];
+        const regex = /(^|\r?\n)```([^\r\n`]*)\r?\n([\s\S]*?)\r?\n```(?=\r?\n|$)/g;
+        let match;
+
+        while ((match = regex.exec(text)) !== null) {
+            const prefixLength = match[1].length;
+            const blockText = match[0].slice(prefixLength);
+            const from = match.index + prefixLength;
+            const to = from + blockText.length;
+            const info = (match[2] || '').trim();
+            const body = (match[3] || '').replace(/\r\n/g, '\n');
+            const lines = body ? body.split('\n') : [];
+            const isLogLike = /^(log|text|console|output|json)$/i.test(info);
+            const isCollapsible = lines.length >= this.fencedBlockThresholds.lines
+                || body.length >= this.fencedBlockThresholds.chars
+                || (isLogLike && lines.length >= 6);
+
+            fencedBlocks.push({
+                from,
+                to,
+                info,
+                body,
+                preview: lines.slice(0, this.fencedBlockThresholds.previewLines).join('\n'),
+                lineCount: lines.length,
+                charCount: body.length,
+                isCollapsible,
+                kind: isLogLike ? 'log' : 'code'
+            });
+        }
+
+        return fencedBlocks;
+    },
+
+    buildFencedBlockLineSet(doc, fencedBlocks) {
+        const blockedLines = new Set();
+
+        for (const block of fencedBlocks) {
+            const startLine = doc.lineAt(block.from).number;
+            const endPosition = Math.max(block.from, block.to - 1);
+            const endLine = doc.lineAt(endPosition).number;
+            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
+                blockedLines.add(lineNumber);
+            }
+        }
+
+        return blockedLines;
+    },
+
+    isSelectionInsideBlock(state, block) {
+        return state.selection.ranges.some((range) => range.to >= block.from && range.from <= block.to);
+    },
+
+    focusFencedBlock(view, from) {
+        view.dispatch({
+            selection: { anchor: from, head: from },
+            scrollIntoView: true
+        });
+        view.focus();
+    },
+
+    openFencedBlockModal(block) {
+        const title = block.info ? `${Common.capitalizeFirst(block.info)} Block` : 'Code Block';
+        const lineLabel = block.lineCount === 1 ? '1 line' : `${block.lineCount} lines`;
+
+        Modal.create({
+            title,
+            modalClass: 'tag-modal content-modal fenced-block-modal',
+            content: `
+                <div class="fenced-block-modal-meta">
+                    <span class="badge">${escapeHtml(block.kind)}</span>
+                    <span class="meta-date">${lineLabel}</span>
+                    <span class="meta-date">${block.charCount} chars</span>
+                </div>
+                <pre class="fenced-block-modal-content">${escapeHtml(block.body)}</pre>
+            `
+        });
+    },
+
     resolveTaskName(idStr) {
         if (!idStr.startsWith('^')) return idStr;
         const blocks = (window.Store && Store.blocks) || [];
@@ -474,6 +672,8 @@ const DocumentView = {
         // Function to create decorations from document state
         function createDecorations(state, hasFocus) {
             const builder = [];
+            const fencedBlocks = self.getFencedBlocks(state.doc.toString());
+            const fencedBlockLines = self.buildFencedBlockLineSet(state.doc, fencedBlocks);
             
             // Get lines containing cursors ONLY if editor is focused
             const cursorLines = new Set();
@@ -483,7 +683,43 @@ const DocumentView = {
                 }
             }
 
+            const widgets = self.getCMWidgets();
+            for (const block of fencedBlocks) {
+                const selectionInsideBlock = hasFocus && self.isSelectionInsideBlock(state, block);
+
+                if (block.isCollapsible && !selectionInsideBlock) {
+                    const startLine = state.doc.lineAt(block.from);
+                    const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
+
+                    builder.push(Decoration.replace({
+                        widget: new widgets.FencedBlockWidget(block),
+                        inclusive: false
+                    }).range(startLine.from, startLine.to));
+
+                    builder.push(Decoration.line({
+                        attributes: {
+                            class: 'md-fenced-block-summary-line'
+                        }
+                    }).range(startLine.from));
+
+                    for (let lineNumber = startLine.number + 1; lineNumber <= endLine.number; lineNumber += 1) {
+                        const blockLine = state.doc.line(lineNumber);
+                        builder.push(Decoration.line({
+                            attributes: {
+                                class: 'md-fenced-block-hidden-line'
+                            }
+                        }).range(blockLine.from));
+                    }
+                } else if (!selectionInsideBlock) {
+                    builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
+                }
+            }
+
             for (let i = 1; i <= state.doc.lines; i++) {
+                if (fencedBlockLines.has(i)) {
+                    continue;
+                }
+
                 const line = state.doc.line(i);
                 const hideSyntax = !cursorLines.has(i);
                 self.applyLineDecorations(line, builder, hideSyntax, Decoration, i === state.doc.lines);
@@ -788,6 +1024,16 @@ const DocumentView = {
                     }
                 }),
                 EditorView.domEventHandlers({
+                    paste: (event, view) => {
+                        const pastedText = event.clipboardData?.getData('text/plain');
+                        if (!self.shouldPromptForLargePaste(pastedText)) {
+                            return false;
+                        }
+
+                        event.preventDefault();
+                        self.handleLargePaste(view, pastedText);
+                        return true;
+                    },
                     blur: (event, view) => {
                         const currentId = container.dataset.id;
                         const content = view.state.doc.toString();

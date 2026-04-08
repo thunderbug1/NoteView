@@ -155,6 +155,69 @@ function createCodeMirrorWidgets(documentView) {
         ignoreEvent() { return true; }
     }
 
+    class FencedBlockWidget extends WidgetType {
+        constructor(block) {
+            super();
+            this.block = block;
+        }
+        eq(other) {
+            return other.block.from === this.block.from
+                && other.block.to === this.block.to
+                && other.block.info === this.block.info
+                && other.block.preview === this.block.preview;
+        }
+        toDOM(view) {
+            const wrap = document.createElement('div');
+            const lineLabel = this.block.lineCount === 1 ? '1 line' : `${this.block.lineCount} lines`;
+            const infoLabel = this.block.info || this.block.kind;
+
+            wrap.className = `md-fenced-block-preview kind-${this.block.kind}`;
+            wrap.innerHTML = `
+                <div class="md-fenced-block-header">
+                    <div class="md-fenced-block-meta">
+                        <span class="md-fenced-block-kind"></span>
+                        <span class="md-fenced-block-count"></span>
+                    </div>
+                    <div class="md-fenced-block-actions">
+                        <button type="button" class="md-fenced-block-btn" data-action="edit">Edit</button>
+                        <button type="button" class="md-fenced-block-btn primary" data-action="open">Open</button>
+                    </div>
+                </div>
+                <pre class="md-fenced-block-body"></pre>
+            `;
+
+            const kind = wrap.querySelector('.md-fenced-block-kind');
+            if (kind) {
+                kind.textContent = infoLabel;
+            }
+
+            const count = wrap.querySelector('.md-fenced-block-count');
+            if (count) {
+                count.textContent = lineLabel;
+            }
+
+            const preview = wrap.querySelector('.md-fenced-block-body');
+            if (preview) {
+                preview.textContent = this.block.preview || '(empty block)';
+            }
+
+            wrap.querySelector('[data-action="open"]').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                documentView.openFencedBlockModal(this.block);
+            });
+
+            wrap.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                documentView.focusFencedBlock(view, this.block.from);
+            });
+
+            return wrap;
+        }
+        ignoreEvent() { return true; }
+    }
+
     class AddDeadlineWidget extends WidgetType {
         constructor(from, to) {
             super();
@@ -289,6 +352,7 @@ function createCodeMirrorWidgets(documentView) {
         CheckboxWidget,
         BadgeWidget,
         LinkWidget,
+        FencedBlockWidget,
         AddDeadlineWidget,
         AddAssigneeWidget,
         AddPriorityWidget,
