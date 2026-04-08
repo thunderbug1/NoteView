@@ -84,10 +84,15 @@
                 <div class="tag-group">
                     <div class="section-header">
                         <h3>Time</h3>
-                        <select id="timeProperty" class="property-select">
-                            <option value="lastUpdated">lastUpdated</option>
-                            <option value="creationDate">creationDate</option>
-                        </select>
+                        <div class="time-controls">
+                            <select id="timeProperty" class="property-select">
+                                <option value="lastUpdated">lastUpdated</option>
+                                <option value="creationDate">creationDate</option>
+                            </select>
+                            <button id="toggleSortOrderBtn" class="icon-btn time-sort-toggle" title="Sort oldest first" aria-label="Sort oldest first">
+                                <span id="sortOrderIcon" aria-hidden="true">↑</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="tag-radio-group" id="timeTags">
                         <div class="tag-radio-option selected" data-group="time" data-tag="">
