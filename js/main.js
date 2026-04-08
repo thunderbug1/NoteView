@@ -229,6 +229,14 @@ const App = {
             });
         }
 
+        const toggleSortOrderBtn = document.getElementById('toggleSortOrderBtn');
+        if (toggleSortOrderBtn && typeof DocumentView !== 'undefined') {
+            DocumentView.updateSortOrderButton();
+            toggleSortOrderBtn.addEventListener('click', () => {
+                DocumentView.toggleSortOrder();
+            });
+        }
+
         // Tag options - different behavior per group
         document.querySelectorAll('.tag-radio-option').forEach(option => {
             option.addEventListener('click', (e) => {
