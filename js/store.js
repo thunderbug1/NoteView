@@ -8,6 +8,25 @@ const Store = {
     timeProperty: 'lastUpdated',
     searchQuery: '',
     currentView: 'document',
+    viewPreferences: {
+        document: {
+            sort: {
+                clauses: [
+                    { field: 'lastUpdated', direction: 'desc' },
+                    { field: 'id', direction: 'asc' }
+                ]
+            }
+        },
+        kanban: {
+            sort: {
+                clauses: [
+                    { field: 'priority', direction: 'asc' },
+                    { field: 'deadline', direction: 'asc' },
+                    { field: 'sourceOrder', direction: 'asc' }
+                ]
+            }
+        }
+    },
     directoryHandle: null,
     contacts: new Map(), // Map of username -> Set of tags
     shortcuts: { newNote: 'Ctrl+Alt+N' },
@@ -30,6 +49,7 @@ const Store = {
     DB_NAME: 'NoteViewDB',
     DB_VERSION: 2,
     STORE_NAME: 'handles',
+    VIEW_PREFERENCES_STORAGE_KEY: 'noteview-view-preferences',
 
     // Check browser support
     isSupported() {
@@ -341,6 +361,7 @@ const Store = {
         }
 
         await this.initDB();
+        this.loadViewPreferences();
 
         // Load shortcuts
         const savedShortcuts = await this.getShortcuts();
@@ -388,6 +409,111 @@ const Store = {
         await this.saveDirectoryHandle(handle);
         await GitStore.init(handle);
         await this.loadBlocks();
+    },
+
+    getDefaultViewPreferences() {
+        return {
+            document: {
+                sort: {
+                    clauses: [
+                        { field: 'lastUpdated', direction: 'desc' },
+                        { field: 'id', direction: 'asc' }
+                    ]
+                }
+            },
+            kanban: {
+                sort: {
+                    clauses: [
+                        { field: 'priority', direction: 'asc' },
+                        { field: 'deadline', direction: 'asc' },
+                        { field: 'sourceOrder', direction: 'asc' }
+                    ]
+                }
+            }
+        };
+    },
+
+    loadViewPreferences() {
+        const defaults = this.getDefaultViewPreferences();
+        try {
+            const raw = localStorage.getItem(this.VIEW_PREFERENCES_STORAGE_KEY);
+            if (!raw) {
+                this.viewPreferences = defaults;
+                return this.viewPreferences;
+            }
+
+            const parsed = JSON.parse(raw);
+            this.viewPreferences = {
+                document: {
+                    ...defaults.document,
+                    ...parsed?.document,
+                    sort: {
+                        ...defaults.document.sort,
+                        ...parsed?.document?.sort
+                    }
+                },
+                kanban: {
+                    ...defaults.kanban,
+                    ...parsed?.kanban,
+                    sort: {
+                        ...defaults.kanban.sort,
+                        ...parsed?.kanban?.sort
+                    }
+                }
+            };
+        } catch (error) {
+            console.warn('Could not load view preferences:', error);
+            this.viewPreferences = defaults;
+        }
+
+        return this.viewPreferences;
+    },
+
+    saveViewPreferences() {
+        try {
+            localStorage.setItem(this.VIEW_PREFERENCES_STORAGE_KEY, JSON.stringify(this.viewPreferences));
+        } catch (error) {
+            console.warn('Could not save view preferences:', error);
+        }
+
+        return this.viewPreferences;
+    },
+
+    getViewPreferences(view) {
+        if (!this.viewPreferences?.[view]) {
+            this.viewPreferences = {
+                ...this.getDefaultViewPreferences(),
+                ...this.viewPreferences
+            };
+        }
+
+        return this.viewPreferences[view];
+    },
+
+    getSortConfig(view) {
+        return this.getViewPreferences(view)?.sort || { clauses: [] };
+    },
+
+    updateSortConfig(view, sortConfig) {
+        const current = this.getViewPreferences(view) || {};
+        this.viewPreferences = {
+            ...this.viewPreferences,
+            [view]: {
+                ...current,
+                sort: {
+                    ...(current.sort || {}),
+                    ...sortConfig
+                }
+            }
+        };
+
+        try {
+            localStorage.setItem(this.VIEW_PREFERENCES_STORAGE_KEY, JSON.stringify(this.viewPreferences));
+        } catch (error) {
+            console.warn('Could not save sort configuration:', error);
+        }
+
+        return this.getSortConfig(view);
     },
 
     async changeDirectory() {

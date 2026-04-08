@@ -15,7 +15,6 @@ const DocumentView = {
     MarkdownWidgetClass: null,
     // Task menus (initialized on first use)
     _taskMenus: null,
-    sortOrder: 'asc',
 
     /**
      * Get or initialize task menus
@@ -27,23 +26,6 @@ const DocumentView = {
         return this._taskMenus;
     },
 
-    updateSortOrderButton() {
-        const button = document.getElementById('toggleSortOrderBtn');
-        const icon = document.getElementById('sortOrderIcon');
-        if (!button || !icon) return;
-
-        const isAscending = this.sortOrder === 'asc';
-        icon.textContent = isAscending ? '↑' : '↓';
-        button.title = isAscending ? 'Sort oldest first' : 'Sort newest first';
-        button.setAttribute('aria-label', button.title);
-    },
-
-    toggleSortOrder() {
-        this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
-        this.updateSortOrderButton();
-        App.render();
-    },
-
     async render(blocks) {
         const container = document.getElementById('viewContainer');
         container.className = 'document-view';
@@ -51,27 +33,7 @@ const DocumentView = {
         // Wait for CodeMirror to be loaded
         await this.waitForCodeMirror();
 
-        this.updateSortOrderButton();
-
-        const timeProperty = Store.timeProperty || 'lastUpdated';
-        const sorted = [...blocks].sort((a, b) => {
-            const aValue = a?.[timeProperty];
-            const bValue = b?.[timeProperty];
-            const aTime = aValue ? new Date(aValue).getTime() : Number.NaN;
-            const bTime = bValue ? new Date(bValue).getTime() : Number.NaN;
-
-            if (!Number.isNaN(aTime) || !Number.isNaN(bTime)) {
-                if (Number.isNaN(aTime)) return 1;
-                if (Number.isNaN(bTime)) return -1;
-                const delta = aTime - bTime;
-                if (delta !== 0) {
-                    return this.sortOrder === 'asc' ? delta : -delta;
-                }
-            }
-
-            const fallback = (a.id || '').localeCompare(b.id || '', undefined, { numeric: true });
-            return this.sortOrder === 'asc' ? fallback : -fallback;
-        });
+        const sorted = SortManager.sortItems('document', blocks);
 
         // Build HTML for blocks - use div containers for CodeMirror
         container.innerHTML = sorted.map(block => `
