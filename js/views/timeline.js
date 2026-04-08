@@ -89,6 +89,7 @@ const TimelineView = {
                     events.push({
                         type: 'created',
                         taskText: currTask.text,
+                        badges: currTask.badges || [],
                         newState: currTask.state,
                         oldState: null,
                         timestamp: commit.timestamp,
@@ -104,6 +105,7 @@ const TimelineView = {
                     events.push({
                         type: 'changed',
                         taskText: currTask.text,
+                        badges: currTask.badges || [],
                         oldState: prevTask.state,
                         newState: currTask.state,
                         timestamp: commit.timestamp,
@@ -123,6 +125,7 @@ const TimelineView = {
                     events.push({
                         type: 'removed',
                         taskText: prevTask.text,
+                        badges: prevTask.badges || [],
                         oldState: prevTask.state,
                         newState: null,
                         timestamp: commit.timestamp,
@@ -205,9 +208,7 @@ const TimelineView = {
             
             // Context tag filter
             if (contextSelection.size > 0) {
-                const requiredTags = Array.from(contextSelection).filter(t => 
-                    t !== 'allTodos' && t !== 'openTodos' && t !== 'untagged'
-                );
+                const requiredTags = Array.from(contextSelection).filter(t => !SelectionManager.isComputedContextTag(t));
                 
                 if (requiredTags.length > 0) {
                     const hasAllTags = requiredTags.every(tag => event.tags?.includes(tag));
@@ -216,6 +217,25 @@ const TimelineView = {
                 
                 if (contextSelection.has('untagged')) {
                     if (event.tags && event.tags.length > 0) return false;
+                }
+                if (contextSelection.has('allTodos')) {
+                        // Timeline events are always task events.
+                }
+                if (contextSelection.has('openTodos')) {
+                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                        if (!TaskParser.isOpenTask(eventTask)) return false;
+                }
+                if (contextSelection.has('blockedTodos')) {
+                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                        if (!TaskParser.isBlockedTask(eventTask)) return false;
+                }
+                if (contextSelection.has('unblockedTodos')) {
+                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                        if (!TaskParser.isUnblockedTask(eventTask)) return false;
+                }
+                if (contextSelection.has('unassigned')) {
+                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                        if (!TaskParser.isUnassignedTask(eventTask)) return false;
                 }
             }
             

@@ -517,11 +517,19 @@ const Store = {
 
             // Context filter (multi-select - must have ALL selected tags)
             if (contextSelection.size > 0) {
-                const requiredTags = Array.from(contextSelection).filter(t => !['allTodos', 'openTodos', 'blockedTodos', 'unblockedTodos', 'untagged'].includes(t));
+                const requiredTags = Array.from(contextSelection).filter(t => !SelectionManager.isComputedContextTag(t));
                 const hasAllTags = requiredTags.every(tag => block.tags?.includes(tag));
                 if (!hasAllTags) {
                     return false;
                 }
+
+                let tasks = null;
+                const getTasks = () => {
+                    if (!tasks) {
+                        tasks = TaskParser.parseTasksFromBlock(block);
+                    }
+                    return tasks;
+                };
                 
                 if (contextSelection.has('allTodos')) {
                     if (!block.content?.match(/\[[ xX\/bB\-]\]/)) return false;
@@ -530,17 +538,19 @@ const Store = {
                     if (!block.content?.match(/\[[ \/]\]/)) return false;
                 }
                 if (contextSelection.has('blockedTodos')) {
-                    const tasks = TaskParser.parseTasksFromBlock(block);
-                    const hasBlocked = tasks.some(t => t.state === 'b' || t.badges.some(b => b.type === 'dependsOn'));
+                    const hasBlocked = getTasks().some(t => TaskParser.isBlockedTask(t));
                     if (!hasBlocked) return false;
                 }
                 if (contextSelection.has('unblockedTodos')) {
-                    const tasks = TaskParser.parseTasksFromBlock(block);
-                    const hasUnblocked = tasks.some(t => (t.state === ' ' || t.state === '/') && !t.badges.some(b => b.type === 'dependsOn'));
+                    const hasUnblocked = getTasks().some(t => TaskParser.isUnblockedTask(t));
                     if (!hasUnblocked) return false;
                 }
                 if (contextSelection.has('untagged')) {
                     if (block.tags && block.tags.length > 0) return false;
+                }
+                if (contextSelection.has('unassigned')) {
+                    const hasUnassigned = TaskParser.hasUnassignedTasks(getTasks());
+                    if (!hasUnassigned) return false;
                 }
             }
 

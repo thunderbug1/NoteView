@@ -66,6 +66,85 @@ function stripBadges(text) {
 }
 
 /**
+ * Check whether a task is closed
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task is done or canceled
+ */
+function isClosedTask(task) {
+    return task.state === 'x' || task.state === '-';
+}
+
+/**
+ * Check whether a task has an assignee badge
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task has a non-empty assignee
+ */
+function hasAssignee(task) {
+    return task.badges.some(b => b.type === 'assignee' && b.value && b.value.trim());
+}
+
+/**
+ * Check whether a task has a dependency badge
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task depends on another task
+ */
+function hasDependency(task) {
+    return task.badges.some(b => b.type === 'dependsOn');
+}
+
+/**
+ * Check whether a task is open
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task is todo or in progress
+ */
+function isOpenTask(task) {
+    return task.state === ' ' || task.state === '/';
+}
+
+/**
+ * Check whether a task is blocked
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task is blocked by state or dependency
+ */
+function isBlockedTask(task) {
+    return task.state === 'b' || hasDependency(task);
+}
+
+/**
+ * Check whether a task is unblocked and actionable
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task is open and has no dependency
+ */
+function isUnblockedTask(task) {
+    return isOpenTask(task) && !hasDependency(task);
+}
+
+/**
+ * Check whether a task has no assignee
+ * @param {Object} task - Parsed task object
+ * @param {Object} options - Matching options
+ * @param {boolean} options.onlyActive - Ignore done/canceled tasks when true
+ * @returns {boolean} True when task has no assignee
+ */
+function isUnassignedTask(task, { onlyActive = false } = {}) {
+    if (onlyActive && isClosedTask(task)) {
+        return false;
+    }
+    return !hasAssignee(task);
+}
+
+/**
+ * Check whether a task collection contains unassigned tasks
+ * @param {Array} tasks - Parsed task objects
+ * @param {Object} options - Matching options
+ * @param {boolean} options.onlyActive - Ignore done/canceled tasks when true
+ * @returns {boolean} True when any matching task is unassigned
+ */
+function hasUnassignedTasks(tasks, { onlyActive = false } = {}) {
+    return tasks.some(task => isUnassignedTask(task, { onlyActive }));
+}
+
+/**
  * Parse tasks from a single block's content
  * @param {Object} block - Block object with content property
  * @returns {Array} Array of task objects
@@ -131,7 +210,7 @@ function parseTasksFromContent(content) {
     while ((match = CHECKBOX_REGEX.exec(content)) !== null) {
         const state = normalizeState(match[2]);
         const originalText = match[3].trim();
-        const cleanText = stripBadges(originalText);
+        const { badges, cleanText } = extractBadges(originalText);
 
         if (cleanText) {
             // Use clean text as key. If duplicate task text exists, append index
@@ -140,7 +219,7 @@ function parseTasksFromContent(content) {
             while (tasks.has(key)) {
                 key = `${cleanText}#${i++}`;
             }
-            tasks.set(key, { state, text: cleanText, originalText });
+            tasks.set(key, { state, text: cleanText, originalText, badges });
         }
     }
 
@@ -152,6 +231,14 @@ window.TaskParser = {
     normalizeState,
     extractBadges,
     stripBadges,
+    isClosedTask,
+    hasAssignee,
+    hasDependency,
+    isOpenTask,
+    isBlockedTask,
+    isUnblockedTask,
+    isUnassignedTask,
+    hasUnassignedTasks,
     parseTasksFromBlock,
     parseTasksFromBlocks,
     parseTasksFromContent,

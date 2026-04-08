@@ -11,6 +11,8 @@ const SelectionManager = {
         contact: ''
     },
 
+    computedContextTags: ['allTodos', 'openTodos', 'blockedTodos', 'unblockedTodos', 'untagged', 'unassigned'],
+
     /**
      * Initialize the selection manager
      */
@@ -105,13 +107,28 @@ const SelectionManager = {
     },
 
     /**
+     * Get computed context tags
+     * @returns {Array} Computed context tag ids
+     */
+    getComputedContextTags() {
+        return [...this.computedContextTags];
+    },
+
+    /**
+     * Check whether a context tag is computed
+     * @param {string} tag - Context tag id
+     * @returns {boolean} True when the tag is computed
+     */
+    isComputedContextTag(tag) {
+        return this.computedContextTags.includes(tag);
+    },
+
+    /**
      * Get active context tags (excluding computed tags)
      * @returns {Array} Array of active context tags
      */
     getActiveTags() {
-        return Array.from(this.selections.context).filter(tag =>
-            tag !== 'allTodos' && tag !== 'openTodos' && tag !== 'blockedTodos' && tag !== 'unblockedTodos' && tag !== 'untagged'
-        );
+        return Array.from(this.selections.context).filter(tag => !this.isComputedContextTag(tag));
     },
 
     /**
@@ -129,6 +146,7 @@ const SelectionManager = {
             'blockedTodos': 'Blocked Todos',
             'unblockedTodos': 'Unblocked Todos',
             'untagged': 'Untagged',
+            'unassigned': 'Unassigned',
             'today': 'Today',
             'thisWeek': 'This Week',
             'thisMonth': 'This Month'
@@ -221,6 +239,7 @@ const SelectionManager = {
         let hasBlockedTodos = false;
         let hasUnblockedTodos = false;
         let hasUntagged = false;
+        let hasUnassigned = false;
 
         let hasToday = false;
         let hasThisWeek = false;
@@ -242,11 +261,13 @@ const SelectionManager = {
             
             // New computed categories
             const tasks = TaskParser.parseTasksFromBlock(block);
-            const hasBlocked = tasks.some(t => t.state === 'b' || t.badges.some(b => b.type === 'dependsOn'));
-            const hasUnblocked = tasks.some(t => (t.state === ' ' || t.state === '/') && !t.badges.some(b => b.type === 'dependsOn'));
+            const hasBlocked = tasks.some(t => TaskParser.isBlockedTask(t));
+            const hasUnblocked = tasks.some(t => TaskParser.isUnblockedTask(t));
+            const hasUnassignedTasks = TaskParser.hasUnassignedTasks(tasks);
             
             if (hasBlocked) hasBlockedTodos = true;
             if (hasUnblocked) hasUnblockedTodos = true;
+            if (hasUnassignedTasks) hasUnassigned = true;
             
             if (!block.tags || block.tags.length === 0) hasUntagged = true;
 
@@ -280,6 +301,7 @@ const SelectionManager = {
                 else if (tag === 'blockedTodos') hasBlocks = hasBlockedTodos;
                 else if (tag === 'unblockedTodos') hasBlocks = hasUnblockedTodos;
                 else if (tag === 'untagged') hasBlocks = hasUntagged;
+                else if (tag === 'unassigned') hasBlocks = hasUnassigned;
                 else hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
             }
 
