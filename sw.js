@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v1';
+const CACHE_NAME = 'noteview-v2';
 
 const PRECACHE_URLS = [
   '/',
@@ -17,10 +17,9 @@ const PRECACHE_URLS = [
   '/js/gitFs.js',
   '/js/gitStore.js',
   '/js/gitRemote.js',
-  '/js/main.js',
-  '/js/store.js',
-  '/js/selectionManager.js',
-  '/js/undoRedoManager.js',
+  '/js/undoRedoManager.js?v=5',
+  '/js/store.js?v=8',
+  '/js/selectionManager.js?v=2',
   '/js/utils/cacheManager.js',
   '/js/utils/common.js',
   '/js/utils/contactHelper.js',
@@ -28,14 +27,25 @@ const PRECACHE_URLS = [
   '/js/utils/performance.js',
   '/js/utils/taskParser.js',
   '/js/utils/timeFilter.js',
-  '/js/views/document.js',
-  '/js/views/history.js',
-  '/js/views/kanban.js',
-  '/js/views/settings.js',
-  '/js/views/timeline.js',
+  '/js/utils/sortManager.js',
   '/js/widgets/codeMirrorWidgets.js',
   '/js/menus/taskMenus.js',
+  '/js/views/history.js',
+  '/js/views/document.js?v=4',
+  '/js/views/timeline.js?v=3',
+  '/js/views/kanban.js?v=3',
+  '/js/views/settings.js',
+  '/js/main.js?v=7',
 ];
+
+function shouldUseNetworkFirst(request) {
+  if (request.mode === 'navigate') {
+    return true;
+  }
+
+  const destination = request.destination;
+  return destination === 'script' || destination === 'style';
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -61,6 +71,32 @@ self.addEventListener('fetch', (event) => {
 
   // Skip CodeMirror CDN and Google Fonts — always fetch from network
   if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return;
+
+  if (shouldUseNetworkFirst(event.request)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) {
+            return cached;
+          }
+
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+
+          throw new Error(`No cached response for ${event.request.url}`);
+        })
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
