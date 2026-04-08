@@ -159,10 +159,10 @@ const DocumentView = {
     },
 
     getSelectedContextBadge() {
-        const contextSelection = SelectionManager.selections?.context;
-        if (!contextSelection || contextSelection.size === 0) return '';
+        const selectedTags = SelectionManager.getActiveTags();
+        if (selectedTags.length === 0) return '';
 
-        return Array.from(contextSelection)
+        return selectedTags
             .map(tag => `<span class="badge">${Common.capitalizeFirst(tag)}</span>`)
             .join('');
     },

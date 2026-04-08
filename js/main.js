@@ -688,9 +688,10 @@ const App = {
 
         const createTag = (tagStr) => {
             const tagsToAdd = tagStr.split(/[\s,]+/).map(t => t.trim().toLowerCase()).filter(t => t);
+            const computedTags = SelectionManager.getComputedContextTags().map(tag => tag.toLowerCase());
 
             for (const tag of tagsToAdd) {
-                if (['alltodos', 'opentodos', 'untagged'].includes(tag)) {
+                if (computedTags.includes(tag)) {
                     console.warn("Cannot assign computed tags directly to a note.");
                     continue;
                 }
@@ -746,7 +747,7 @@ const App = {
                 if (tag === val) exactMatch = true;
             });
 
-            const isComputedTag = ['alltodos', 'opentodos', 'untagged'].includes(val);
+            const isComputedTag = SelectionManager.getComputedContextTags().some(tag => tag.toLowerCase() === val);
 
             if (val && !exactMatch && !selectedTags.has(val) && !isComputedTag) {
                 promptBtn.style.display = 'flex';
@@ -780,7 +781,7 @@ const App = {
         if (currentTags && currentTags.length > 0) {
             currentTags.forEach(t => referenceContext.add(t));
         } else if (SelectionManager.selections.context.size > 0) {
-            referenceContext = new Set(Array.from(SelectionManager.selections.context).filter(t => t !== 'allTodos' && t !== 'openTodos'));
+            referenceContext = new Set(SelectionManager.getActiveTags());
         }
 
         if (referenceContext.size > 0) {

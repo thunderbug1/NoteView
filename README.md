@@ -59,7 +59,7 @@ Every save is automatically committed to a local git repository using [isomorphi
 Find what you need fast with multi-layered filtering:
 
 - **Tags** — Organize notes with frontmatter tags, click to filter
-- **Computed tags** — Smart collections like `allTodos`, `openTodos`, `blockedTodos`, `unblockedTodos`
+- **Computed tags** — Smart collections like `allTodos`, `openTodos`, `blockedTodos`, `unblockedTodos`, `unassigned`
 - **Time filters** — Show notes from today, this week, or this month
 - **Contacts** — Filter by @mentions and assignees
 - **Search** — Real-time full-text search across all notes

@@ -35,7 +35,28 @@ const KanbanView = {
     },
 
     extractTasks(blocks) {
-        return TaskParser.parseTasksFromBlocks(blocks);
+        const tasks = TaskParser.parseTasksFromBlocks(blocks);
+        const contextSelection = SelectionManager.selections?.context;
+
+        if (!contextSelection || contextSelection.size === 0) {
+            return tasks;
+        }
+
+        return tasks.filter(task => {
+            if (contextSelection.has('openTodos') && !TaskParser.isOpenTask(task)) {
+                return false;
+            }
+            if (contextSelection.has('blockedTodos') && !TaskParser.isBlockedTask(task)) {
+                return false;
+            }
+            if (contextSelection.has('unblockedTodos') && !TaskParser.isUnblockedTask(task)) {
+                return false;
+            }
+            if (contextSelection.has('unassigned') && !TaskParser.isUnassignedTask(task)) {
+                return false;
+            }
+            return true;
+        });
     },
 
     renderTaskCard(task) {
