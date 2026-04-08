@@ -353,7 +353,7 @@ const SelectionManager = {
         });
 
         if (allContacts.length === 0) {
-            html = '<div style="color:var(--text-muted); font-size:12px; padding:4px 8px;">Mention @someone to add</div>';
+            html = '<div style="color:var(--text-muted); font-size:12px; padding:4px 8px;">Mention @someone or add [assignee:: name] to a task</div>';
         }
 
         container.innerHTML = html;

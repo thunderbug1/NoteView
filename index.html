@@ -148,7 +148,7 @@
                 <!-- Contacts Group -->
                 <div class="tag-group" id="contactTagGroup">
                     <div class="section-header">
-                        <h3>Contacts</h3>
+                        <h3>People</h3>
                     </div>
                     <div class="tag-radio-group" id="contactTags">
                         <!-- Populated dynamically -->
@@ -191,6 +191,7 @@
         import {EditorState, StateField, Prec} from "https://esm.sh/@codemirror/state@6";
         import {unifiedMergeView} from "https://esm.sh/@codemirror/merge@6";
         import {indentWithTab} from "https://esm.sh/@codemirror/commands@6";
+        import {autocompletion, completionKeymap, closeBracketsKeymap} from "https://esm.sh/@codemirror/autocomplete@6";
 
         // Export to global scope for use in document.js
         window.CodeMirror = {
@@ -207,7 +208,10 @@
             unifiedMergeView,
             indentWithTab,
             placeholder,
-            EditorState
+            EditorState,
+            autocompletion,
+            completionKeymap,
+            closeBracketsKeymap
         };
 
         // Signal when CodeMirror is ready
@@ -236,7 +240,7 @@
     <script src="js/widgets/codeMirrorWidgets.js"></script>
     <script src="js/menus/taskMenus.js"></script>
     <script src="js/views/history.js"></script>
-    <script src="js/views/document.js?v=3"></script>
+    <script src="js/views/document.js?v=4"></script>
     <script src="js/views/timeline.js?v=3"></script>
     <script src="js/views/kanban.js?v=3"></script>
     <script src="js/views/settings.js"></script>

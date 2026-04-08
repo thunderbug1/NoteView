@@ -15,6 +15,17 @@ const CONTACT_MENTION_REGEX = /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g;
  */
 const CONTACT_ASSIGNEE_REGEX = /\[assignee::\s*([^\]]+)\]/g;
 
+function normalizeContactName(contactName) {
+    if (!contactName) return '';
+
+    let normalized = String(contactName).trim().toLowerCase();
+    if (normalized.startsWith('@')) {
+        normalized = normalized.substring(1);
+    }
+
+    return normalized;
+}
+
 /**
  * Extract all unique @mentions from content
  * @param {string} content - Markdown content to search
@@ -47,11 +58,7 @@ function extractAssignees(content) {
     CONTACT_ASSIGNEE_REGEX.lastIndex = 0;
 
     while ((match = CONTACT_ASSIGNEE_REGEX.exec(content)) !== null) {
-        let username = match[1].trim();
-        // Strip optional @ if user typed [@Alice]
-        if (username.startsWith('@')) {
-            username = username.substring(1);
-        }
+        let username = normalizeContactName(match[1]);
         assignees.add(username.toLowerCase());
     }
 
@@ -69,6 +76,48 @@ function extractContacts(content) {
     return new Set([...mentions, ...assignees]);
 }
 
+function hasMention(content, contactName) {
+    if (!content || !contactName) return false;
+
+    const searchLower = normalizeContactName(contactName);
+    if (!searchLower) return false;
+
+    return extractMentions(content).has(searchLower);
+}
+
+function hasAssignee(content, contactName) {
+    if (!content || !contactName) return false;
+
+    const searchLower = normalizeContactName(contactName);
+    if (!searchLower) return false;
+
+    return extractAssignees(content).has(searchLower);
+}
+
+function hasTaskContact(task, contactName) {
+    if (!task || !contactName) return false;
+
+    const searchLower = normalizeContactName(contactName);
+    if (!searchLower) return false;
+
+    const taskText = task.originalText || task.text || '';
+    if (hasMention(taskText, searchLower)) return true;
+
+    return (task.badges || []).some(badge => {
+        if (badge.type !== 'assignee') return false;
+        return normalizeContactName(badge.value) === searchLower;
+    });
+}
+
+function hasEventContact(event, contactName) {
+    if (!event || !contactName) return false;
+    return hasTaskContact({
+        text: event.taskText || '',
+        originalText: event.taskText || '',
+        badges: event.badges || []
+    }, contactName);
+}
+
 /**
  * Check if content mentions a specific contact
  * @param {string} content - Markdown content to search
@@ -76,27 +125,20 @@ function extractContacts(content) {
  * @returns {boolean} True if the contact is mentioned or assigned
  */
 function hasContact(content, contactName) {
-    if (!content || !contactName) return false;
-
-    const searchLower = contactName.toLowerCase();
-
-    // Check for @mention
-    const mentionRegex = new RegExp(`(?:^|\\s)@${searchLower}(?!\\S)`, 'i');
-    if (mentionRegex.test(content)) return true;
-
-    // Check for [assignee::] badge
-    const assigneeRegex = new RegExp(`\\[assignee::\\s*@?${searchLower}\\]`, 'i');
-    if (assigneeRegex.test(content)) return true;
-
-    return false;
+    return hasMention(content, contactName) || hasAssignee(content, contactName);
 }
 
 // Export for use in other modules
 window.ContactHelper = {
     CONTACT_MENTION_REGEX,
     CONTACT_ASSIGNEE_REGEX,
+    normalizeContactName,
     extractMentions,
     extractAssignees,
     extractContacts,
-    hasContact
+    hasMention,
+    hasAssignee,
+    hasContact,
+    hasTaskContact,
+    hasEventContact
 };
