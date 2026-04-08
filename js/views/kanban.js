@@ -11,6 +11,14 @@ const KanbanView = {
         { id: 'canceled', label: 'Canceled', state: '-' }
     ],
 
+    getColumnByState(state) {
+        return this.columns.find(col => col.state === state) || null;
+    },
+
+    getColumnById(id) {
+        return this.columns.find(col => col.id === id) || null;
+    },
+
     render(blocks) {
         const container = document.getElementById('viewContainer');
         container.className = 'kanban-view';
@@ -19,9 +27,9 @@ const KanbanView = {
         
         let html = '';
         this.columns.forEach(col => {
-            const colTasks = tasks.filter(t => t.state === col.state);
+            const colTasks = SortManager.sortItems('kanban', tasks.filter(t => t.state === col.state));
             html += `
-                <div class="kanban-column" data-state="${col.state}">
+                <div class="kanban-column" data-column-id="${col.id}">
                     <h4>${col.label} <span class="count">(${colTasks.length})</span></h4>
                     <div class="blocks">
                         ${colTasks.map(task => this.renderTaskCard(task)).join('')}
@@ -30,7 +38,7 @@ const KanbanView = {
             `;
         });
         
-        container.innerHTML = html;
+        container.innerHTML = `<div class="kanban-board">${html}</div>`;
         this.attachEventListeners(container);
     },
 
@@ -60,8 +68,9 @@ const KanbanView = {
     },
 
     renderTaskCard(task) {
+        const column = this.getColumnByState(task.state);
         return `
-            <div class="block kanban-card" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}">
+            <div class="block kanban-card" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}">
                 <div class="kanban-card-content">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <p class="kanban-task-text">${escapeHtml(task.text)}</p>
@@ -78,23 +87,36 @@ const KanbanView = {
     attachEventListeners(container) {
         const cards = container.querySelectorAll('.kanban-card');
         const columns = container.querySelectorAll('.kanban-column .blocks');
+        let dragInProgress = false;
+
+        const buildDragPayload = (card) => JSON.stringify({
+            id: card.dataset.id,
+            blockId: card.dataset.blockId,
+            matchIndex: parseInt(card.dataset.matchIndex, 10),
+            matchLength: parseInt(card.dataset.matchLength, 10),
+            prefix: card.dataset.prefix,
+            columnId: card.dataset.columnId
+        });
 
         // Card dragging
         cards.forEach(card => {
             card.addEventListener('dragstart', (e) => {
                 card.classList.add('dragging');
-                e.dataTransfer.setData('text/plain', card.dataset.id);
-                // Also store task data as JSON
-                e.dataTransfer.setData('application/json', JSON.stringify({
-                    blockId: card.dataset.blockId,
-                    matchIndex: parseInt(card.dataset.matchIndex),
-                    matchLength: parseInt(card.dataset.matchLength),
-                    prefix: card.dataset.prefix
-                }));
+                dragInProgress = true;
+
+                const payload = buildDragPayload(card);
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', payload);
+                    e.dataTransfer.setData('application/json', payload);
+                }
             });
 
             card.addEventListener('dragend', () => {
                 card.classList.remove('dragging');
+                setTimeout(() => {
+                    dragInProgress = false;
+                }, 0);
             });
             
             // Edit modal on click
@@ -115,7 +137,9 @@ const KanbanView = {
 
             // Edit on card click
             card.addEventListener('click', (e) => {
+                if (dragInProgress) return;
                 if (e.target.closest('.kanban-badge')) return; // Ignore if badge clicked
+                if (e.target.closest('.kanban-edit-btn')) return;
                 App.showBlockContentModal(card.dataset.blockId);
             });
 
@@ -131,10 +155,6 @@ const KanbanView = {
                         
                         App.showAssigneeModal((contact) => {
                             // Find the exact task in block content and update it
-                            const matchIndex = parseInt(card.dataset.matchIndex);
-                            const prefix = card.dataset.prefix;
-                            const state = card.dataset.state || ''; // Need state? Card doesn't have it direct but it's in the column
-                            
                             // Re-extract tasks to find the exact one in current content
                             const tasks = KanbanView.extractTasks([block]);
                             const taskToUpdate = tasks.find(t => t.id === card.dataset.id);
@@ -157,7 +177,7 @@ const KanbanView = {
                                 const newContent = beforeTask + newLine + content.substring(nextNewline);
                                 
                                 const commitMessage = `Update assignee for '${taskToUpdate.text}'`;
-                                App.saveBlockContent(block.id, newContent, commitMessage).then(() => {
+                                App.saveBlockContent(block.id, newContent, { commit: true, commitMessage }).then(() => {
                                     App.render();
                                 });
                             }
@@ -184,11 +204,15 @@ const KanbanView = {
                 e.preventDefault();
                 colContainer.classList.remove('drag-over');
                 
-                const targetState = colContainer.dataset.state;
-                const dataJson = e.dataTransfer.getData('application/json');
+                const targetColumn = KanbanView.getColumnById(colContainer.dataset.columnId);
+                const targetState = targetColumn ? targetColumn.state : null;
+                const dataJson = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
                 
-                if (dataJson) {
+                if (dataJson && targetState !== null) {
                     const data = JSON.parse(dataJson);
+                    if (data.columnId === colContainer.dataset.columnId) {
+                        return;
+                    }
                     const block = Store.blocks.find(b => b.id === data.blockId);
                     
                     if (block && block.content) {
@@ -201,10 +225,10 @@ const KanbanView = {
                         
                         // Check if the bracket is indeed at targetPos
                         if (content[targetPos - 1] === '[' && content[targetPos + 1] === ']') {
-                            const newStateLabel = KanbanView.columns.find(c => c.state === targetState)?.label || targetState;
+                            const newStateLabel = targetColumn?.label || targetState;
                             const commitMessage = `Move task to ${newStateLabel}`;
                             const newContent = content.substring(0, targetPos) + targetState + content.substring(targetPos + 1);
-                            await App.saveBlockContent(block.id, newContent, commitMessage);
+                            await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
                             App.render();
                         } else {
                             // Fallback: full re-render if indices don't match cleanly (e.g. concurrent edits)
@@ -217,12 +241,9 @@ const KanbanView = {
     },
 
     showEditModal(task, block) {
-        let due = '', assignee = '', priority = '';
-        task.badges.forEach(b => {
-            if (b.type === 'due') due = b.value;
-            if (b.type === 'assignee') assignee = b.value;
-            if (b.type === 'priority') priority = b.value;
-        });
+        const due = TaskParser.getBadgeValue(task, 'due');
+        const assignee = TaskParser.getBadgeValue(task, 'assignee');
+        const priority = TaskParser.getBadgeValue(task, 'priority');
 
         const content = `
             <div style="padding-top: 10px;">
@@ -243,6 +264,7 @@ const KanbanView = {
                     <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:12px; color:var(--text-secondary);">Priority</label>
                     <select id="editModalPriority" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid var(--border-color); border-radius:4px; font-family:inherit;">
                         <option value="" ${!priority ? 'selected' : ''}>None</option>
+                        <option value="Urgent" ${priority === 'Urgent' ? 'selected' : ''}>Urgent</option>
                         <option value="High" ${priority === 'High' ? 'selected' : ''}>High</option>
                         <option value="Medium" ${priority === 'Medium' ? 'selected' : ''}>Medium</option>
                         <option value="Low" ${priority === 'Low' ? 'selected' : ''}>Low</option>
@@ -303,7 +325,7 @@ const KanbanView = {
             const newContent = beforeTask + newLine + blockContent.substring(nextNewline);
 
             const commitMessage = `Update properties for '${task.text}'`;
-            await App.saveBlockContent(block.id, newContent, commitMessage);
+            await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
 
             modal.close();
             App.render();

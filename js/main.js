@@ -193,7 +193,8 @@ const App = {
         document.getElementById('main').addEventListener('mousedown', (e) => {
             const insideEditor = e.target.closest('.cm-editor');
             const onInteractive = e.target.closest('button, input, a, select');
-            if (!insideEditor && !onInteractive) {
+            const onDraggable = e.target.closest('[draggable="true"]');
+            if (!insideEditor && !onInteractive && !onDraggable) {
                 e.preventDefault();
                 document.activeElement?.blur();
             }
@@ -219,24 +220,10 @@ const App = {
             });
         }
 
+
+        SortManager.initSidebar(() => this.render());
+        SortManager.updateSidebar();
         // Time property selector
-        const timeProperty = document.getElementById('timeProperty');
-        if (timeProperty) {
-            timeProperty.addEventListener('change', (e) => {
-                Store.timeProperty = e.target.value;
-                SelectionManager.updateTagCounts();
-                this.render();
-            });
-        }
-
-        const toggleSortOrderBtn = document.getElementById('toggleSortOrderBtn');
-        if (toggleSortOrderBtn && typeof DocumentView !== 'undefined') {
-            DocumentView.updateSortOrderButton();
-            toggleSortOrderBtn.addEventListener('click', () => {
-                DocumentView.toggleSortOrder();
-            });
-        }
-
         // Tag options - different behavior per group
         document.querySelectorAll('.tag-radio-option').forEach(option => {
             option.addEventListener('click', (e) => {
@@ -397,12 +384,15 @@ const App = {
         // across view changes.
 
         SelectionManager.updateSelectionUI();
+        SortManager.updateSidebar();
         this.render();
     },
 
     render() {
         const blocks = Store.getFilteredBlocks();
         const view = Store.currentView;
+
+        SortManager.updateSidebar();
 
         switch (view) {
             case 'document':

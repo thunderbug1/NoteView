@@ -20,6 +20,12 @@ const KNOWN_BADGE_KEYS = ['due', 'assignee', 'dependsOn', 'priority'];
 // Regex patterns
 const CHECKBOX_REGEX = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm;
 const BADGE_REGEX = /\[([a-zA-Z0-9_]+)::\s*([^\]]+)\]/g;
+const PRIORITY_RANKS = {
+    urgent: 0,
+    high: 1,
+    medium: 2,
+    low: 4
+};
 
 /**
  * Normalize task state character
@@ -54,6 +60,52 @@ function extractBadges(text) {
     }
 
     return { badges, cleanText: cleanText.trim() };
+}
+
+/**
+ * Get a badge value by type
+ * @param {Object} task - Parsed task object
+ * @param {string} type - Badge type
+ * @returns {string} Badge value or empty string
+ */
+function getBadgeValue(task, type) {
+    return task?.badges?.find(badge => badge.type === type)?.value || '';
+}
+
+/**
+ * Get normalized priority rank for a task
+ * @param {Object} task - Parsed task object
+ * @returns {number} Numeric rank where lower is more important
+ */
+function getPriorityRank(task) {
+    const priority = getBadgeValue(task, 'priority').trim().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(PRIORITY_RANKS, priority)
+        ? PRIORITY_RANKS[priority]
+    : 3;
+}
+
+/**
+ * Parse due date badge into a comparable timestamp
+ * @param {Object} task - Parsed task object
+ * @returns {number} Timestamp or NaN for invalid/missing values
+ */
+function getDueTimestamp(task) {
+    const due = getBadgeValue(task, 'due').trim();
+    if (!due) return Number.NaN;
+
+    const timestamp = new Date(due).getTime();
+    return Number.isNaN(timestamp) ? Number.NaN : timestamp;
+}
+
+/**
+ * Build a stable source-order key for tie breaking
+ * @param {Object} task - Parsed task object
+ * @returns {string} Comparable source-order key
+ */
+function getSourceOrderKey(task) {
+    const blockId = task?.blockId || '';
+    const matchIndex = Number.isFinite(task?.matchIndex) ? task.matchIndex : Number.MAX_SAFE_INTEGER;
+    return `${blockId}::${String(matchIndex).padStart(12, '0')}`;
 }
 
 /**
@@ -230,6 +282,10 @@ function parseTasksFromContent(content) {
 window.TaskParser = {
     normalizeState,
     extractBadges,
+    getBadgeValue,
+    getPriorityRank,
+    getDueTimestamp,
+    getSourceOrderKey,
     stripBadges,
     isClosedTask,
     hasAssignee,
@@ -242,6 +298,7 @@ window.TaskParser = {
     parseTasksFromBlock,
     parseTasksFromBlocks,
     parseTasksFromContent,
+    PRIORITY_RANKS,
     KNOWN_BADGE_KEYS,
     CHECKBOX_REGEX,
     BADGE_REGEX

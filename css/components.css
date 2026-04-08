@@ -100,6 +100,132 @@
     font-size: 0.9rem;
 }
 
+
+.sort-sidebar-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.sort-toolbar-summary {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.sort-toolbar-button {
+    align-self: flex-start;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.sort-toolbar-button:hover {
+    border-color: var(--border-light);
+    background: var(--bg-hover);
+}
+
+.sort-config-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    margin-top: 1rem;
+}
+
+.sort-config-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sort-config-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+}
+
+.sort-config-row select {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.sort-config-row-actions {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.sort-config-btn {
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.sort-config-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-light);
+}
+
+.sort-config-empty {
+    padding: 1rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.sort-config-footer {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.sort-config-primary,
+.sort-config-secondary {
+    padding: 0.55rem 0.85rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.sort-config-primary {
+    border: none;
+    background: var(--accent-color, #3b82f6);
+    color: white;
+}
+
+.sort-config-secondary {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+    .sort-config-row {
+        grid-template-columns: 1fr;
+    }
+
+    .sort-config-row-actions {
+        justify-content: flex-end;
+    }
+}
+
 .tag-radio-group {
     display: flex;
     flex-wrap: wrap;
