@@ -823,6 +823,7 @@ const DocumentView = {
         let cbMatch;
         let lineHasCheckedTask = false;
         let isTaskLine = false;
+        let taskLineStart = from;
         
         while ((cbMatch = checkboxRegex.exec(text)) !== null) {
             const matchFrom = from + cbMatch.index + cbMatch[1].length;
@@ -842,6 +843,10 @@ const DocumentView = {
                 lineHasCheckedTask = true;
             }
             isTaskLine = true;
+            taskLineStart = from + cbMatch[0].length;
+            while (taskLineStart < line.to && /\s/.test(text[taskLineStart - from])) {
+                taskLineStart += 1;
+            }
         }
 
         if (isTaskLine) {
@@ -909,8 +914,7 @@ const DocumentView = {
         }
 
         if (lineHasCheckedTask) {
-            // Apply line-through to the entire line text
-            builder.push(Decoration.mark({ class: 'md-task-done' }).range(from, line.to));
+            builder.push(Decoration.mark({ class: 'md-task-done' }).range(taskLineStart, line.to));
         }
 
         // Header pattern

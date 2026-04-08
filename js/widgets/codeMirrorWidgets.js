@@ -119,11 +119,28 @@ function createCodeMirrorWidgets(documentView) {
         eq(other) {
             return other.text === this.text && other.url === this.url && other.from === this.from;
         }
+        getDisplayText() {
+            if (this.text !== this.url || this.text.length <= 72) {
+                return this.text;
+            }
+
+            try {
+                const parsedUrl = new URL(this.url);
+                const prefix = `${parsedUrl.host}${parsedUrl.pathname}`;
+                const suffix = `${parsedUrl.search}${parsedUrl.hash}`;
+                const head = prefix.slice(0, 44);
+                const tail = suffix ? suffix.slice(-16) : this.text.slice(-16);
+                return `${head}...${tail}`;
+            } catch {
+                return `${this.text.slice(0, 56)}...${this.text.slice(-13)}`;
+            }
+        }
         toDOM(view) {
             const a = document.createElement("a");
             a.className = "md-link-text";
             a.href = this.url;
-            a.textContent = this.text;
+            a.textContent = this.getDisplayText();
+            a.title = this.url;
             a.target = "_blank";
             a.rel = "noopener noreferrer";
             a.onclick = (e) => {
