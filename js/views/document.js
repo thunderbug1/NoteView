@@ -987,7 +987,7 @@ const DocumentView = {
                 if (hideSyntax) {
                     // Strip trailing punctuation that's unlikely to be part of the URL
                     let url = match[0];
-                    while (/[.,;:!?)\]>}]/.test(url) && url.length > 1) {
+                    while (/[.,;:!?)\]>}]$/.test(url) && url.length > 1) {
                         url = url.slice(0, -1);
                     }
                     const urlTo = matchFrom + url.length;
