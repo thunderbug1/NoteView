@@ -14,6 +14,9 @@ const PRECACHE_URLS = [
   '/css/views/kanban.css',
   '/css/views/history.css',
   '/css/views/settings.css',
+  '/vendor/marked.js?v=1',
+  '/vendor/isomorphic-git.js?v=1',
+  '/vendor/codemirror.js?v=1',
   '/js/gitFs.js',
   '/js/gitStore.js',
   '/js/gitRemote.js',
@@ -68,9 +71,6 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET and cross-origin requests
   if (event.request.method !== 'GET' || url.origin !== location.origin) return;
-
-  // Skip CodeMirror CDN and Google Fonts — always fetch from network
-  if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return;
 
   if (shouldUseNetworkFirst(event.request)) {
     event.respondWith(

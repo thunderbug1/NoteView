@@ -1,0 +1,18 @@
+{
+  "name": "noteview-vendor",
+  "private": true,
+  "scripts": {
+    "vendor": "node scripts/vendor-codemirror.js"
+  },
+  "devDependencies": {
+    "codemirror": "^6.0.1",
+    "@codemirror/lang-markdown": "^6.2.5",
+    "@codemirror/language-data": "^6.0.1",
+    "@codemirror/view": "^6.26.2",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/merge": "^6.2.2",
+    "@codemirror/commands": "^6.3.3",
+    "@codemirror/autocomplete": "^6.16.0",
+    "esbuild": "^0.20.2"
+  }
+}

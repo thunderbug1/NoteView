@@ -575,7 +575,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: -apple-system, sans-serif;
     font-size: 0.85rem;
     padding: 0.5rem 0;
     overflow: hidden;
