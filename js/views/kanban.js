@@ -64,7 +64,7 @@ const KanbanView = {
             if (contextSelection.has('unblockedTodos') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('unassigned') && !TaskParser.isUnassignedTask(task)) {
+            if (contextSelection.has('unassigned') && !TaskParser.isUnassignedTask(task, { onlyActive: true })) {
                 return false;
             }
             return true;
