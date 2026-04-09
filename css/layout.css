@@ -59,8 +59,7 @@
     border-bottom: 1px solid var(--border);
 }
 
-.sidebar-section:last-of-type {
-    border-bottom: none;
+.sidebar-scroll {
     flex: 1;
     overflow-y: auto;
 }
