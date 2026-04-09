@@ -19,7 +19,6 @@
     <link rel="stylesheet" href="css/views/settings.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
@@ -181,45 +180,11 @@
     </div>
 
     <!-- Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://unpkg.com/isomorphic-git@1.24.5/index.umd.min.js"></script>
+    <script src="vendor/marked.js?v=1"></script>
+    <script src="vendor/isomorphic-git.js?v=1"></script>
 
     <!-- CodeMirror 6 for Live Preview Markdown Editing -->
-    <script type="module">
-        import {EditorView, basicSetup} from "https://esm.sh/codemirror";
-        import {markdown} from "https://esm.sh/@codemirror/lang-markdown";
-        import {languages} from "https://esm.sh/@codemirror/language-data";
-        import {ViewPlugin, Decoration, WidgetType, keymap, placeholder} from "https://esm.sh/@codemirror/view@6";
-        import {EditorState, StateField, Prec} from "https://esm.sh/@codemirror/state@6";
-        import {unifiedMergeView} from "https://esm.sh/@codemirror/merge@6";
-        import {indentWithTab} from "https://esm.sh/@codemirror/commands@6";
-        import {autocompletion, completionKeymap, closeBracketsKeymap} from "https://esm.sh/@codemirror/autocomplete@6";
-
-        // Export to global scope for use in document.js
-        window.CodeMirror = {
-            EditorView,
-            basicSetup,
-            Prec,
-            keymap,
-            markdown,
-            languages,
-            ViewPlugin,
-            Decoration,
-            WidgetType,
-            StateField,
-            unifiedMergeView,
-            indentWithTab,
-            placeholder,
-            EditorState,
-            autocompletion,
-            completionKeymap,
-            closeBracketsKeymap
-        };
-
-        // Signal when CodeMirror is ready
-        window.CodeMirrorReady = true;
-        window.dispatchEvent(new Event('CodeMirrorReady'));
-    </script>
+    <script src="vendor/codemirror.js?v=1"></script>
 
     <!-- App Scripts -->
     <script src="js/gitFs.js"></script>
