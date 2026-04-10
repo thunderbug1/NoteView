@@ -193,6 +193,26 @@
 
 @media (max-width: 768px) {
     body.sidebar-open { overflow: hidden; }
+    body { overscroll-behavior-x: none; }
+
+    .mobile-menu-btn {
+        display: flex;
+        position: fixed;
+        top: 0.5rem;
+        left: 0.5rem;
+        z-index: 50;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm, 6px);
+        color: var(--text-primary);
+        padding: 0.5rem;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+    }
+    .mobile-menu-btn:hover { opacity: 1; }
 
     #sidebar {
         position: fixed;
@@ -200,9 +220,11 @@
         left: -280px;
         width: 280px;
         height: 100vh;
+        height: 100dvh;
         z-index: 100;
         transition: left 0.3s ease;
         overflow-y: auto;
+        padding-left: env(safe-area-inset-left);
     }
     #sidebar.sidebar-open { left: 0; }
 
@@ -215,5 +237,52 @@
     }
     #sidebarOverlay.active { display: block; }
 
-    #viewContainer { padding: 1rem; }
+    #viewContainer { padding: 1rem; padding-top: 3.5rem; }
+}
+
+/* Hamburger button hidden on desktop */
+.mobile-menu-btn { display: none; }
+
+/* PWA install banner */
+.install-banner {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    padding: 0.75rem 1rem;
+    z-index: 200;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+}
+.install-banner.visible {
+    display: flex;
+}
+.install-banner span {
+    flex: 1;
+    color: var(--text-secondary);
+}
+.install-banner button {
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.install-banner #installBtn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+}
+.install-banner .dismiss {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 0.3rem 0.5rem;
 }
