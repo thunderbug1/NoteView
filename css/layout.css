@@ -229,6 +229,25 @@
     }
     #sidebar.sidebar-open { left: 0; }
 
+    #sidebarRight {
+        position: fixed;
+        top: 0;
+        right: -280px;
+        width: 280px;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 100;
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: right 0.3s ease;
+        overflow-y: auto;
+        padding-right: env(safe-area-inset-right);
+    }
+    #sidebarRight.sidebar-open { right: 0; }
+
     #sidebarOverlay {
         display: none;
         position: fixed;

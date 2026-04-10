@@ -109,6 +109,7 @@ const App = {
                         const permission = await savedHandle.requestPermission({ mode: 'readwrite' });
                         if (permission === 'granted') {
                             Store.directoryHandle = savedHandle;
+                            await GitStore.init(savedHandle);
                             await Store.loadBlocks();
                             await this.completeInitialization();
                         } else {
@@ -171,8 +172,10 @@ const App = {
     setupEventListeners() {
         // Mobile sidebar slide
         const sidebar = document.getElementById('sidebar');
+        const sidebarRight = document.getElementById('sidebarRight');
         const overlay = document.getElementById('sidebarOverlay');
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const screenWidth = () => window.innerWidth;
 
         function openSidebar() {
             sidebar.classList.add('sidebar-open');
@@ -184,11 +187,24 @@ const App = {
             overlay.classList.remove('active');
             document.body.classList.remove('sidebar-open');
         }
+        function openSidebarRight() {
+            sidebarRight.classList.add('sidebar-open');
+            overlay.classList.add('active');
+            document.body.classList.add('sidebar-open');
+        }
+        function closeSidebarRight() {
+            sidebarRight.classList.remove('sidebar-open');
+            overlay.classList.remove('active');
+            document.body.classList.remove('sidebar-open');
+        }
 
-        overlay?.addEventListener('click', closeSidebar);
+        overlay?.addEventListener('click', () => {
+            closeSidebar();
+            closeSidebarRight();
+        });
         mobileMenuBtn?.addEventListener('click', openSidebar);
 
-        // Touch swipe for sidebar
+        // Touch swipe for sidebars
         let touchStartX = 0, touchStartY = 0;
         document.addEventListener('touchstart', e => {
             touchStartX = e.touches[0].clientX;
@@ -198,9 +214,41 @@ const App = {
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
             if (Math.abs(dx) < 50 || dy > 30) return;
-            // Open: swipe right from inner edge zone (10-35px) — avoids OS back gesture at pixel 0
-            if (dx > 0 && touchStartX > 10 && touchStartX < 35) openSidebar();
-            if (dx < 0 && sidebar.classList.contains('sidebar-open')) closeSidebar();
+            const w = screenWidth();
+
+            // Open left sidebar: swipe right starting from left edge
+            // Use an expanding zone: closer to edge needs less distance,
+            // further from edge is still accepted if gesture is decisive
+            if (dx > 0 && !sidebar.classList.contains('sidebar-open') &&
+                !sidebarRight.classList.contains('sidebar-open')) {
+                // Zones: 0-10px (OS gesture area, skip), 10-50px (strong match), 50-120px (forgiving)
+                const fromLeft = touchStartX;
+                if ((fromLeft > 10 && fromLeft < 50) ||
+                    (fromLeft >= 50 && fromLeft < 120 && dx > 80)) {
+                    openSidebar();
+                    return;
+                }
+            }
+            // Close left sidebar: swipe left while open
+            if (dx < 0 && sidebar.classList.contains('sidebar-open')) {
+                closeSidebar();
+                return;
+            }
+            // Open right sidebar: swipe left starting from right edge
+            if (dx < 0 && !sidebarRight.classList.contains('sidebar-open') &&
+                !sidebar.classList.contains('sidebar-open')) {
+                const fromRight = w - touchStartX;
+                if ((fromRight > 10 && fromRight < 50) ||
+                    (fromRight >= 50 && fromRight < 120 && Math.abs(dx) > 80)) {
+                    openSidebarRight();
+                    return;
+                }
+            }
+            // Close right sidebar: swipe right while open
+            if (dx > 0 && sidebarRight.classList.contains('sidebar-open')) {
+                closeSidebarRight();
+                return;
+            }
         });
 
         // PWA install prompt
