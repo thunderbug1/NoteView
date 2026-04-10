@@ -181,12 +181,13 @@
             <div id="viewContainer"></div>
         </main>
 
-        <!-- PWA install prompt -->
-        <div id="installBanner" class="install-banner">
-            <span>Install NoteView for the best mobile experience</span>
-            <button id="installBtn">Install</button>
-            <button id="installDismissBtn" class="dismiss">&times;</button>
-        </div>
+    </div>
+
+    <!-- PWA install prompt (outside #app to avoid flex layout interference) -->
+    <div id="installBanner" class="install-banner">
+        <span>Install NoteView for the best mobile experience</span>
+        <button id="installBtn">Install</button>
+        <button id="installDismissBtn" class="dismiss">&times;</button>
     </div>
 
     <!-- Libraries -->
@@ -222,7 +223,7 @@
     <script src="js/views/kanban.js?v=3"></script>
     <script src="js/views/settings.js"></script>
 
-    <script src="js/main.js?v=8"></script>
+    <script src="js/main.js?v=9"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
