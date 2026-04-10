@@ -38,7 +38,7 @@ const PRECACHE_URLS = [
   '/js/views/timeline.js?v=3',
   '/js/views/kanban.js?v=4',
   '/js/views/settings.js?v=4',
-  '/js/main.js?v=11',
+  '/js/main.js?v=12',
 ];
 
 function shouldUseNetworkFirst(request) {

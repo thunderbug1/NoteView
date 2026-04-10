@@ -204,6 +204,14 @@ const App = {
         });
         mobileMenuBtn?.addEventListener('click', openSidebar);
 
+        // Desktop right sidebar toggle
+        const sidebarRightToggle = document.getElementById('sidebarRightToggle');
+        sidebarRightToggle?.addEventListener('click', () => {
+            const collapsed = sidebarRight.classList.toggle('collapsed');
+            sidebarRightToggle.classList.toggle('shifted', collapsed);
+            sidebarRightToggle.classList.toggle('rotated', collapsed);
+        });
+
         // Touch swipe for sidebars
         let touchStartX = 0, touchStartY = 0;
         document.addEventListener('touchstart', e => {

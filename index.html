@@ -173,16 +173,6 @@
 
         <div id="sidebarOverlay"></div>
 
-        <!-- Right Sidebar (mobile) -->
-        <aside id="sidebarRight">
-            <div class="app-header">
-                <h1>Details</h1>
-            </div>
-            <div class="sidebar-scroll">
-                <!-- Content placeholder -->
-            </div>
-        </aside>
-
         <!-- Main Content -->
         <main id="main">
             <button id="mobileMenuBtn" class="mobile-menu-btn" title="Open menu">
@@ -190,6 +180,16 @@
             </button>
             <div id="viewContainer"></div>
         </main>
+
+        <!-- Right Sidebar -->
+        <button id="sidebarRightToggle" class="sidebar-right-toggle" title="Toggle details panel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <aside id="sidebarRight">
+            <div class="sidebar-scroll">
+                <!-- Content placeholder -->
+            </div>
+        </aside>
 
     </div>
 
@@ -233,7 +233,7 @@
     <script src="js/views/kanban.js?v=4"></script>
     <script src="js/views/settings.js?v=4"></script>
 
-    <script src="js/main.js?v=11"></script>
+    <script src="js/main.js?v=12"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
