@@ -13,7 +13,7 @@ const PRECACHE_URLS = [
   '/css/views/timeline.css',
   '/css/views/kanban.css',
   '/css/views/history.css',
-  '/css/views/settings.css',
+  '/css/views/settings.css?v=2',
   '/vendor/marked.js?v=1',
   '/vendor/isomorphic-git.js?v=1',
   '/vendor/codemirror.js?v=1',
@@ -21,7 +21,7 @@ const PRECACHE_URLS = [
   '/js/gitStore.js',
   '/js/gitRemote.js',
   '/js/undoRedoManager.js?v=5',
-  '/js/store.js?v=8',
+  '/js/store.js?v=9',
   '/js/selectionManager.js?v=2',
   '/js/utils/cacheManager.js',
   '/js/utils/common.js',
@@ -36,8 +36,8 @@ const PRECACHE_URLS = [
   '/js/views/history.js',
   '/js/views/document.js?v=4',
   '/js/views/timeline.js?v=3',
-  '/js/views/kanban.js?v=3',
-  '/js/views/settings.js',
+  '/js/views/kanban.js?v=4',
+  '/js/views/settings.js?v=2',
   '/js/main.js?v=11',
 ];
 
