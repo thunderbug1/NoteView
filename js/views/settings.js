@@ -41,6 +41,19 @@ const SettingsView = {
                 </div>
 
                 <div class="settings-section">
+                    <h3>Tag Management</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Manage Tags</label>
+                            <p class="settings-item-hint">Rename or delete tags across all notes in this vault.</p>
+                        </div>
+                        <button id="manageTagsBtn" class="settings-btn secondary">
+                            Manage Tags...
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Editor Shortcuts</h3>
                     <div class="settings-item">
                         <div class="settings-item-info">
@@ -72,6 +85,11 @@ const SettingsView = {
         const backBtn = document.getElementById('settingsBackBtn');
         if (backBtn) {
             backBtn.addEventListener('click', () => App.setView('document'));
+        }
+
+        const manageTagsBtn = document.getElementById('manageTagsBtn');
+        if (manageTagsBtn) {
+            manageTagsBtn.addEventListener('click', () => this.openTagModal());
         }
 
         // Shortcut remapping
@@ -116,6 +134,115 @@ const SettingsView = {
                 window.addEventListener('keydown', handleKeydown, true);
             });
         }
+    },
+
+    openTagModal() {
+        const allTags = SelectionManager.getAllContextTags();
+
+        // Count blocks per tag
+        const tagCounts = {};
+        for (const tag of allTags) {
+            tagCounts[tag] = Store.blocks.filter(b => b.tags?.includes(tag)).length;
+        }
+
+        const tagListHtml = allTags.length === 0
+            ? '<div class="tag-editor-empty">No tags found in this vault</div>'
+            : `<div class="tag-editor-list">${allTags.map(tag => `
+                <div class="tag-editor-row" data-tag="${escapeHtml(tag)}">
+                    <span class="tag-name">${escapeHtml(tag)}</span>
+                    <span class="tag-count">${tagCounts[tag]} note${tagCounts[tag] !== 1 ? 's' : ''}</span>
+                    <div class="tag-actions">
+                        <button class="tag-action-btn rename" data-tag="${escapeHtml(tag)}">Rename</button>
+                        <button class="tag-action-btn delete" data-tag="${escapeHtml(tag)}">Delete</button>
+                    </div>
+                </div>`).join('')}</div>`;
+
+        const modal = Modal.create({
+            title: 'Manage Tags',
+            content: tagListHtml,
+            width: '480px'
+        });
+
+        this.attachTagListeners(modal);
+    },
+
+    attachTagListeners(modal) {
+        const tagList = modal.querySelector('.tag-editor-list');
+        if (!tagList) return;
+
+        tagList.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.tag-action-btn');
+            if (!btn) return;
+
+            const tag = btn.dataset.tag;
+            const row = btn.closest('.tag-editor-row');
+
+            if (btn.classList.contains('rename')) {
+                this.startInlineRename(row, tag, modal);
+            } else if (btn.classList.contains('delete')) {
+                const count = Store.blocks.filter(b => b.tags?.includes(tag)).length;
+                if (confirm(`Remove "${tag}" from ${count} note${count !== 1 ? 's' : ''}?`)) {
+                    btn.disabled = true;
+                    btn.textContent = 'Deleting...';
+                    await Store.deleteTag(tag);
+                    modal.close();
+                    this.openTagModal();
+                }
+            }
+        });
+    },
+
+    startInlineRename(row, oldTag, modal) {
+        const nameEl = row.querySelector('.tag-name');
+        const actionsEl = row.querySelector('.tag-actions');
+
+        // Replace name with input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'rename-input';
+        input.value = oldTag;
+
+        nameEl.replaceWith(input);
+        input.focus();
+        input.select();
+
+        // Replace action buttons with Save/Cancel
+        actionsEl.innerHTML = `
+            <button class="tag-action-btn save">Save</button>
+            <button class="tag-action-btn cancel">Cancel</button>
+        `;
+
+        const doSave = async () => {
+            const newTag = input.value.trim();
+            if (!newTag || newTag === oldTag) {
+                modal.close();
+                this.openTagModal();
+                return;
+            }
+            // Check for duplicate
+            if (SelectionManager.getAllContextTags().includes(newTag)) {
+                alert(`Tag "${newTag}" already exists.`);
+                input.focus();
+                return;
+            }
+            actionsEl.querySelector('.save').disabled = true;
+            actionsEl.querySelector('.save').textContent = 'Saving...';
+            await Store.renameTag(oldTag, newTag);
+            modal.close();
+            this.openTagModal();
+        };
+
+        const doCancel = () => {
+            modal.close();
+            this.openTagModal();
+        };
+
+        actionsEl.querySelector('.save').addEventListener('click', doSave);
+        actionsEl.querySelector('.cancel').addEventListener('click', doCancel);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doSave();
+            if (e.key === 'Escape') doCancel();
+        });
     }
 };
 

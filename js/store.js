@@ -813,6 +813,31 @@ const Store = {
         }
     },
 
+    // Rename a tag across all blocks
+    async renameTag(oldTag, newTag) {
+        if (oldTag === newTag) return;
+        const affected = this.blocks.filter(b => b.tags?.includes(oldTag));
+        for (const block of affected) {
+            block.tags = block.tags.map(t => t === oldTag ? newTag : t);
+            await this.saveBlock(block, { commit: true, commitMessage: `Rename tag "${oldTag}" to "${newTag}"`, skipUndo: true });
+        }
+        this._filteredBlocksCache.invalidate();
+        SelectionManager.updateTagCounts();
+        return affected.length;
+    },
+
+    // Delete a tag from all blocks
+    async deleteTag(tag) {
+        const affected = this.blocks.filter(b => b.tags?.includes(tag));
+        for (const block of affected) {
+            block.tags = block.tags.filter(t => t !== tag);
+            await this.saveBlock(block, { commit: true, commitMessage: `Remove tag "${tag}"`, skipUndo: true });
+        }
+        this._filteredBlocksCache.invalidate();
+        SelectionManager.updateTagCounts();
+        return affected.length;
+    },
+
     // Override loadBlocks to invalidate cache
     async loadBlocks() {
         this.blocks = [];
