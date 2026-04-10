@@ -172,6 +172,7 @@ const App = {
         // Mobile sidebar slide
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebarOverlay');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 
         function openSidebar() {
             sidebar.classList.add('sidebar-open');
@@ -185,6 +186,7 @@ const App = {
         }
 
         overlay?.addEventListener('click', closeSidebar);
+        mobileMenuBtn?.addEventListener('click', openSidebar);
 
         // Touch swipe for sidebar
         let touchStartX = 0, touchStartY = 0;
@@ -196,8 +198,36 @@ const App = {
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
             if (Math.abs(dx) < 50 || dy > 30) return;
-            if (dx > 0 && touchStartX < 40) openSidebar();
+            // Open: swipe right from inner edge zone (10-35px) — avoids OS back gesture at pixel 0
+            if (dx > 0 && touchStartX > 10 && touchStartX < 35) openSidebar();
             if (dx < 0 && sidebar.classList.contains('sidebar-open')) closeSidebar();
+        });
+
+        // PWA install prompt
+        let deferredPrompt = null;
+        const installBanner = document.getElementById('installBanner');
+        const installBtn = document.getElementById('installBtn');
+        const installDismissBtn = document.getElementById('installDismissBtn');
+
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Only show on mobile
+            if (window.innerWidth <= 768 && installBanner) {
+                installBanner.classList.add('visible');
+            }
+        });
+
+        installBtn?.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            if (installBanner) installBanner.classList.remove('visible');
+        });
+
+        installDismissBtn?.addEventListener('click', () => {
+            if (installBanner) installBanner.classList.remove('visible');
         });
 
         // Deselect / defocus editor when clicking anywhere outside a CM editor —

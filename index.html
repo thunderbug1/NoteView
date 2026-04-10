@@ -175,8 +175,18 @@
 
         <!-- Main Content -->
         <main id="main">
+            <button id="mobileMenuBtn" class="mobile-menu-btn" title="Open menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
             <div id="viewContainer"></div>
         </main>
+
+        <!-- PWA install prompt -->
+        <div id="installBanner" class="install-banner">
+            <span>Install NoteView for the best mobile experience</span>
+            <button id="installBtn">Install</button>
+            <button id="installDismissBtn" class="dismiss">&times;</button>
+        </div>
     </div>
 
     <!-- Libraries -->
@@ -212,7 +222,7 @@
     <script src="js/views/kanban.js?v=3"></script>
     <script src="js/views/settings.js"></script>
 
-    <script src="js/main.js?v=7"></script>
+    <script src="js/main.js?v=8"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
