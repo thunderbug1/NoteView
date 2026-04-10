@@ -250,3 +250,102 @@
     50% { opacity: 0.8; transform: scale(0.98); }
     100% { opacity: 1; transform: scale(1); }
 }
+
+/* Tag Editor */
+.tag-editor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.tag-editor-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+
+.tag-editor-row:hover {
+    border-color: var(--accent-light);
+    box-shadow: var(--shadow-sm);
+}
+
+.tag-editor-row .tag-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.tag-editor-row .tag-count {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.tag-editor-row .tag-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tag-editor-row .tag-action-btn {
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    transition: all 0.15s ease;
+}
+
+.tag-editor-row .tag-action-btn:hover {
+    background: var(--accent-light);
+    color: white;
+    border-color: var(--accent-light);
+}
+
+.tag-editor-row .tag-action-btn.delete:hover {
+    background: var(--danger-color, #ef4444);
+    border-color: var(--danger-color, #ef4444);
+}
+
+.tag-editor-row .rename-input {
+    flex: 1;
+    padding: 0.35rem 0.6rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--accent-primary);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.tag-editor-row .tag-action-btn.save {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+
+.tag-editor-row .tag-action-btn.save:hover {
+    background: var(--accent-dark);
+}
+
+.tag-editor-empty {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 1rem;
+    text-align: center;
+}
