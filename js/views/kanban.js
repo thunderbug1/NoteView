@@ -91,7 +91,13 @@ const KanbanView = {
     attachEventListeners(container) {
         const cards = container.querySelectorAll('.kanban-card');
         const columns = container.querySelectorAll('.kanban-column .blocks');
+        const isMobile = window.innerWidth <= 768;
         let dragInProgress = false;
+
+        // Disable native drag on mobile
+        if (isMobile) {
+            cards.forEach(card => card.setAttribute('draggable', 'false'));
+        }
 
         const buildDragPayload = (card) => JSON.stringify({
             id: card.dataset.id,
@@ -102,7 +108,7 @@ const KanbanView = {
             columnId: card.dataset.columnId
         });
 
-        // Card dragging
+        // Card dragging (desktop only)
         cards.forEach(card => {
             card.addEventListener('dragstart', (e) => {
                 card.classList.add('dragging');
@@ -122,7 +128,7 @@ const KanbanView = {
                     dragInProgress = false;
                 }, 0);
             });
-            
+
             // Edit modal on click
             const editBtn = card.querySelector('.kanban-edit-btn');
             if (editBtn) {
@@ -136,6 +142,29 @@ const KanbanView = {
                             KanbanView.showEditModal(taskToEdit, block);
                         }
                     }
+                });
+            }
+
+            // Long-press to move on mobile
+            if (isMobile) {
+                let longPressTimer = null;
+                let longPressTriggered = false;
+
+                card.addEventListener('touchstart', (e) => {
+                    longPressTriggered = false;
+                    longPressTimer = setTimeout(() => {
+                        longPressTriggered = true;
+                        const payload = buildDragPayload(card);
+                        KanbanView.showMoveModal(JSON.parse(payload));
+                    }, 500);
+                }, { passive: true });
+
+                card.addEventListener('touchmove', () => {
+                    clearTimeout(longPressTimer);
+                }, { passive: true });
+
+                card.addEventListener('touchend', () => {
+                    clearTimeout(longPressTimer);
                 });
             }
 
@@ -156,13 +185,13 @@ const KanbanView = {
                         const blockId = card.dataset.blockId;
                         const block = Store.blocks.find(b => b.id === blockId);
                         if (!block) return;
-                        
+
                         App.showAssigneeModal((contact) => {
                             // Find the exact task in block content and update it
                             // Re-extract tasks to find the exact one in current content
                             const tasks = KanbanView.extractTasks([block]);
                             const taskToUpdate = tasks.find(t => t.id === card.dataset.id);
-                            
+
                             if (taskToUpdate) {
                                 // Update assignee in originalText
                                 let newText = taskToUpdate.originalText;
@@ -171,15 +200,15 @@ const KanbanView = {
                                 } else {
                                     newText += ` [assignee:: ${contact}]`;
                                 }
-                                
+
                                 const content = block.content;
                                 const beforeTask = content.substring(0, taskToUpdate.matchIndex);
                                 let nextNewline = content.indexOf('\n', taskToUpdate.matchIndex);
                                 if (nextNewline === -1) nextNewline = content.length;
-                                
+
                                 const newLine = taskToUpdate.prefix + '[' + taskToUpdate.state + '] ' + newText;
                                 const newContent = beforeTask + newLine + content.substring(nextNewline);
-                                
+
                                 const commitMessage = `Update assignee for '${taskToUpdate.text}'`;
                                 App.saveBlockContent(block.id, newContent, { commit: true, commitMessage }).then(() => {
                                     App.render();
@@ -240,6 +269,52 @@ const KanbanView = {
                         }
                     }
                 }
+            });
+        });
+    },
+
+    showMoveModal(data) {
+        const currentColumn = this.getColumnById(data.columnId);
+        const columns = this.columns.filter(col => col.id !== data.columnId);
+
+        const content = `
+            <div style="padding-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                ${columns.map(col => `
+                    <button class="kanban-move-btn" data-target-column="${col.id}" style="
+                        width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px;
+                        background: var(--bg-primary, #fff); cursor: pointer; font-family: inherit;
+                        font-size: 14px; font-weight: 500; text-align: left;
+                    ">${col.label}</button>
+                `).join('')}
+            </div>
+        `;
+
+        const modal = Modal.create({
+            title: `Move to...`,
+            content,
+            width: '280px'
+        });
+
+        modal.querySelectorAll('.kanban-move-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const targetColumnId = btn.dataset.targetColumn;
+                const targetColumn = KanbanView.getColumnById(targetColumnId);
+                if (!targetColumn) return;
+
+                const block = Store.blocks.find(b => b.id === data.blockId);
+                if (!block || !block.content) { modal.close(); return; }
+
+                const blockContent = block.content;
+                const targetPos = data.matchIndex + data.prefix.length + 1;
+
+                if (blockContent[targetPos - 1] === '[' && blockContent[targetPos + 1] === ']') {
+                    const commitMessage = `Move task to ${targetColumn.label}`;
+                    const newContent = blockContent.substring(0, targetPos) + targetColumn.state + blockContent.substring(targetPos + 1);
+                    await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
+                }
+
+                modal.close();
+                App.render();
             });
         });
     },
