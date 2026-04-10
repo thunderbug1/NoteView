@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## General Rules
+
+- **Always update documentation** (`docs/` directory and this file) when making changes that affect documented behavior, architecture, or data flow. Documentation should stay in sync with the code.
+
 ## Project Overview
 
 NoteView is a browser-based markdown note-taking and task management app with built-in git version control. It runs entirely client-side — no server, no build step, no framework. Data lives as plain `.md` files on the user's local filesystem via the File System Access API.

@@ -240,6 +240,10 @@ aside#sidebar
       div.tag-group: Computed Tags (static HTML)
       div.tag-group: People  (dynamic, from renderContactsSidebar)
   div.sidebar-footer      — Settings link
+
+aside#sidebarRight (mobile only)
+  div.app-header          — "Details" heading
+  div.sidebar-scroll      — Content placeholder (empty)
 ```
 
 ### Tag counts and dimming
@@ -289,8 +293,9 @@ All components reference CSS variables (`var(--bg-primary)`, `var(--text-primary
 ### CSS breakpoints
 
 At `max-width: 768px` (`css/layout.css`):
-- Sidebar becomes fixed-position, hidden off-screen (`left: -280px`)
-- `.sidebar-open` class animates `left: 0` with 0.3s ease
+- Left sidebar becomes fixed-position, hidden off-screen (`left: -280px`)
+- Right sidebar (`#sidebarRight`) slides from the right (`right: -280px`)
+- `.sidebar-open` class animates either sidebar into view with 0.3s ease
 - Semi-transparent overlay appears
 - `body.sidebar-open` prevents background scrolling
 - View container padding reduced from `2rem` to `1rem`
@@ -298,9 +303,17 @@ At `max-width: 768px` (`css/layout.css`):
 
 ### Touch swipe gestures
 
-Implemented in `App.setupEventListeners()`:
+Implemented in `App.setupEventListeners()`. Both sidebars share one overlay and only one can be open at a time.
 
-- Right-swipe from left edge (<40px from left) opens sidebar
-- Left-swipe while sidebar is open closes it
-- Minimum 50px horizontal distance, max 30px vertical variance
-- Overlay click also closes sidebar
+**Left sidebar (swipe right):**
+- Zone 10–50px from left edge: any right-swipe >50px opens it
+- Zone 50–120px from left edge: opens if swipe distance >80px (forgiving)
+- Zone 0–10px is ignored to avoid conflicting with OS back gesture
+- Left-swipe while open closes it
+
+**Right sidebar (swipe left):**
+- Same zone logic mirrored from the right edge
+- Swipe left from right edge (10–50px: any swipe; 50–120px: needs >80px distance)
+- Right-swipe while open closes it
+
+Both gestures require minimum 50px horizontal distance and max 30px vertical variance. Overlay click closes whichever sidebar is open.
