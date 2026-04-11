@@ -1,44 +1,44 @@
-const CACHE_NAME = 'noteview-v2';
+const CACHE_NAME = 'noteview-v3';
 
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/icon.svg',
-  '/manifest.json',
-  '/css/base.css',
-  '/css/layout.css',
-  '/css/components.css',
-  '/css/editor.css',
-  '/css/views/document.css',
-  '/css/views/timeline.css',
-  '/css/views/kanban.css',
-  '/css/views/history.css',
-  '/css/views/settings.css?v=2',
-  '/vendor/marked.js?v=1',
-  '/vendor/isomorphic-git.js?v=1',
-  '/vendor/codemirror.js?v=1',
-  '/js/gitFs.js',
-  '/js/gitStore.js',
-  '/js/gitRemote.js',
-  '/js/undoRedoManager.js?v=5',
-  '/js/store.js?v=9',
-  '/js/selectionManager.js?v=2',
-  '/js/utils/cacheManager.js',
-  '/js/utils/common.js',
-  '/js/utils/contactHelper.js',
-  '/js/utils/modal.js',
-  '/js/utils/performance.js',
-  '/js/utils/taskParser.js',
-  '/js/utils/timeFilter.js',
-  '/js/utils/sortManager.js',
-  '/js/widgets/codeMirrorWidgets.js',
-  '/js/menus/taskMenus.js',
-  '/js/views/history.js',
-  '/js/views/document.js?v=4',
-  '/js/views/timeline.js?v=3',
-  '/js/views/kanban.js?v=4',
-  '/js/views/settings.js?v=4',
-  '/js/main.js?v=12',
+  './',
+  './index.html',
+  './icon.svg',
+  './manifest.json',
+  './css/base.css',
+  './css/layout.css',
+  './css/components.css',
+  './css/editor.css',
+  './css/views/document.css',
+  './css/views/timeline.css',
+  './css/views/kanban.css',
+  './css/views/history.css',
+  './css/views/settings.css?v=2',
+  './vendor/marked.js?v=1',
+  './vendor/isomorphic-git.js?v=1',
+  './vendor/codemirror.js?v=1',
+  './js/gitFs.js',
+  './js/gitStore.js',
+  './js/gitRemote.js',
+  './js/undoRedoManager.js?v=5',
+  './js/store.js?v=9',
+  './js/selectionManager.js?v=2',
+  './js/utils/cacheManager.js',
+  './js/utils/common.js',
+  './js/utils/contactHelper.js',
+  './js/utils/modal.js',
+  './js/utils/performance.js',
+  './js/utils/taskParser.js',
+  './js/utils/timeFilter.js',
+  './js/utils/sortManager.js',
+  './js/widgets/codeMirrorWidgets.js',
+  './js/menus/taskMenus.js',
+  './js/views/history.js',
+  './js/views/document.js?v=4',
+  './js/views/timeline.js?v=3',
+  './js/views/kanban.js?v=4',
+  './js/views/settings.js?v=4',
+  './js/main.js?v=12',
 ];
 
 function shouldUseNetworkFirst(request) {
@@ -89,7 +89,7 @@ self.addEventListener('fetch', (event) => {
           }
 
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('./index.html');
           }
 
           throw new Error(`No cached response for ${event.request.url}`);
@@ -110,7 +110,7 @@ self.addEventListener('fetch', (event) => {
       });
     }).catch(() => {
       if (event.request.mode === 'navigate') {
-        return caches.match('/index.html');
+        return caches.match('./index.html');
       }
     })
   );
