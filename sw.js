@@ -34,7 +34,7 @@ const PRECACHE_URLS = [
   './js/widgets/codeMirrorWidgets.js',
   './js/menus/taskMenus.js',
   './js/views/history.js',
-  './js/views/document.js?v=4',
+  './js/views/document.js?v=5',
   './js/views/timeline.js?v=3',
   './js/views/kanban.js?v=4',
   './js/views/settings.js?v=4',
