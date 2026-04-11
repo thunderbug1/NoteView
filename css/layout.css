@@ -239,30 +239,33 @@
 
 /* Mobile Responsive */
 #sidebarOverlay { display: none; }
+.sidebar-edge { display: none; }
 
 @media (max-width: 768px) {
     body.sidebar-open { overflow: hidden; }
     body { overscroll-behavior-x: none; }
 
-    .mobile-menu-btn {
-        display: flex;
+    .sidebar-edge {
+        display: block;
         position: fixed;
-        top: 0.5rem;
-        left: 0.5rem;
-        width: auto;
-        z-index: 50;
-        background: var(--bg-secondary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-sm, 6px);
-        color: var(--text-primary);
-        padding: 0.5rem;
+        top: 0;
+        height: 100vh;
+        height: 100dvh;
+        width: 6px;
         cursor: pointer;
-        align-items: center;
-        justify-content: center;
-        opacity: 0.8;
-        transition: opacity 0.2s;
+        z-index: 50;
+        transition: background 0.2s;
     }
-    .mobile-menu-btn:hover { opacity: 1; }
+    .sidebar-edge-left {
+        left: 0;
+        background: var(--border);
+    }
+    .sidebar-edge-right {
+        right: 0;
+        background: var(--border);
+    }
+    .sidebar-edge-left.hidden { display: none; }
+    .sidebar-edge-right.hidden { display: none; }
 
     #sidebar {
         position: fixed;
@@ -309,9 +312,6 @@
 
     #viewContainer { padding: 1rem; padding-top: 3.5rem; }
 }
-
-/* Hamburger button hidden on desktop */
-.mobile-menu-btn { display: none; }
 
 /* PWA install banner */
 .install-banner {
