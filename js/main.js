@@ -55,6 +55,9 @@ const App = {
 
     async init() {
         ThemeManager.init();
+        // Hide FAB until a vault is opened
+        const fab = document.getElementById('fabNewNote');
+        if (fab) fab.style.display = 'none';
         // Auto-load on startup
         try {
             const container = document.getElementById('viewContainer');
@@ -126,6 +129,9 @@ const App = {
     },
 
     async completeInitialization() {
+        // Show FAB now that a vault is open
+        const fab = document.getElementById('fabNewNote');
+        if (fab) fab.style.display = '';
         console.log('[App] completeInitialization:start', {
             isInitialized: this.isInitialized,
             currentView: Store.currentView,

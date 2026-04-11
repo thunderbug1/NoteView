@@ -251,19 +251,28 @@
         top: 0;
         height: 100vh;
         height: 100dvh;
-        width: 6px;
+        width: 8px;
         cursor: pointer;
         z-index: 50;
         transition: background 0.2s;
+    }
+    .sidebar-edge::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        height: 100%;
+        width: 28px;
     }
     .sidebar-edge-left {
         left: 0;
         background: var(--border);
     }
+    .sidebar-edge-left::before { right: -28px; }
     .sidebar-edge-right {
         right: 0;
         background: var(--border);
     }
+    .sidebar-edge-right::before { left: -28px; }
     .sidebar-edge-left.hidden { display: none; }
     .sidebar-edge-right.hidden { display: none; }
 
