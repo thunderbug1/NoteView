@@ -968,21 +968,26 @@ const DocumentView = {
                         const marker = document.querySelector(`.block-split-marker[data-id="${blockId}"]`);
                         if (marker) {
                             if (update.view.hasFocus) {
+                                if (update.state.doc.lines <= 1) {
+                                    marker.style.display = 'none';
+                                    return;
+                                }
+
                                 const sel = update.state.selection.main;
                                 const isExtract = !sel.empty && sel.from !== sel.to;
-                                
+
                                 const startBlock = update.view.lineBlockAt(sel.from);
                                 const endBlock = update.view.lineBlockAt(sel.to);
-                                
+
                                 const scroller = update.view.scrollDOM;
                                 const blockEl = container.closest('.block');
-                                
+
                                 if (blockEl) {
                                     const contentTop = scroller.getBoundingClientRect().top;
                                     const blockRectTop = blockEl.getBoundingClientRect().top;
-                                    
+
                                     const relativeTopStart = contentTop - blockRectTop + startBlock.top - scroller.scrollTop;
-                                    const iconTopStart = relativeTopStart + (startBlock.height / 2) - 9;
+                                    const iconTopStart = relativeTopStart + startBlock.height - 9;
                                     
                                     marker.style.display = 'flex';
                                     marker.style.top = `${iconTopStart}px`;
@@ -991,7 +996,7 @@ const DocumentView = {
                                     
                                     if (isExtract) {
                                         const relativeTopEnd = contentTop - blockRectTop + endBlock.top - scroller.scrollTop;
-                                        const iconTopEnd = relativeTopEnd + (endBlock.height / 2) - 9;
+                                        const iconTopEnd = relativeTopEnd + endBlock.height - 9;
                                         const h = Math.max(18, iconTopEnd - iconTopStart + 18);
                                         
                                         marker.style.height = `${h}px`;
