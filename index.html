@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#1a1b26">
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="css/base.css">
-    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/layout.css?v=2">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/editor.css">
     <link rel="stylesheet" href="css/views/document.css">
@@ -174,10 +174,10 @@
         <div id="sidebarOverlay"></div>
 
         <!-- Main Content -->
+        <div id="sidebarEdgeLeft" class="sidebar-edge sidebar-edge-left"></div>
+        <div id="sidebarEdgeRight" class="sidebar-edge sidebar-edge-right"></div>
+
         <main id="main">
-            <button id="mobileMenuBtn" class="mobile-menu-btn" title="Open menu">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-            </button>
             <div id="viewContainer"></div>
         </main>
 
@@ -233,7 +233,7 @@
     <script src="js/views/kanban.js?v=4"></script>
     <script src="js/views/settings.js?v=4"></script>
 
-    <script src="js/main.js?v=12"></script>
+    <script src="js/main.js?v=13"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
