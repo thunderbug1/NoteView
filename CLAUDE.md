@@ -26,7 +26,7 @@ npx serve .
 
 **No build step, no package manager needed for dev.** Dependencies are vendored locally in `vendor/` to ensure offline capability. To update vendored dependencies, run `scripts/vendor.sh` (this will create an ephemeral `node_modules/` to run esbuild, bundle CodeMirror, and download CDN scripts directly). CSS and JS are loaded directly via `<link>` and `<script>` tags.
 
-**Cache busting:** Script tags use query parameters (e.g., `js/store.js?v=8`). When editing JS files referenced with `?v=` params, bump the version number in `index.html` and `sw.js` PRECACHE_URLS to ensure users get the update.
+**Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-v4` to `noteview-v5`) and the `?v=` param on the `sw.js` registration line in `index.html`. This is only two places to update, regardless of how many files changed.
 
 ### Single File Release Packaging
 The entire application can be packaged into a single, fully offline `noteview.html` file (with all CSS, JS, and SVG assets inlined) using `node scripts/build-single-file.js`.

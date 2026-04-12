@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v3';
+const CACHE_NAME = 'noteview-v4';
 
 const PRECACHE_URLS = [
   './',
@@ -6,23 +6,23 @@ const PRECACHE_URLS = [
   './icon.svg',
   './manifest.json',
   './css/base.css',
-  './css/layout.css?v=2',
+  './css/layout.css',
   './css/components.css',
   './css/editor.css',
   './css/views/document.css',
   './css/views/timeline.css',
   './css/views/kanban.css',
   './css/views/history.css',
-  './css/views/settings.css?v=2',
-  './vendor/marked.js?v=1',
-  './vendor/isomorphic-git.js?v=1',
-  './vendor/codemirror.js?v=1',
+  './css/views/settings.css',
+  './vendor/marked.js',
+  './vendor/isomorphic-git.js',
+  './vendor/codemirror.js',
   './js/gitFs.js',
   './js/gitStore.js',
   './js/gitRemote.js',
-  './js/undoRedoManager.js?v=5',
-  './js/store.js?v=9',
-  './js/selectionManager.js?v=2',
+  './js/undoRedoManager.js',
+  './js/store.js',
+  './js/selectionManager.js',
   './js/utils/cacheManager.js',
   './js/utils/common.js',
   './js/utils/contactHelper.js',
@@ -34,11 +34,11 @@ const PRECACHE_URLS = [
   './js/widgets/codeMirrorWidgets.js',
   './js/menus/taskMenus.js',
   './js/views/history.js',
-  './js/views/document.js?v=5',
-  './js/views/timeline.js?v=3',
-  './js/views/kanban.js?v=4',
-  './js/views/settings.js?v=4',
-  './js/main.js?v=13',
+  './js/views/document.js',
+  './js/views/timeline.js',
+  './js/views/kanban.js',
+  './js/views/settings.js',
+  './js/main.js',
 ];
 
 function shouldUseNetworkFirst(request) {
@@ -74,7 +74,7 @@ self.addEventListener('fetch', (event) => {
 
   if (shouldUseNetworkFirst(event.request)) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-cache' })
         .then((response) => {
           if (response.ok) {
             const clone = response.clone();
@@ -101,7 +101,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
-      return fetch(event.request).then((response) => {
+      return fetch(event.request, { cache: 'no-cache' }).then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
