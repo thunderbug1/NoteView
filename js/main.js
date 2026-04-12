@@ -18,6 +18,10 @@ const App = {
                         <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:bottom; margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></span>
                         <span>Select Folder</span>
                     </button>
+                    <button id="openVaultManagerBtn" class="select-folder-btn" style="margin-top: 0.5rem; background: var(--bg-secondary); color: var(--text); border: 1px solid var(--border);">
+                        <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:bottom; margin-right:4px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 7 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                        <span>Manage Vaults</span>
+                    </button>
                     <p class="picker-hint">Your notes will be stored as markdown files in the selected folder.</p>
                 </div>
             </div>
@@ -26,6 +30,10 @@ const App = {
         const selectBtn = document.getElementById('selectFolderBtn');
         if (selectBtn) {
             selectBtn.addEventListener('click', () => this.selectDirectory());
+        }
+        const vaultMgrBtn = document.getElementById('openVaultManagerBtn');
+        if (vaultMgrBtn) {
+            vaultMgrBtn.addEventListener('click', () => this.showManageVaultsModal());
         }
     },
 
@@ -55,7 +63,8 @@ const App = {
 
     async init() {
         ThemeManager.init();
-        // Hide FAB until a vault is opened
+        // Hide sidebars and FAB until a vault is opened
+        document.getElementById('app')?.classList.add('no-vault');
         const fab = document.getElementById('fabNewNote');
         if (fab) fab.style.display = 'none';
         // Auto-load on startup
@@ -94,6 +103,10 @@ const App = {
                         <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:bottom; margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></span>
                         <span>Open Notes</span>
                     </button>
+                    <button id="openVaultManagerBtn" class="select-folder-btn" style="margin-top: 0.5rem; background: var(--bg-secondary); color: var(--text); border: 1px solid var(--border);">
+                        <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:bottom; margin-right:4px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 7 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                        <span>Manage Vaults</span>
+                    </button>
                     <p class="picker-hint">Grant access to continue where you left off.</p>
                 </div>
             </div>
@@ -126,10 +139,15 @@ const App = {
                 }
             });
         }
+        const vaultMgrBtn = document.getElementById('openVaultManagerBtn');
+        if (vaultMgrBtn) {
+            vaultMgrBtn.addEventListener('click', () => this.showManageVaultsModal());
+        }
     },
 
     async completeInitialization() {
-        // Show FAB now that a vault is open
+        // Show sidebars and FAB now that a vault is open
+        document.getElementById('app')?.classList.remove('no-vault');
         const fab = document.getElementById('fabNewNote');
         if (fab) fab.style.display = '';
         console.log('[App] completeInitialization:start', {

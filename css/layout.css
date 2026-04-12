@@ -281,6 +281,12 @@
     scroll-behavior: smooth;
 }
 
+/* No-vault state: hide sidebars and edges */
+#app.no-vault #sidebar,
+#app.no-vault #sidebarRight,
+#app.no-vault #sidebarRightToggle,
+#app.no-vault .sidebar-edge { display: none !important; }
+
 /* Mobile Responsive */
 #sidebarOverlay { display: none; }
 .sidebar-edge { display: none; }
