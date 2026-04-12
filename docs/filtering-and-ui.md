@@ -35,7 +35,7 @@ Every mutation method (`setTimeSelection`, `setContactSelection`, `addContextTag
 2. `saveSelectionState()` (context only)
 3. `updateSelectionUI()` — iterates all `.tag-radio-option` DOM elements, compares `data-group`/`data-tag` against selections, toggles `.selected` CSS class
 
-After the mutation, the caller (event handlers in `App.setupEventListeners()`) invokes `App.render()`.
+After the mutation, the caller (event handlers in `App.setupSidebarTagListeners()`) invokes `App.render()`.
 
 ---
 
@@ -49,7 +49,7 @@ The sidebar exposes four filter groups with different selection semantics:
 - **`data-group="time"`**
 - **Options**: `""` (All), `"today"`, `"thisWeek"`, `"thisMonth"`
 - **Behavior**: Mutually exclusive. Clicking the selected option (except "All") deselects it.
-- **Event handler**: `App.setupEventListeners()` line 261
+- **Event handler**: `App.setupSidebarTagListeners()`
 
 ### Tags (multi-select)
 
@@ -70,7 +70,7 @@ The sidebar exposes four filter groups with different selection semantics:
 - **Container**: `#contactTags` — populated dynamically by `SelectionManager.renderContactsSidebar()`
 - **`data-group="contact"`**
 - **Behavior**: Single-select. Click to select, click again to deselect.
-- **Event handler**: `App.setupEventListeners()` line 274
+- **Event handler**: `App.setupSidebarTagListeners()`
 
 ---
 
@@ -212,8 +212,9 @@ Returns `Promise<string|null>`. Text input dialog with Enter/Escape handling.
 
 | Modal | Trigger | Purpose |
 |-------|---------|---------|
-| Tag modal | `App.showTagModal(blockId)` | Multi-select tags for a block |
-| Assignee modal | `App.showAssigneeModal(onSelect, tags)` | Select or create assignee |
+| Tag modal | `TagModal.show(blockId)` (via `App.showTagModal`) | Multi-select tags for a block |
+| Assignee modal | `AssigneeModal.show(onSelect, tags)` (via `App.showAssigneeModal`) | Select or create assignee |
+| Vault manager | `VaultModal.showManager()` (via `App.showManageVaultsModal`) | Create, open, switch, remove vaults |
 | Content modal | `App.showBlockContentModal(blockId)` | Full CodeMirror editor in modal |
 | New note modal | `App.showNewNoteModal()` | Create note from non-document views |
 | Sort config | `SortManager.openSortModal(view, onChange)` | Multi-clause sort configuration |
@@ -303,7 +304,7 @@ At `max-width: 768px` (`css/layout.css`):
 
 ### Touch swipe gestures
 
-Implemented in `App.setupEventListeners()`. Both sidebars share one overlay and only one can be open at a time.
+Implemented in `App.setupSidebarListeners()`. Both sidebars share one overlay and only one can be open at a time.
 
 **Left sidebar (swipe right):**
 - Zone 10–50px from left edge: any right-swipe >50px opens it

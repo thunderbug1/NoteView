@@ -53,13 +53,16 @@ DocumentView manages a `Map<string, EditorView>` at `DocumentView.editors`:
 
 ### Creation
 
-`DocumentView.createEditor(container, blockId, initialContent)`:
+`DocumentView.createEditor(container, blockId, initialContent)` assembles extensions from helper methods and creates the EditorView:
 
-1. Creates an `EditorState` with extensions (markdown language, custom widgets, keymaps, autocompletion)
-2. Creates an `EditorView` attached to the container DOM element
-3. Stores the editor in `DocumentView.editors`
-4. Stores the initial content in `DocumentView.originalContents` for change detection
-5. Sets up the auto-save listener
+1. Calls `createMentionCompletionSource(container)` for @-autocomplete
+2. Calls `createLivePreviewPlugin()` for the decoration ViewPlugin
+3. Calls `getEditorTheme()` (cached) for editor styling
+4. Calls `createUpdateListener(container, blockId, handleContentChange)` for split-marker positioning and content change dispatch
+5. Calls `createDomEventHandlers(container)` for paste and blur handling
+6. Calls `createNewBlockKeymap(container, createNewBlock)` for Mod-Enter/Shift-Enter bindings
+7. Creates the `EditorView` with all extensions
+8. Stores the editor in `DocumentView.editors` and initial content in `DocumentView.originalContents`
 
 ### Destruction
 
@@ -124,7 +127,7 @@ All action widgets call `documentView.appendInlineField(view, from, to, fieldNam
 
 ## Auto-Save Flow
 
-Each editor registers an update listener in `DocumentView.createEditor()`:
+Each editor registers an update listener via `DocumentView.createUpdateListener()`:
 
 ```
 Editor update → debounce(1000ms) → compare content to original
@@ -159,7 +162,7 @@ Key details:
 
 ### Click-to-deselect
 
-`App.setupEventListeners()` attaches a mousedown handler on `#main` that blurs the active editor when clicking outside any `.cm-editor` (line 208):
+`App.setupEventListeners()` attaches a mousedown handler on `#main` that blurs the active editor when clicking outside any `.cm-editor`:
 
 ```js
 document.getElementById('main').addEventListener('mousedown', (e) => {
@@ -241,5 +244,5 @@ Undo/redo (`Ctrl+Z` / `Ctrl+Y`) is handled separately: when focus is inside a Co
 
 1. Create a class extending `WidgetType` in `js/widgets/codeMirrorWidgets.js` inside the `createCodeMirrorWidgets()` factory
 2. Implement `toDOM(view)` to return a DOM element, `eq(other)` for update comparison, and `ignoreEvent()` for event handling
-3. Add the decoration logic in the ViewPlugin builder (inside `DocumentView.createEditor()`) to detect the target pattern and create decorations
+3. Add the decoration logic either in `DocumentView.buildDecorations()` (for fenced-block-level decorations) or as a new decorator method in `DocumentView._lineDecorators` (for line-level decorations). The `_lineDecorators` getter returns an array of bound methods called by `applyLineDecorations()`
 4. Add any event handlers that dispatch editor changes via `view.dispatch()`

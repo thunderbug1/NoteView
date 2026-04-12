@@ -38,7 +38,7 @@ This process is automated via GitHub Actions (`.github/workflows/release.yml`). 
 
 All core modules are plain objects on `window` — there are no ES module imports between app scripts. Load order matters and is determined by `<script>` tag sequence in `index.html`.
 
-- **`App`** (`js/main.js`) — Top-level controller. Initializes the app, handles routing between views, manages event listeners, modals (tag, assignee, new note). Also contains `ThemeManager`.
+- **`App`** (`js/main.js`) — Top-level controller. Initializes the app, handles routing between views, manages event listeners. Also contains `ThemeManager`. Delegates modal logic to dedicated modules.
 - **`Store`** (`js/store.js`) — Central state and file I/O. Manages `blocks` array, IndexedDB persistence, directory handle, file read/write, git commit on save, contact/mention tracking. Filtering logic lives in `Store.getFilteredBlocks()`.
 - **`GitStore`** (`js/gitStore.js`) — Git operations abstraction over isomorphic-git. Init, commit, log, diff, restore.
 - **`GitFs`** (`js/gitFs.js`) — Filesystem adapter that bridges the browser File System Access API with isomorphic-git's expected fs interface.
@@ -46,13 +46,16 @@ All core modules are plain objects on `window` — there are no ES module import
 - **`SelectionManager`** (`js/selectionManager.js`) — Manages sidebar filter state: time selection, context tags (multi-select), contact filter (single-select). Updates tag counts and UI.
 - **`UndoRedoManager`** (`js/undoRedoManager.js`) — Command-pattern undo/redo for block operations.
 - **`SortManager`** (`js/utils/sortManager.js`) — Per-view sort configuration with multi-clause sorting.
+- **`TagModal`** (`js/modals/tagModal.js`) — Tag selection and creation modal for blocks.
+- **`AssigneeModal`** (`js/modals/assigneeModal.js`) — Contact selection modal for task assignment.
+- **`VaultModal`** (`js/modals/vaultModal.js`) — Vault management: dropdown switcher, manager modal, vault switching.
 
 ### Views
 
 Each view is a global object with a `render(blocks)` method called by `App.render()`:
 
-- **`DocumentView`** (`js/views/document.js`) — Main markdown editor. Creates/manages CodeMirror 6 editor instances per block. Handles inline editing, auto-save with debounce, block metadata rendering.
-- **`KanbanView`** (`js/views/kanban.js`) — Drag-and-drop task board. Columns map to task states (`[ ]`, `[/]`, `[x]`, `[b]`, `[-]`).
+- **`DocumentView`** (`js/views/document.js`) — Main markdown editor. Creates/manages CodeMirror 6 editor instances per block. Handles inline editing, auto-save with debounce, block metadata rendering. Editor construction is split into helper methods: `getEditorTheme()`, `buildDecorations()`, `createLivePreviewPlugin()`, `createUpdateListener()`, `createDomEventHandlers()`, `createNewBlockKeymap()`. Line decorations use a registry pattern via `applyLineDecorations()` with pluggable `_lineDecorators`.
+- **`KanbanView`** (`js/views/kanban.js`) — Drag-and-drop task board. Columns map to task states (`[ ]`, `[/]`, `[x]`, `[b]`, `[-]`). Event handling split into `setupCardDragDrop()`, `setupCardClickHandlers()`, `setupMobileInteractions()`, `setupColumnDropTargets()`.
 - **`TimelineView`** (`js/views/timeline.js`) — Git-history-based task timeline. Has its own cache that's invalidated on save/delete.
 - **`HistoryView`** (`js/views/history.js`) — Version browser with side-by-side diff using CodeMirror's merge view.
 - **`SettingsView`** (`js/views/settings.js`) — App configuration and keyboard shortcut customization.
