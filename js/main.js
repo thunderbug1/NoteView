@@ -1235,7 +1235,20 @@ const App = {
                 closeVaultMenu();
                 const confirmed = window.confirm(`Remove "${vaultName}" from your vault list?\n\nYour files are not deleted.`);
                 if (confirmed) {
-                    Store.deleteVault(vaultName).then(() => refreshList());
+                    Store.deleteVault(vaultName).then(async () => {
+                        await refreshList();
+                        // If the removed vault was the active one, close it
+                        if (vaultName === (Store.directoryHandle?.name || '')) {
+                            Store.directoryHandle = null;
+                            Store.blocks = [];
+                            Store.currentView = 'document';
+                            document.getElementById('app')?.classList.add('no-vault');
+                            const fab = document.getElementById('fabNewNote');
+                            if (fab) fab.style.display = 'none';
+                            document.getElementById('viewContainer').innerHTML = '';
+                            this.updateVaultSwitcherName();
+                        }
+                    });
                 }
             });
 
