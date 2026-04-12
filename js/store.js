@@ -747,6 +747,7 @@ const Store = {
         await GitStore.init(handle);
         await this.loadBlocks();
         await UndoRedoManager.clear();
+        TimelineView.invalidateRawDataCache();
     },
 
     extractContacts() {

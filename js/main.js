@@ -732,6 +732,7 @@ const App = {
     async changeVaultDirectory() {
         const success = await Store.changeDirectory();
         if (success) {
+            TimelineView.invalidateRawDataCache();
             SelectionManager.updateTagCounts();
             this.setView('document');
             VaultModal.updateVaultSwitcherName();

@@ -71,6 +71,9 @@ const GitRemote = {
             console.log('Pull successful');
             // Reload notes after pull
             await Store.loadBlocks();
+            // Pull may have added/rewritten commits — force full timeline rebuild
+            TimelineView.invalidateRawDataCache();
+            TimelineView.invalidateCache();
             return true;
         } catch (err) {
             console.error('Pull failed:', err);

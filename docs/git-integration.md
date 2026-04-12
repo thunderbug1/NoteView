@@ -200,17 +200,22 @@ Remote operations are user-initiated from the Settings view.
 
 ## Timeline Data Extraction
 
-`TimelineView` (`js/views/timeline.js`) builds a task timeline by diffing the entire file tree across all commits:
+`TimelineView` (`js/views/timeline.js`) builds a task timeline by diffing task state across git commits. Uses a two-layer caching strategy for performance.
 
 ### buildTimeline()
 
 1. Gets full commit history (up to 100 commits) via `GitStore.getFullHistory(100)`
 2. Reverses to chronological order (oldest first)
-3. For each commit:
-   - Reads all files at that commit via `GitStore.getAllFilesAtCommit(oid)`
-   - Extracts tasks from each file's content using `TaskParser.parseTasksFromContent()`
+3. Checks if an incremental rebuild is possible (new commits appended since last build)
+4. For each commit (via `_processCommit()`):
+   - **First commit**: reads all files via `GitStore.getAllFilesAtCommit(oid)`
+   - **Subsequent commits**: uses `GitStore.getChangedFilesBetween(parentOid, childOid)` with isomorphic-git's `walk()` + two `TREE` walkers to discover only changed files, then merges with previous task snapshot
    - Diffs against the previous commit's tasks via `TimelineView.diffTasks()`
-4. Returns events sorted newest-first
+5. Returns events sorted newest-first
+
+### getChangedFilesBetween(parentOid, childOid)
+
+Uses `git.walk()` with two `TREE({ref})` walkers to compare consecutive commits. Only files whose blob OIDs differ are read — most commits touch 1-2 files, so this eliminates ~95% of blob reads compared to reading all files at every commit. Falls back to `getAllFilesAtCommit()` on error.
 
 ### diffTasks(prevAllTasks, currAllTasks, commit)
 
@@ -224,11 +229,14 @@ Compares task maps between two commits and produces events:
 
 Events include: `taskText`, `oldState`, `newState`, `timestamp`, `commitMessage`, `blockId`, `tags`, `oid`, `parents`.
 
-### Caching
+### Caching (two layers)
 
-TimelineView has its own `CacheManager.createCache()` instance (`_cache`). The cache key includes time/context/contact/search selections but NOT block data — it only needs rebuilding when git history changes.
+**Layer 1 — Filtered events cache** (`_cache`): `CacheManager.createCache()` instance keyed by time/context/contact/search selections. Only needs rebuilding when selections change.
 
-Cache is invalidated by calling `TimelineView.invalidateCache()`, which happens after every `App.saveBlockContent()`, `App.deleteBlock()`, and `App.updateBlockProperty()`.
+**Layer 2 — Raw data cache** (`_rawDataCache`): Stores per-commit task snapshots keyed by HEAD OID. Survives filter changes. On `invalidateCache()` (triggered by save/delete), only the events cache is cleared — the raw data cache enables incremental rebuilds where only new commits are processed instead of all 100.
+
+- `invalidateCache()` — clears filtered events cache only (called after save/delete/property update)
+- `invalidateRawDataCache()` — clears raw data cache for full rebuild (called after git pull, vault switch, directory change)
 
 ---
 

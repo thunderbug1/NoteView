@@ -122,6 +122,69 @@ const GitStore = {
         }
     },
     
+    /**
+     * Get only the .md files that changed between two commits.
+     * Uses git.walk() with two TREE walkers for efficient diffing.
+     * Returns { filename: content } for changed/added files.
+     */
+    async getChangedFilesBetween(parentOid, childOid) {
+        if (!this.git || !this.fs) return null;
+
+        const { walk, TREE } = this.git;
+
+        try {
+            const changedFiles = await walk({
+                fs: this.fs,
+                dir: this.dir,
+                trees: [
+                    TREE({ ref: parentOid }),
+                    TREE({ ref: childOid })
+                ],
+                map: async (filepath, [parentEntry, childEntry]) => {
+                    if (!filepath.endsWith('.md')) return;
+                    if (filepath.includes('/')) return;
+
+                    const parentBlobOid = parentEntry ? await parentEntry.oid() : null;
+                    const childBlobOid = childEntry ? await childEntry.oid() : null;
+
+                    // Same OID means file unchanged — skip
+                    if (parentBlobOid === childBlobOid) return;
+
+                    // File added or modified — read content from child commit
+                    if (childEntry) {
+                        const type = await childEntry.type();
+                        if (type === 'blob') {
+                            const content = await childEntry.content();
+                            return [filepath, new TextDecoder().decode(content)];
+                        }
+                    }
+
+                    // File deleted — return null marker
+                    if (parentEntry && !childEntry) {
+                        return [filepath, null];
+                    }
+                },
+                reduce: async (parent, children) => {
+                    // Keep nulls (file deletions), only drop undefined (skipped entries)
+                    return [parent, children].flat().filter(x => x !== undefined);
+                }
+            });
+
+            const result = {};
+            for (const entry of changedFiles || []) {
+                if (!Array.isArray(entry) || entry.length < 2) continue;
+                const [filepath, content] = entry;
+                if (typeof filepath === 'string') {
+                    result[filepath] = content;
+                }
+            }
+            return result;
+        } catch (err) {
+            console.warn('walk-based diff failed, falling back to full read:', err);
+            return null;
+        }
+    },
+
     async getAllFilesAtCommit(oid) {
         if (!this.git || !this.fs) return {};
         

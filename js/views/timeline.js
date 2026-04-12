@@ -19,7 +19,7 @@ const TimelineView = {
         '-': '✕'
     },
 
-    // Cache management
+    // Filtered events cache (keyed by sidebar selections)
     _cache: CacheManager.createCache(() => {
         const timeSelection = SelectionManager.selections?.time || '';
         const contextSelection = SelectionManager.selections?.context
@@ -30,6 +30,15 @@ const TimelineView = {
         return `${timeSelection}|${contextSelection}|${contactSelection}|${searchQuery}`;
     }),
 
+    // Raw git data cache — stores task snapshots per commit, survives filter changes.
+    // Validated by HEAD OID inside buildTimeline(). Incremental rebuild when only new
+    // commits are added; full rebuild when HEAD OID doesn't match or on first load.
+    _rawDataCache: {
+        headOid: null,
+        commitCount: 0,
+        commitSnapshots: [],
+    },
+
     /**
      * Check if cache is still valid
      */
@@ -38,10 +47,22 @@ const TimelineView = {
     },
 
     /**
-     * Invalidate cache
+     * Invalidate the filtered events cache.
+     * The raw data cache is preserved for incremental rebuilds.
      */
     invalidateCache() {
         this._cache.invalidate();
+    },
+
+    /**
+     * Force full rebuild on next buildTimeline() call.
+     * Called after operations that fundamentally change git history
+     * (pull, directory change, etc.)
+     */
+    invalidateRawDataCache() {
+        this._rawDataCache.headOid = null;
+        this._rawDataCache.commitCount = 0;
+        this._rawDataCache.commitSnapshots = [];
     },
 
     /**
@@ -165,28 +186,114 @@ const TimelineView = {
     },
 
     /**
+     * Process a single commit: determine changed files, extract tasks, diff.
+     * Uses diff-based approach for commits after the first one.
+     */
+    async _processCommit(commit, prevAllTasks, parentCommit) {
+        let currAllTasks;
+
+        if (!parentCommit) {
+            // First commit: must read all files
+            const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
+            currAllTasks = this.extractAllTasks(filesContent);
+        } else {
+            // Diff-based: only read files that changed between parent and this commit
+            const changedFiles = await GitStore.getChangedFilesBetween(
+                parentCommit.oid, commit.oid
+            );
+
+            if (changedFiles === null) {
+                // walk() failed, fallback to reading all files
+                const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
+                currAllTasks = this.extractAllTasks(filesContent);
+            } else if (Object.keys(changedFiles).length === 0) {
+                // No file changes (e.g. merge commit) — carry forward previous tasks
+                currAllTasks = prevAllTasks;
+            } else {
+                // Start from previous snapshot, update only changed files
+                currAllTasks = new Map(prevAllTasks);
+                for (const [filename, content] of Object.entries(changedFiles)) {
+                    if (content === null || content === undefined) {
+                        // File was deleted or content unavailable
+                        currAllTasks.delete(filename);
+                    } else if (typeof content === 'string') {
+                        const parsed = parseFrontMatter(content);
+                        const tasks = this.extractTasksFromContent(parsed.content);
+                        if (tasks.size > 0) {
+                            currAllTasks.set(filename, { tasks, tags: parsed.tags || [] });
+                        } else {
+                            currAllTasks.delete(filename);
+                        }
+                    }
+                }
+            }
+        }
+
+        const events = this.diffTasks(prevAllTasks, currAllTasks, commit);
+        return { tasks: currAllTasks, events };
+    },
+
+    /**
      * Build the full list of events from git history.
+     * Uses diff-based file discovery and supports incremental rebuilds.
      */
     async buildTimeline() {
         const commits = await GitStore.getFullHistory(100);
         if (commits.length === 0) return [];
-        
+
         // Process from oldest to newest for correct diffing
         const chronological = [...commits].reverse();
-        
-        let prevAllTasks = new Map();
-        const allEvents = [];
-        
-        for (const commit of chronological) {
-            const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
-            const currAllTasks = this.extractAllTasks(filesContent);
-            
-            const events = this.diffTasks(prevAllTasks, currAllTasks, commit);
-            allEvents.push(...events);
-            
-            prevAllTasks = currAllTasks;
+        const currentHeadOid = commits[0].oid;
+
+        // Check if we can do an incremental rebuild (new commits appended to existing history)
+        const rawCache = this._rawDataCache;
+        const canIncrement = rawCache.headOid !== null
+            && rawCache.commitCount > 0
+            && rawCache.commitSnapshots.length === rawCache.commitCount
+            && chronological.length > rawCache.commitCount
+            && chronological[rawCache.commitCount - 1].oid
+                === rawCache.commitSnapshots[rawCache.commitCount - 1].oid;
+
+        let allEvents = [];
+        let commitSnapshots;
+        let prevAllTasks;
+
+        if (canIncrement) {
+            // Incremental: reuse existing snapshots, process only new commits
+            commitSnapshots = [...rawCache.commitSnapshots];
+            prevAllTasks = commitSnapshots[commitSnapshots.length - 1].tasks;
+
+            for (let i = rawCache.commitCount; i < chronological.length; i++) {
+                const commit = chronological[i];
+                const { tasks, events } = await this._processCommit(
+                    commit, prevAllTasks, chronological[i - 1]
+                );
+                commitSnapshots.push({ oid: commit.oid, tasks });
+                allEvents.push(...events);
+                prevAllTasks = tasks;
+            }
+        } else {
+            // Full rebuild with diff-based optimization
+            commitSnapshots = [];
+            prevAllTasks = new Map();
+
+            for (let i = 0; i < chronological.length; i++) {
+                const commit = chronological[i];
+                const parentCommit = i > 0 ? chronological[i - 1] : null;
+                const { tasks, events } = await this._processCommit(
+                    commit, prevAllTasks, parentCommit
+                );
+                commitSnapshots.push({ oid: commit.oid, tasks });
+                allEvents.push(...events);
+                prevAllTasks = tasks;
+            }
         }
-        
+
+        // Update raw data cache
+        this._rawDataCache.headOid = currentHeadOid;
+        this._rawDataCache.commitCount = chronological.length;
+        this._rawDataCache.commitSnapshots = commitSnapshots;
+
         // Return newest first
         allEvents.reverse();
         return allEvents;
@@ -334,7 +441,7 @@ const TimelineView = {
         container.innerHTML = `
             <div class="tl-loading">
                 <div class="tl-spinner"></div>
-                <p>Building timeline from git history...</p>
+                <p>${this._rawDataCache.headOid ? 'Updating timeline...' : 'Building timeline from git history...'}</p>
             </div>
         `;
 
@@ -392,6 +499,7 @@ const TimelineView = {
         });
 
         document.getElementById('tlRefreshBtn')?.addEventListener('click', () => {
+            this.invalidateRawDataCache();
             this.invalidateCache();
             this.render(blocks);
         });
