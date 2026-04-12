@@ -837,8 +837,12 @@ const Store = {
             return cached;
         }
 
-        // Filter blocks
-        const filtered = this.blocks.filter(block => {
+        // Separate pinned blocks (always shown regardless of filters)
+        const pinnedBlocks = this.blocks.filter(block => block.pinned);
+        const unpinnedBlocks = this.blocks.filter(block => !block.pinned);
+
+        // Filter only unpinned blocks
+        const filteredUnpinned = unpinnedBlocks.filter(block => {
             // Get active selections from App
             const timeSelection = SelectionManager.selections.time || '';
             const contextSelection = SelectionManager.selections.context;
@@ -913,9 +917,10 @@ const Store = {
             return true;
         });
 
-        // Cache the result
-        this._filteredBlocksCache.set(filtered);
-        return filtered;
+        // Combine: pinned blocks first (unfiltered), then filtered unpinned blocks
+        const result = [...pinnedBlocks, ...filteredUnpinned];
+        this._filteredBlocksCache.set(result);
+        return result;
     },
 
     // Override saveBlock to invalidate cache

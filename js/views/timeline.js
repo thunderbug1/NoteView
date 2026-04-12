@@ -200,8 +200,15 @@ const TimelineView = {
         const contextSelection = SelectionManager.selections.context;
         const contactSelection = SelectionManager.selections.contact;
         const searchQuery = Store.searchQuery;
-        
+
+        // Build set of pinned block IDs for O(1) lookup
+        const pinnedBlockIds = new Set(
+            Store.blocks.filter(b => b.pinned).map(b => b.id)
+        );
+
         return events.filter(event => {
+            // Events from currently-pinned blocks always pass through
+            if (pinnedBlockIds.has(event.blockId)) return true;
             // Time filter
             if (timeSelection && !TimeFilter.checkTimeFilter(event.timestamp, timeSelection)) {
                 return false;

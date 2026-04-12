@@ -110,7 +110,14 @@ const SortManager = {
     sortItems(view, items) {
         const clauses = this.normalizeClauses(view, Store.getSortConfig(view)?.clauses || []);
         const fieldMap = this.getFieldMap(view);
-        return [...items].sort((a, b) => this.compareItems(a, b, clauses, fieldMap));
+        return [...items].sort((a, b) => {
+            // Pinned items always come first, regardless of sort config
+            const aPinned = a.pinned ? 0 : 1;
+            const bPinned = b.pinned ? 0 : 1;
+            if (aPinned !== bPinned) return aPinned - bPinned;
+
+            return this.compareItems(a, b, clauses, fieldMap);
+        });
     },
 
     compareItems(a, b, clauses, fieldMap) {
