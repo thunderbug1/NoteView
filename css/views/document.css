@@ -495,6 +495,66 @@
     opacity: 0.6;
 }
 
+/* Microphone / Speech-to-Text Button */
+.mic-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
+}
+
+.document-view .block:hover .mic-btn,
+.document-view .block:focus-within .mic-btn {
+    opacity: 0.5;
+}
+
+.mic-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+/* Recording (active) state */
+.mic-btn.recording {
+    opacity: 1 !important;
+    color: var(--danger, #ef4444);
+    animation: mic-pulse 1.5s ease-in-out infinite;
+}
+
+.mic-btn.recording:hover {
+    background: rgba(239, 68, 68, 0.1);
+    transform: scale(1.1);
+}
+
+@keyframes mic-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Keep metadata bar visible during recording */
+.document-view .block.block-recording .block-metadata {
+    opacity: 1;
+    height: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+/* Content modal mic button is always visible */
+.content-modal .mic-btn {
+    opacity: 0.6;
+}
+
 @media (max-width: 768px) {
     .tag-modal.content-modal {
         width: 95vw;

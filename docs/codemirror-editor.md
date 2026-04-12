@@ -145,6 +145,33 @@ Key details:
 
 ---
 
+## Speech-to-Text Dictation
+
+A microphone button in each block's metadata bar (`<button class="mic-btn">`) enables on-device speech-to-text via the browser's Web Speech API. The button is hidden entirely when `window.SpeechRecognition` or `window.webkitSpeechRecognition` is unavailable (non-Chromium browsers).
+
+### Flow
+
+1. User clicks mic button → `DocumentView.handleMicClick()` → `startSpeechRecognition(blockId, btnElement)`
+2. A `SpeechRecognition` instance is created with `continuous: true` and `interimResults: true`
+3. The editor is focused so the cursor position is known
+4. On `onresult`, final transcripts are inserted at cursor via `insertTextAtSelection(view, text)`
+5. On `onend`, recognition auto-restarts if the user didn't explicitly stop (Chrome pauses after silence)
+6. User clicks mic again → `stopSpeechRecognition()` → `cleanupRecognition()` resets state and UI
+
+### State
+
+- `_recognition` — Active `SpeechRecognition` instance (null when idle)
+- `_recordingBlockId` — Block ID currently being recorded (null when idle)
+- `_isStopping` — Flag to distinguish user-initiated stop from Chrome's auto-stop
+
+### Visual feedback
+
+- `.mic-btn.recording` — Red color with a pulse animation
+- `.block.block-recording .block-metadata` — Keeps metadata bar pinned open during recording
+- Recording is stopped automatically on view re-render to prevent stale editor references
+
+---
+
 ## Editor Focus Management
 
 ### focusEditor(blockId)

@@ -54,7 +54,7 @@ All core modules are plain objects on `window` — there are no ES module import
 
 Each view is a global object with a `render(blocks)` method called by `App.render()`:
 
-- **`DocumentView`** (`js/views/document.js`) — Main markdown editor. Creates/manages CodeMirror 6 editor instances per block. Handles inline editing, auto-save with debounce, block metadata rendering. Editor construction is split into helper methods: `getEditorTheme()`, `buildDecorations()`, `createLivePreviewPlugin()`, `createUpdateListener()`, `createDomEventHandlers()`, `createNewBlockKeymap()`. Line decorations use a registry pattern via `applyLineDecorations()` with pluggable `_lineDecorators`.
+- **`DocumentView`** (`js/views/document.js`) — Main markdown editor. Creates/manages CodeMirror 6 editor instances per block. Handles inline editing, auto-save with debounce, block metadata rendering, speech-to-text dictation via Web Speech API. Editor construction is split into helper methods: `getEditorTheme()`, `buildDecorations()`, `createLivePreviewPlugin()`, `createUpdateListener()`, `createDomEventHandlers()`, `createNewBlockKeymap()`. Line decorations use a registry pattern via `applyLineDecorations()` with pluggable `_lineDecorators`. Speech recognition is managed through `startSpeechRecognition()`, `stopSpeechRecognition()`, and `cleanupRecognition()`, with a mic button in the block metadata bar.
 - **`KanbanView`** (`js/views/kanban.js`) — Drag-and-drop task board. Columns map to task states (`[ ]`, `[/]`, `[x]`, `[b]`, `[-]`). Event handling split into `setupCardDragDrop()`, `setupCardClickHandlers()`, `setupMobileInteractions()`, `setupColumnDropTargets()`.
 - **`TimelineView`** (`js/views/timeline.js`) — Git-history-based task timeline. Has its own cache that's invalidated on save/delete.
 - **`HistoryView`** (`js/views/history.js`) — Version browser with side-by-side diff using CodeMirror's merge view.
@@ -86,6 +86,7 @@ CodeMirror 6 modules load as ES modules via esm.sh in `index.html`, then are exp
 ### Browser APIs used
 
 - **File System Access API** (`showDirectoryPicker`) — Read/write markdown files
+- **Web Speech API** (`SpeechRecognition`) — On-device speech-to-text dictation in DocumentView. Mic button in block metadata bar toggles recording; transcribed text inserts at cursor. Only available in Chromium browsers; button is hidden when unsupported.
 - **IndexedDB** — Persist directory handle, view preferences, current view
 - **Service Worker** — Offline caching with network-first strategy for scripts/styles
 

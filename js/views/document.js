@@ -22,6 +22,10 @@ const DocumentView = {
     _taskMenus: null,
     _cmWidgets: null,
     _editorTheme: null,
+    // Speech recognition state
+    _recognition: null,
+    _recordingBlockId: null,
+    _isStopping: false,
 
     /**
      * Get or initialize task menus
@@ -34,6 +38,11 @@ const DocumentView = {
     },
 
     async render(blocks) {
+        // Stop any active speech recognition before re-rendering
+        if (this._recordingBlockId) {
+            this.stopSpeechRecognition();
+        }
+
         const container = document.getElementById('viewContainer');
         container.className = 'document-view';
 
@@ -97,6 +106,13 @@ const DocumentView = {
         this._pinHandler = this.handlePinClick.bind(this);
         container.addEventListener('click', this._pinHandler);
 
+        // Add event delegation for mic button click
+        if (this._micHandler) {
+            container.removeEventListener('click', this._micHandler);
+        }
+        this._micHandler = this.handleMicClick.bind(this);
+        container.addEventListener('click', this._micHandler);
+
         this.attachEventListeners();
     },
 
@@ -141,6 +157,10 @@ const DocumentView = {
         return selectedTags
             .map(tag => `<span class="badge">${Common.capitalizeFirst(tag)}</span>`)
             .join('');
+    },
+
+    isSpeechRecognitionSupported() {
+        return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     },
 
     // Render metadata header above block (like Obsidian/Tana)
@@ -193,6 +213,15 @@ const DocumentView = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="${block.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z"/></svg>
             </button>
         `);
+
+        // Microphone / Speech-to-Text button
+        if (this.isSpeechRecognitionSupported()) {
+            parts.push(`
+                <button class="mic-btn" data-id="${block.id}" title="Dictate text">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                </button>
+            `);
+        }
 
         // Delete button (always shown, far right)
         parts.push(`
@@ -268,6 +297,117 @@ const DocumentView = {
             if (block) {
                 App.updateBlockProperty(blockId, 'pinned', !block.pinned,
                     block.pinned ? 'Unpin note' : 'Pin note');
+            }
+        }
+    },
+
+    handleMicClick(e) {
+        const micBtn = e.target.closest('.mic-btn');
+        if (!micBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const blockId = micBtn.dataset.id;
+        if (!blockId) return;
+
+        if (this._recordingBlockId === blockId) {
+            this.stopSpeechRecognition();
+        } else {
+            this.startSpeechRecognition(blockId, micBtn);
+        }
+    },
+
+    startSpeechRecognition(blockId, btnElement) {
+        // Stop any existing recording
+        if (this._recognition) {
+            this.stopSpeechRecognition();
+        }
+
+        const view = this.editors.get(blockId);
+        if (!view) return;
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = '';
+
+        this._recognition = recognition;
+        this._recordingBlockId = blockId;
+        this._isStopping = false;
+
+        // Visual: activate the button
+        btnElement.classList.add('recording');
+        btnElement.title = 'Stop dictation';
+
+        // Keep metadata bar visible during recording
+        const block = btnElement.closest('.block');
+        if (block) {
+            block.classList.add('block-recording');
+        }
+
+        // Focus the editor so cursor position is known
+        view.focus();
+
+        recognition.onresult = (event) => {
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                    finalTranscript += result[0].transcript;
+                }
+            }
+
+            if (finalTranscript) {
+                const currentView = this.editors.get(blockId);
+                if (currentView) {
+                    this.insertTextAtSelection(currentView, finalTranscript);
+                }
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.warn('Speech recognition error:', event.error);
+            this.stopSpeechRecognition();
+        };
+
+        recognition.onend = () => {
+            // Auto-restart if user didn't explicitly stop (Chrome pauses after silence)
+            if (!this._isStopping && this._recordingBlockId === blockId) {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    this.cleanupRecognition();
+                }
+            } else {
+                this.cleanupRecognition();
+            }
+        };
+
+        recognition.start();
+    },
+
+    stopSpeechRecognition() {
+        this._isStopping = true;
+        if (this._recognition) {
+            this._recognition.stop();
+        }
+        this.cleanupRecognition();
+    },
+
+    cleanupRecognition() {
+        const blockId = this._recordingBlockId;
+        this._recognition = null;
+        this._recordingBlockId = null;
+
+        if (blockId) {
+            const btn = document.querySelector(`.mic-btn[data-id="${blockId}"]`);
+            if (btn) {
+                btn.classList.remove('recording');
+                btn.title = 'Dictate text';
+            }
+            const block = document.querySelector(`.block[data-id="${blockId}"]`);
+            if (block) {
+                block.classList.remove('block-recording');
             }
         }
     },
