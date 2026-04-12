@@ -383,6 +383,7 @@ const Store = {
                 const permission = await savedHandle.queryPermission({ mode: 'readwrite' });
                 if (permission === 'granted') {
                     this.directoryHandle = savedHandle;
+                    await this.saveVault(savedHandle);
                     await GitStore.init(this.directoryHandle); // INIT GIT HERE
                     await this.loadBlocks();
                     return true;
@@ -392,6 +393,7 @@ const Store = {
                         const granted = await savedHandle.requestPermission({ mode: 'readwrite' });
                         if (granted === 'granted') {
                             this.directoryHandle = savedHandle;
+                            await this.saveVault(savedHandle);
                             await GitStore.init(this.directoryHandle);
                             await this.loadBlocks();
                             return true;
@@ -464,6 +466,7 @@ const Store = {
     async openDirectory(handle) {
         this.directoryHandle = handle;
         await this.saveDirectoryHandle(handle);
+        await this.saveVault(handle);
         await GitStore.init(handle);
         await this.loadBlocks();
     },
@@ -578,6 +581,7 @@ const Store = {
             const newHandle = await window.showDirectoryPicker();
             this.directoryHandle = newHandle;
             await this.saveDirectoryHandle(this.directoryHandle);
+            await this.saveVault(this.directoryHandle);
             await GitStore.init(this.directoryHandle);
             await this.loadBlocks();
             // Clear undo/redo stacks when changing directory
@@ -589,6 +593,160 @@ const Store = {
             }
             throw err;
         }
+    },
+
+    // --- Vault management ---
+
+    async saveVault(handle) {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return;
+        }
+
+        const name = handle.name;
+
+        // Store the handle under vault::<name>
+        await new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.put(handle, `vault::${name}`);
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            } catch (e) { reject(e); }
+        });
+
+        // Update vault list
+        const list = await this.getVaultList();
+        if (!list.some(v => v.name === name)) {
+            list.push({ name, addedAt: new Date().toISOString() });
+            await new Promise((resolve, reject) => {
+                try {
+                    const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                    const store = tx.objectStore(this.STORE_NAME);
+                    const req = store.put(list, 'vaultList');
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => reject(req.error);
+                } catch (e) { reject(e); }
+            });
+        }
+
+        // Keep lastDirectory in sync for backward compat
+        await this.saveDirectoryHandle(handle);
+    },
+
+    async getVaultList() {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return [];
+        }
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readonly');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.get('vaultList');
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => resolve([]);
+            } catch (e) { resolve([]); }
+        });
+    },
+
+    async getVaultHandle(name) {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return null;
+        }
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readonly');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.get(`vault::${name}`);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            } catch (e) { resolve(null); }
+        });
+    },
+
+    async deleteVault(name) {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return;
+        }
+
+        // Remove the handle
+        await new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.delete(`vault::${name}`);
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            } catch (e) { reject(e); }
+        });
+
+        // Update vault list
+        const list = await this.getVaultList();
+        const filtered = list.filter(v => v.name !== name);
+        await new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.put(filtered, 'vaultList');
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            } catch (e) { reject(e); }
+        });
+    },
+
+    async setLastActiveVault(name) {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return;
+        }
+        return new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.put(name, 'lastActiveVault');
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            } catch (e) { reject(e); }
+        });
+    },
+
+    async getLastActiveVault() {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return null;
+        }
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readonly');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.get('lastActiveVault');
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            } catch (e) { resolve(null); }
+        });
+    },
+
+    async switchToVault(handle) {
+        // Check / request permission
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+            const requested = await handle.requestPermission({ mode: 'readwrite' });
+            if (requested !== 'granted') {
+                throw new Error('Permission denied for vault');
+            }
+        }
+
+        this.directoryHandle = handle;
+        await this.saveDirectoryHandle(handle);
+        await this.saveVault(handle);
+        await this.setLastActiveVault(handle.name);
+        await GitStore.init(handle);
+        await this.loadBlocks();
+        await UndoRedoManager.clear();
     },
 
     extractContacts() {
