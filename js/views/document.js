@@ -21,6 +21,7 @@ const DocumentView = {
     // Task menus (initialized on first use)
     _taskMenus: null,
     _cmWidgets: null,
+    _editorTheme: null,
 
     /**
      * Get or initialize task menus
@@ -680,99 +681,475 @@ const DocumentView = {
         };
     },
 
+    /**
+     * Get the cached EditorView.theme() config object, creating it on first call.
+     */
+    getEditorTheme() {
+        if (this._editorTheme) return this._editorTheme;
+        const { EditorView } = window.CodeMirror;
+        this._editorTheme = EditorView.theme({
+            "&": {
+                fontFamily: 'Inter, -apple-system, sans-serif',
+                fontSize: '15px',
+                lineHeight: '1.6'
+            },
+            ".cm-content": {
+                padding: '0',
+                minHeight: '0'
+            },
+            ".cm-editor": {
+                minHeight: '0'
+            },
+            ".cm-focused": {
+                outline: 'none'
+            },
+            ".cm-tooltip.cm-tooltip-autocomplete": {
+                border: '1px solid var(--border-color, #e2e8f0)',
+                backgroundColor: 'var(--bg-primary, #ffffff)',
+                borderRadius: '10px',
+                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
+                overflow: 'hidden'
+            },
+            ".cm-tooltip-autocomplete ul": {
+                fontFamily: 'inherit',
+                padding: '4px'
+            },
+            ".cm-tooltip-autocomplete li": {
+                borderRadius: '8px',
+                padding: '6px 10px'
+            },
+            ".cm-tooltip-autocomplete li[aria-selected]": {
+                backgroundColor: 'var(--bg-hover, #f1f5f9)',
+                color: 'var(--text-primary, #0f172a)'
+            },
+            ".cm-completionLabel": {
+                color: 'var(--text-primary, #0f172a)'
+            },
+            ".cm-foldGutter": {
+                width: '15px'
+            },
+            ".cm-foldGutter .cm-gutterElement": {
+                color: 'var(--text-muted, #94a3b8)',
+                cursor: 'pointer'
+            },
+            ".cm-foldGutter .cm-gutterElement:hover": {
+                color: 'var(--text-primary, #0f172a)'
+            },
+            // Live preview widget styles
+            ".md-header": {
+                fontWeight: '700',
+                color: 'var(--text-primary)',
+                display: 'inline-block'
+            },
+            ".md-header-1": { fontSize: '1.8em', padding: '0.1em 0' },
+            ".md-header-2": { fontSize: '1.5em', padding: '0.1em 0' },
+            ".md-header-3": { fontSize: '1.3em', padding: '0.1em 0' },
+            ".md-header-4": { fontSize: '1.1em', padding: '0.1em 0' },
+            ".md-header-5": { fontSize: '1.0em', padding: '0.1em 0' },
+            ".md-header-6": { fontSize: '0.9em', padding: '0.1em 0' },
+            ".md-strong": {
+                fontWeight: '700',
+                color: 'var(--text-color, #0f172a)'
+            },
+            ".md-emphasis": {
+                fontStyle: 'italic'
+            },
+            ".md-code": {
+                backgroundColor: 'var(--code-bg, #f1f5f9)',
+                color: 'var(--code-color, #0f172a)',
+                borderRadius: '3px',
+                padding: '2px 4px',
+                fontFamily: 'monospace',
+                fontSize: '0.9em'
+            },
+            ".md-link-text": {
+                color: 'var(--accent-color, #3b82f6)',
+                textDecoration: 'underline'
+            },
+            ".md-strikethrough": {
+                textDecoration: 'line-through'
+            },
+            ".md-task-checkbox": {
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '18px',
+                height: '18px',
+                border: '1.5px solid var(--border-color, #cbd5e1)',
+                borderRadius: '4px',
+                marginRight: '8px',
+                verticalAlign: 'text-bottom',
+                cursor: 'pointer',
+                color: 'transparent',
+                transition: 'all 0.15s ease'
+            },
+            ".md-task-checkbox:hover": {
+                borderColor: 'var(--accent-color, #3b82f6)'
+            },
+            ".state-done": {
+                backgroundColor: 'var(--accent-color, #3b82f6)',
+                borderColor: 'var(--accent-color, #3b82f6)',
+                color: 'white'
+            },
+            ".state-progress": {
+                borderColor: 'var(--warning-color, #f59e0b)'
+            },
+            ".state-progress .half-fill": {
+                width: '10px',
+                height: '10px',
+                backgroundColor: 'var(--warning-color, #f59e0b)',
+                borderRadius: '2px'
+            },
+            ".state-blocked": {
+                backgroundColor: 'var(--danger-color, #ef4444)',
+                borderColor: 'var(--danger-color, #ef4444)',
+                color: 'white'
+            },
+            ".state-canceled": {
+                backgroundColor: 'var(--bg-tertiary, #f1f5f9)',
+                borderColor: 'var(--border-color, #cbd5e1)',
+                color: 'var(--text-muted, #94a3b8)'
+            },
+            ".md-task-done": {
+                textDecoration: 'line-through',
+                color: 'var(--text-muted, #94a3b8)'
+            },
+            ".md-task-badge": {
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontSize: '0.85em',
+                padding: '2px 6px',
+                borderRadius: '12px',
+                backgroundColor: 'var(--bg-secondary, #f8fafc)',
+                color: 'var(--text-secondary, #64748b)',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                margin: '0 4px',
+                verticalAlign: 'text-bottom',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+            },
+            ".badge-dependsOn": {
+                borderColor: 'var(--badge-todos-border, #fca5a5)',
+                backgroundColor: 'var(--badge-todos-bg, #fff1f2)',
+                color: 'var(--badge-todos-text, #9f1239)'
+            },
+            ".badge-due": {
+                borderColor: 'var(--badge-work-border, #bae6fd)',
+                backgroundColor: 'var(--badge-work-bg, #f0f9ff)',
+                color: 'var(--badge-work-text, #075985)'
+            },
+            ".badge-assignee": {
+                borderColor: 'var(--badge-time-border, #d8b4fe)',
+                backgroundColor: 'var(--badge-time-bg, #faf5ff)',
+                color: 'var(--badge-time-text, #6b21a8)'
+            },
+            ".badge-priority": {
+                borderColor: 'var(--border-color, #e2e8f0)',
+                backgroundColor: 'var(--bg-secondary, #f8fafc)',
+                color: 'var(--text-secondary, #64748b)'
+            },
+            ".badge-priority[data-priority='urgent']": {
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                color: '#ef4444',
+                fontWeight: '700'
+            },
+            ".badge-priority[data-priority='high']": {
+                borderColor: 'rgba(249, 115, 22, 0.3)',
+                backgroundColor: 'rgba(249, 115, 22, 0.05)',
+                color: '#f97316',
+                fontWeight: '600'
+            },
+            ".badge-priority[data-priority='medium']": {
+                borderColor: 'rgba(59, 130, 246, 0.3)',
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                color: '#3b82f6'
+            },
+            ".badge-priority[data-priority='low']": {
+                borderColor: 'rgba(148, 163, 184, 0.3)',
+                backgroundColor: 'rgba(148, 163, 184, 0.05)',
+                color: '#94a3b8'
+            },
+            ".badge-id": {
+                opacity: '0.7',
+                fontFamily: 'monospace',
+                fontSize: '0.8em'
+            },
+            ".md-task-badge:hover": {
+                backgroundColor: 'var(--bg-hover, #f1f5f9)'
+            },
+            ".md-add-deadline, .md-add-action": {
+                display: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted, #94a3b8)',
+                marginLeft: '8px',
+                verticalAlign: 'text-bottom',
+                padding: '2px 4px',
+                borderRadius: '4px'
+            },
+            ".md-add-deadline:hover, .md-add-action:hover": {
+                color: 'var(--accent-color, #3b82f6)',
+                backgroundColor: 'var(--bg-hover, #f1f5f9)'
+            },
+            ".cm-line:hover .md-add-deadline, .cm-line:hover .md-add-action": {
+                display: 'inline-flex'
+            },
+        });
+        return this._editorTheme;
+    },
+
+    /**
+     * Build the decoration set from editor state.
+     */
+    buildDecorations(state, hasFocus) {
+        const { Decoration } = window.CodeMirror;
+        const builder = [];
+        const fencedBlocks = this.getFencedBlocks(state.doc.toString());
+        const fencedBlockLines = this.buildFencedBlockLineSet(state.doc, fencedBlocks);
+
+        // Get lines containing cursors ONLY if editor is focused
+        const cursorLines = new Set();
+        if (hasFocus) {
+            for (const range of state.selection.ranges) {
+                cursorLines.add(state.doc.lineAt(range.head).number);
+            }
+        }
+
+        const widgets = this.getCMWidgets();
+        for (const block of fencedBlocks) {
+            const selectionInsideBlock = hasFocus && this.isSelectionInsideBlock(state, block);
+
+            if (block.isCollapsible && !selectionInsideBlock) {
+                const startLine = state.doc.lineAt(block.from);
+                const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
+
+                builder.push(Decoration.replace({
+                    widget: new widgets.FencedBlockWidget(block),
+                    inclusive: false
+                }).range(startLine.from, startLine.to));
+
+                builder.push(Decoration.line({
+                    attributes: {
+                        class: 'md-fenced-block-summary-line'
+                    }
+                }).range(startLine.from));
+
+                for (let lineNumber = startLine.number + 1; lineNumber <= endLine.number; lineNumber += 1) {
+                    const blockLine = state.doc.line(lineNumber);
+                    builder.push(Decoration.line({
+                        attributes: {
+                            class: 'md-fenced-block-hidden-line'
+                        }
+                    }).range(blockLine.from));
+                }
+            } else if (!selectionInsideBlock) {
+                builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
+            }
+        }
+
+        for (let i = 1; i <= state.doc.lines; i++) {
+            if (fencedBlockLines.has(i)) {
+                continue;
+            }
+
+            const line = state.doc.line(i);
+            const hideSyntax = !cursorLines.has(i);
+            this.applyLineDecorations(line, builder, hideSyntax, Decoration, i === state.doc.lines);
+        }
+
+        // Delegate sorting entirely to CodeMirror which understands how to resolve overlaps securely
+        return Decoration.set(builder, true);
+    },
+
+    /**
+     * Create the live preview ViewPlugin that manages decorations.
+     */
+    createLivePreviewPlugin() {
+        const { ViewPlugin } = window.CodeMirror;
+        const self = this;
+        return ViewPlugin.fromClass(class {
+            constructor(view) {
+                this.decorations = self.buildDecorations(view.state, view.hasFocus);
+            }
+            update(update) {
+                if (update.docChanged || update.selectionSet || update.focusChanged) {
+                    this.decorations = self.buildDecorations(update.view.state, update.view.hasFocus);
+                }
+            }
+        }, {
+            decorations: (v) => v.decorations
+        });
+    },
+
+    /**
+     * Create the update listener extension for content changes and split-marker positioning.
+     */
+    createUpdateListener(container, blockId, handleContentChange) {
+        const { EditorView } = window.CodeMirror;
+        return EditorView.updateListener.of((update) => {
+            if (update.selectionSet || update.focusChanged || update.docChanged || update.geometryChanged) {
+                const marker = document.querySelector(`.block-split-marker[data-id="${blockId}"]`);
+                if (marker) {
+                    if (update.view.hasFocus) {
+                        if (update.state.doc.lines <= 1) {
+                            marker.style.display = 'none';
+                            return;
+                        }
+
+                        const sel = update.state.selection.main;
+                        const isExtract = !sel.empty && sel.from !== sel.to;
+
+                        const startBlock = update.view.lineBlockAt(sel.from);
+                        const endBlock = update.view.lineBlockAt(sel.to);
+
+                        const scroller = update.view.scrollDOM;
+                        const blockEl = container.closest('.block');
+
+                        if (blockEl) {
+                            const contentTop = scroller.getBoundingClientRect().top;
+                            const blockRectTop = blockEl.getBoundingClientRect().top;
+
+                            const relativeTopStart = contentTop - blockRectTop + startBlock.top - scroller.scrollTop;
+                            const iconTopStart = relativeTopStart + startBlock.height - 9;
+
+                            marker.style.display = 'flex';
+                            marker.style.top = `${iconTopStart}px`;
+
+                            const scissorSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>';
+
+                            if (isExtract) {
+                                const relativeTopEnd = contentTop - blockRectTop + endBlock.top - scroller.scrollTop;
+                                const iconTopEnd = relativeTopEnd + endBlock.height - 9;
+                                const h = Math.max(18, iconTopEnd - iconTopStart + 18);
+
+                                marker.style.height = `${h}px`;
+                                marker.style.flexDirection = 'column';
+                                marker.style.justifyContent = 'space-between';
+                                marker.innerHTML = scissorSvg + scissorSvg;
+                                marker.title = "Extract block";
+                            } else {
+                                marker.style.height = '18px';
+                                marker.style.flexDirection = 'row';
+                                marker.style.justifyContent = 'center';
+                                marker.innerHTML = scissorSvg;
+                                marker.title = "Split note here";
+                            }
+                        }
+                    } else {
+                        marker.style.display = 'none';
+                    }
+                }
+            }
+
+            if (update.docChanged) {
+                const content = update.state.doc.toString();
+                if (content !== '' && !content.endsWith('\n')) {
+                    update.view.dispatch({
+                        changes: { from: content.length, to: content.length, insert: '\n' }
+                    });
+                }
+                handleContentChange(content);
+            }
+        });
+    },
+
+    /**
+     * Create DOM event handlers for paste and blur.
+     */
+    createDomEventHandlers(container) {
+        const { EditorView } = window.CodeMirror;
+        const self = this;
+        return EditorView.domEventHandlers({
+            paste: (event, view) => {
+                const pastedText = event.clipboardData?.getData('text/plain');
+                if (!self.shouldPromptForLargePaste(pastedText)) {
+                    return false;
+                }
+
+                event.preventDefault();
+                self.handleLargePaste(view, pastedText);
+                return true;
+            },
+            blur: (event, view) => {
+                const currentId = container.dataset.id;
+                const content = view.state.doc.toString();
+                if (currentId !== 'new') {
+                    // Skip blur handling during undo/redo execution
+                    if (UndoRedoManager.isExecuting) {
+                        return;
+                    }
+                     if (content.trim() === '') {
+                        console.log('Deleting empty block on blur:', currentId);
+                        App.deleteBlock(currentId);
+                    } else {
+                        // Only commit if content changed
+                        const originalContent = self.originalContents.get(currentId);
+                        if (content !== originalContent) {
+                            console.log('Committing block on blur:', currentId);
+                            App.saveBlockContent(currentId, content, { commit: true });
+                            self.originalContents.set(currentId, content);
+                        }
+                    }
+                }
+            }
+        });
+    },
+
+    /**
+     * Create the keymap extension for new-block key bindings (Mod-Enter, Shift-Enter).
+     */
+    createNewBlockKeymap(container, createNewBlock) {
+        const { keymap, Prec } = window.CodeMirror;
+        return Prec.high(keymap.of([
+            {
+                key: 'Mod-Enter',
+                run: (target) => {
+                    const currentId = container.dataset.id;
+                    if (currentId === 'new') {
+                        const content = target.state.doc.toString();
+                        if (content.trim()) {
+                            console.log('Creating block via Mod+Enter', { currentId, content: content.substring(0, 50) });
+                            createNewBlock();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            },
+            {
+                key: 'Shift-Enter',
+                run: (target) => {
+                    const currentId = container.dataset.id;
+                    if (currentId === 'new') {
+                        const content = target.state.doc.toString();
+                        if (content.trim()) {
+                            console.log('Creating block via Shift+Enter', { currentId, content: content.substring(0, 50) });
+                            createNewBlock();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            }
+        ]));
+    },
+
+    /**
+     * Create a CodeMirror editor instance for a block.
+     */
     createEditor(container, blockId, initialContent) {
         if (!window.CodeMirror) {
             console.error('CodeMirror not loaded');
             return;
         }
 
-        const { EditorView, EditorState, basicSetup, markdown, languages, Decoration, ViewPlugin, StateField, WidgetType, keymap, Prec, indentWithTab, placeholder } = window.CodeMirror;
+        const { EditorView, EditorState, basicSetup, markdown, languages, keymap, indentWithTab, placeholder } = window.CodeMirror;
 
-        // We no longer use simple Widget replacement for everything.
-        // We will use Decoration.mark to style, and Decoration.replace to hide syntax.
         const self = this;
-
-        // Store reference for use in closures. Read current id dynamically to allow promotion.
         const handleContentChange = (content) => self.handleContentChange(container.dataset.id, content);
         const createNewBlock = () => self.createNewBlock();
-        const newBlockContentGetter = () => self.newBlockContent;
         const mentionCompletionSource = this.createMentionCompletionSource(container);
 
-        // Function to create decorations from document state
-        function createDecorations(state, hasFocus) {
-            const builder = [];
-            const fencedBlocks = self.getFencedBlocks(state.doc.toString());
-            const fencedBlockLines = self.buildFencedBlockLineSet(state.doc, fencedBlocks);
-            
-            // Get lines containing cursors ONLY if editor is focused
-            const cursorLines = new Set();
-            if (hasFocus) {
-                for (const range of state.selection.ranges) {
-                    cursorLines.add(state.doc.lineAt(range.head).number);
-                }
-            }
-
-            const widgets = self.getCMWidgets();
-            for (const block of fencedBlocks) {
-                const selectionInsideBlock = hasFocus && self.isSelectionInsideBlock(state, block);
-
-                if (block.isCollapsible && !selectionInsideBlock) {
-                    const startLine = state.doc.lineAt(block.from);
-                    const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
-
-                    builder.push(Decoration.replace({
-                        widget: new widgets.FencedBlockWidget(block),
-                        inclusive: false
-                    }).range(startLine.from, startLine.to));
-
-                    builder.push(Decoration.line({
-                        attributes: {
-                            class: 'md-fenced-block-summary-line'
-                        }
-                    }).range(startLine.from));
-
-                    for (let lineNumber = startLine.number + 1; lineNumber <= endLine.number; lineNumber += 1) {
-                        const blockLine = state.doc.line(lineNumber);
-                        builder.push(Decoration.line({
-                            attributes: {
-                                class: 'md-fenced-block-hidden-line'
-                            }
-                        }).range(blockLine.from));
-                    }
-                } else if (!selectionInsideBlock) {
-                    builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
-                }
-            }
-
-            for (let i = 1; i <= state.doc.lines; i++) {
-                if (fencedBlockLines.has(i)) {
-                    continue;
-                }
-
-                const line = state.doc.line(i);
-                const hideSyntax = !cursorLines.has(i);
-                self.applyLineDecorations(line, builder, hideSyntax, Decoration, i === state.doc.lines);
-            }
-
-            // Delegate sorting entirely to CodeMirror which understands how to resolve overlaps securely
-            return Decoration.set(builder, true);
-        }
-
-        // View plugin to provide decorations to the view
-        const livePreviewPlugin = ViewPlugin.fromClass(class {
-            constructor(view) {
-                this.decorations = createDecorations(view.state, view.hasFocus);
-            }
-            update(update) {
-                if (update.docChanged || update.selectionSet || update.focusChanged) {
-                    this.decorations = createDecorations(update.view.state, update.view.hasFocus);
-                }
-            }
-        }, {
-            decorations: (v) => v.decorations
-        });
-
-        // Create the editor view
         const view = new EditorView({
             doc: (blockId === 'new' && initialContent === '') ? '' : (initialContent.endsWith('\n') ? initialContent : initialContent + '\n'),
             extensions: [
@@ -781,354 +1158,16 @@ const DocumentView = {
                 keymap.of([indentWithTab]),
                 EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }]),
                 EditorView.lineWrapping,
-                livePreviewPlugin,
+                this.createLivePreviewPlugin(),
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),
-                EditorView.theme({
-                    "&": {
-                        fontFamily: 'Inter, -apple-system, sans-serif',
-                        fontSize: '15px',
-                        lineHeight: '1.6'
-                    },
-                    ".cm-content": {
-                        padding: '0',
-                        minHeight: '0'
-                    },
-                    ".cm-editor": {
-                        minHeight: '0'
-                    },
-                    ".cm-focused": {
-                        outline: 'none'
-                    },
-                    ".cm-tooltip.cm-tooltip-autocomplete": {
-                        border: '1px solid var(--border-color, #e2e8f0)',
-                        backgroundColor: 'var(--bg-primary, #ffffff)',
-                        borderRadius: '10px',
-                        boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
-                        overflow: 'hidden'
-                    },
-                    ".cm-tooltip-autocomplete ul": {
-                        fontFamily: 'inherit',
-                        padding: '4px'
-                    },
-                    ".cm-tooltip-autocomplete li": {
-                        borderRadius: '8px',
-                        padding: '6px 10px'
-                    },
-                    ".cm-tooltip-autocomplete li[aria-selected]": {
-                        backgroundColor: 'var(--bg-hover, #f1f5f9)',
-                        color: 'var(--text-primary, #0f172a)'
-                    },
-                    ".cm-completionLabel": {
-                        color: 'var(--text-primary, #0f172a)'
-                    },
-                    ".cm-foldGutter": {
-                        width: '15px'
-                    },
-                    ".cm-foldGutter .cm-gutterElement": {
-                        color: 'var(--text-muted, #94a3b8)',
-                        cursor: 'pointer'
-                    },
-                    ".cm-foldGutter .cm-gutterElement:hover": {
-                        color: 'var(--text-primary, #0f172a)'
-                    },
-                    // Live preview widget styles
-                    ".md-header": {
-                        fontWeight: '700',
-                        color: 'var(--text-primary)',
-                        display: 'inline-block'
-                    },
-                    ".md-header-1": { fontSize: '1.8em', padding: '0.1em 0' },
-                    ".md-header-2": { fontSize: '1.5em', padding: '0.1em 0' },
-                    ".md-header-3": { fontSize: '1.3em', padding: '0.1em 0' },
-                    ".md-header-4": { fontSize: '1.1em', padding: '0.1em 0' },
-                    ".md-header-5": { fontSize: '1.0em', padding: '0.1em 0' },
-                    ".md-header-6": { fontSize: '0.9em', padding: '0.1em 0' },
-                    ".md-strong": {
-                        fontWeight: '700',
-                        color: 'var(--text-color, #0f172a)'
-                    },
-                    ".md-emphasis": {
-                        fontStyle: 'italic'
-                    },
-                    ".md-code": {
-                        backgroundColor: 'var(--code-bg, #f1f5f9)',
-                        color: 'var(--code-color, #0f172a)',
-                        borderRadius: '3px',
-                        padding: '2px 4px',
-                        fontFamily: 'monospace',
-                        fontSize: '0.9em'
-                    },
-                    ".md-link-text": {
-                        color: 'var(--accent-color, #3b82f6)',
-                        textDecoration: 'underline'
-                    },
-                    ".md-strikethrough": {
-                        textDecoration: 'line-through'
-                    },
-                    ".md-task-checkbox": {
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '18px',
-                        height: '18px',
-                        border: '1.5px solid var(--border-color, #cbd5e1)',
-                        borderRadius: '4px',
-                        marginRight: '8px',
-                        verticalAlign: 'text-bottom',
-                        cursor: 'pointer',
-                        color: 'transparent',
-                        transition: 'all 0.15s ease'
-                    },
-                    ".md-task-checkbox:hover": {
-                        borderColor: 'var(--accent-color, #3b82f6)'
-                    },
-                    ".state-done": {
-                        backgroundColor: 'var(--accent-color, #3b82f6)',
-                        borderColor: 'var(--accent-color, #3b82f6)',
-                        color: 'white'
-                    },
-                    ".state-progress": {
-                        borderColor: 'var(--warning-color, #f59e0b)'
-                    },
-                    ".state-progress .half-fill": {
-                        width: '10px',
-                        height: '10px',
-                        backgroundColor: 'var(--warning-color, #f59e0b)',
-                        borderRadius: '2px'
-                    },
-                    ".state-blocked": {
-                        backgroundColor: 'var(--danger-color, #ef4444)',
-                        borderColor: 'var(--danger-color, #ef4444)',
-                        color: 'white'
-                    },
-                    ".state-canceled": {
-                        backgroundColor: 'var(--bg-tertiary, #f1f5f9)',
-                        borderColor: 'var(--border-color, #cbd5e1)',
-                        color: 'var(--text-muted, #94a3b8)'
-                    },
-                    ".md-task-done": {
-                        textDecoration: 'line-through',
-                        color: 'var(--text-muted, #94a3b8)'
-                    },
-                    ".md-task-badge": {
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        fontSize: '0.85em',
-                        padding: '2px 6px',
-                        borderRadius: '12px',
-                        backgroundColor: 'var(--bg-secondary, #f8fafc)',
-                        color: 'var(--text-secondary, #64748b)',
-                        border: '1px solid var(--border-color, #e2e8f0)',
-                        margin: '0 4px',
-                        verticalAlign: 'text-bottom',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                    },
-                    ".badge-dependsOn": {
-                        borderColor: 'var(--badge-todos-border, #fca5a5)',
-                        backgroundColor: 'var(--badge-todos-bg, #fff1f2)',
-                        color: 'var(--badge-todos-text, #9f1239)'
-                    },
-                    ".badge-due": {
-                        borderColor: 'var(--badge-work-border, #bae6fd)',
-                        backgroundColor: 'var(--badge-work-bg, #f0f9ff)',
-                        color: 'var(--badge-work-text, #075985)'
-                    },
-                    ".badge-assignee": {
-                        borderColor: 'var(--badge-time-border, #d8b4fe)',
-                        backgroundColor: 'var(--badge-time-bg, #faf5ff)',
-                        color: 'var(--badge-time-text, #6b21a8)'
-                    },
-                    ".badge-priority": {
-                        borderColor: 'var(--border-color, #e2e8f0)',
-                        backgroundColor: 'var(--bg-secondary, #f8fafc)',
-                        color: 'var(--text-secondary, #64748b)'
-                    },
-                    ".badge-priority[data-priority='urgent']": {
-                        borderColor: 'rgba(239, 68, 68, 0.3)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
-                        color: '#ef4444',
-                        fontWeight: '700'
-                    },
-                    ".badge-priority[data-priority='high']": {
-                        borderColor: 'rgba(249, 115, 22, 0.3)',
-                        backgroundColor: 'rgba(249, 115, 22, 0.05)',
-                        color: '#f97316',
-                        fontWeight: '600'
-                    },
-                    ".badge-priority[data-priority='medium']": {
-                        borderColor: 'rgba(59, 130, 246, 0.3)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                        color: '#3b82f6'
-                    },
-                    ".badge-priority[data-priority='low']": {
-                        borderColor: 'rgba(148, 163, 184, 0.3)',
-                        backgroundColor: 'rgba(148, 163, 184, 0.05)',
-                        color: '#94a3b8'
-                    },
-                    ".badge-id": {
-                        opacity: '0.7',
-                        fontFamily: 'monospace',
-                        fontSize: '0.8em'
-                    },
-                    ".md-task-badge:hover": {
-                        backgroundColor: 'var(--bg-hover, #f1f5f9)'
-                    },
-                    ".md-add-deadline, .md-add-action": {
-                        display: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--text-muted, #94a3b8)',
-                        marginLeft: '8px',
-                        verticalAlign: 'text-bottom',
-                        padding: '2px 4px',
-                        borderRadius: '4px'
-                    },
-                    ".md-add-deadline:hover, .md-add-action:hover": {
-                        color: 'var(--accent-color, #3b82f6)',
-                        backgroundColor: 'var(--bg-hover, #f1f5f9)'
-                    },
-                    ".cm-line:hover .md-add-deadline, .cm-line:hover .md-add-action": {
-                        display: 'inline-flex'
-                    },
-                }),
-                // Listen for content changes and cursor movements
-                EditorView.updateListener.of((update) => {
-                    if (update.selectionSet || update.focusChanged || update.docChanged || update.geometryChanged) {
-                        const marker = document.querySelector(`.block-split-marker[data-id="${blockId}"]`);
-                        if (marker) {
-                            if (update.view.hasFocus) {
-                                if (update.state.doc.lines <= 1) {
-                                    marker.style.display = 'none';
-                                    return;
-                                }
-
-                                const sel = update.state.selection.main;
-                                const isExtract = !sel.empty && sel.from !== sel.to;
-
-                                const startBlock = update.view.lineBlockAt(sel.from);
-                                const endBlock = update.view.lineBlockAt(sel.to);
-
-                                const scroller = update.view.scrollDOM;
-                                const blockEl = container.closest('.block');
-
-                                if (blockEl) {
-                                    const contentTop = scroller.getBoundingClientRect().top;
-                                    const blockRectTop = blockEl.getBoundingClientRect().top;
-
-                                    const relativeTopStart = contentTop - blockRectTop + startBlock.top - scroller.scrollTop;
-                                    const iconTopStart = relativeTopStart + startBlock.height - 9;
-                                    
-                                    marker.style.display = 'flex';
-                                    marker.style.top = `${iconTopStart}px`;
-                                    
-                                    const scissorSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>';
-                                    
-                                    if (isExtract) {
-                                        const relativeTopEnd = contentTop - blockRectTop + endBlock.top - scroller.scrollTop;
-                                        const iconTopEnd = relativeTopEnd + endBlock.height - 9;
-                                        const h = Math.max(18, iconTopEnd - iconTopStart + 18);
-                                        
-                                        marker.style.height = `${h}px`;
-                                        marker.style.flexDirection = 'column';
-                                        marker.style.justifyContent = 'space-between';
-                                        marker.innerHTML = scissorSvg + scissorSvg;
-                                        marker.title = "Extract block";
-                                    } else {
-                                        marker.style.height = '18px';
-                                        marker.style.flexDirection = 'row';
-                                        marker.style.justifyContent = 'center';
-                                        marker.innerHTML = scissorSvg;
-                                        marker.title = "Split note here";
-                                    }
-                                }
-                            } else {
-                                marker.style.display = 'none';
-                            }
-                        }
-                    }
-
-                    if (update.docChanged) {
-                        const content = update.state.doc.toString();
-                        if (content !== '' && !content.endsWith('\n')) {
-                            update.view.dispatch({
-                                changes: { from: content.length, to: content.length, insert: '\n' }
-                            });
-                        }
-                        handleContentChange(content);
-                    }
-                }),
-                EditorView.domEventHandlers({
-                    paste: (event, view) => {
-                        const pastedText = event.clipboardData?.getData('text/plain');
-                        if (!self.shouldPromptForLargePaste(pastedText)) {
-                            return false;
-                        }
-
-                        event.preventDefault();
-                        self.handleLargePaste(view, pastedText);
-                        return true;
-                    },
-                    blur: (event, view) => {
-                        const currentId = container.dataset.id;
-                        const content = view.state.doc.toString();
-                        if (currentId !== 'new') {
-                            // Skip blur handling during undo/redo execution
-                            if (UndoRedoManager.isExecuting) {
-                                return;
-                            }
-                             if (content.trim() === '') {
-                                console.log('Deleting empty block on blur:', currentId);
-                                App.deleteBlock(currentId);
-                            } else {
-                                // Only commit if content changed
-                                const originalContent = self.originalContents.get(currentId);
-                                if (content !== originalContent) {
-                                    console.log('Committing block on blur:', currentId);
-                                    App.saveBlockContent(currentId, content, { commit: true });
-                                    self.originalContents.set(currentId, content);
-                                }
-                            }
-                        }
-                    }
-                }),
-                // Handle key bindings for creating new blocks using keymap (with high precedence)
-                Prec.high(keymap.of([
-                    {
-                        key: 'Mod-Enter',
-                        run: (target) => {
-                            const currentId = container.dataset.id;
-                            if (currentId === 'new') {
-                                const content = target.state.doc.toString();
-                                if (content.trim()) {
-                                    console.log('Creating block via Mod+Enter', { currentId, content: content.substring(0, 50) });
-                                    createNewBlock();
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }
-                    },
-                    {
-                        key: 'Shift-Enter',
-                        run: (target) => {
-                            const currentId = container.dataset.id;
-                            if (currentId === 'new') {
-                                const content = target.state.doc.toString();
-                                if (content.trim()) {
-                                    console.log('Creating block via Shift+Enter', { currentId, content: content.substring(0, 50) });
-                                    createNewBlock();
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }
-                    }
-                ]))
+                this.getEditorTheme(),
+                this.createUpdateListener(container, blockId, handleContentChange),
+                this.createDomEventHandlers(container),
+                this.createNewBlockKeymap(container, createNewBlock)
             ],
             parent: container
         });
 
-        // Store editor instance and original content
         this.editors.set(blockId, view);
         this.originalContents.set(blockId, initialContent);
     },
@@ -1137,18 +1176,18 @@ const DocumentView = {
     applyLineDecorations(line, builder, hideSyntax, Decoration, isLastLine) {
         const text = line.text;
         const from = line.from;
-        let usedRanges = [];
-        
+        const usedRanges = [];
+
         // Ensure widgets are initialized
         const widgets = this.getCMWidgets();
 
-        // 1. Task List Checkboxes
+        // 1. Task List Checkboxes (kept inline due to interdependencies with task-done styling)
         const checkboxRegex = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\]/g;
         let cbMatch;
         let lineHasCheckedTask = false;
         let isTaskLine = false;
         let taskLineStart = from;
-        
+
         while ((cbMatch = checkboxRegex.exec(text)) !== null) {
             const matchFrom = from + cbMatch.index + cbMatch[1].length;
             const matchTo = matchFrom + 3; // "[ ]" length
@@ -1173,6 +1212,7 @@ const DocumentView = {
             }
         }
 
+        // 2. Add-field widgets for task lines
         if (isTaskLine) {
             if (!text.includes('[due::')) {
                 builder.push(Decoration.widget({
@@ -1200,7 +1240,31 @@ const DocumentView = {
             }
         }
 
-        // 3. Inline Fields (e.g. [due:: 2026-03-25], [dependsOn:: ^id])
+        // 3. Run registered line decorators
+        for (const decorator of this._lineDecorators) {
+            decorator(text, from, builder, hideSyntax, Decoration, usedRanges, widgets);
+        }
+
+        // 4. Task-done styling for checked/canceled tasks
+        if (lineHasCheckedTask) {
+            builder.push(Decoration.mark({ class: 'md-task-done' }).range(taskLineStart, line.to));
+        }
+    },
+
+    // Registry of line decorator functions. Each takes (text, from, builder, hideSyntax, Decoration, usedRanges, widgets).
+    get _lineDecorators() {
+        return [
+            this.decorateInlineFields.bind(this),
+            this.decorateTaskAnchors.bind(this),
+            this.decorateHeaders.bind(this),
+            this.decorateInlineFormats.bind(this),
+            this.decorateLinks.bind(this),
+            this.decorateBareUrls.bind(this)
+        ];
+    },
+
+    // Decorator: inline fields (e.g. [due:: 2026-03-25], [dependsOn:: ^id])
+    decorateInlineFields(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
         const inlineFieldRegex = /\[(due|dependsOn|assignee|priority)::\s*([^\]]+)\]/g;
         let fieldMatch;
         while ((fieldMatch = inlineFieldRegex.exec(text)) !== null) {
@@ -1218,8 +1282,10 @@ const DocumentView = {
             }
             usedRanges.push({ from: matchFrom, to: matchTo });
         }
+    },
 
-        // 3. Task Anchors (e.g. ^task-id)
+    // Decorator: task anchors (e.g. ^task-id)
+    decorateTaskAnchors(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
         const anchorRegex = /(?:\s+)(\^[a-zA-Z0-9-_]+)\b/g;
         let anchorMatch;
         while ((anchorMatch = anchorRegex.exec(text)) !== null) {
@@ -1236,28 +1302,28 @@ const DocumentView = {
             }
             usedRanges.push({ from: matchFrom, to: matchTo });
         }
+    },
 
-        if (lineHasCheckedTask) {
-            builder.push(Decoration.mark({ class: 'md-task-done' }).range(taskLineStart, line.to));
-        }
-
-        // Header pattern
+    // Decorator: markdown headers (#{1,6})
+    decorateHeaders(text, from, builder, hideSyntax, Decoration, usedRanges) {
         const headerMatch = text.match(/^(#{1,6})\s+(.*)$/);
         if (headerMatch) {
             const level = headerMatch[1].length;
-            const matchTo = from + line.text.length;
+            const matchTo = from + text.length;
             let overlaps = usedRanges.some(r => from < r.to && matchTo > r.from);
-            
+
             if (!overlaps) {
-                builder.push(Decoration.mark({ class: `md-header md-header-${level}` }).range(from, line.to));
+                builder.push(Decoration.mark({ class: `md-header md-header-${level}` }).range(from, from + text.length));
                 if (hideSyntax) {
                     const syntaxEnd = from + level + 1; // # + space
                     builder.push(Decoration.replace({}).range(from, syntaxEnd));
                 }
             }
         }
+    },
 
-        // Inline patterns
+    // Decorator: inline formatting patterns (bold, italic, strikethrough, code)
+    decorateInlineFormats(text, from, builder, hideSyntax, Decoration, usedRanges) {
         const patterns = [
             { regex: /\*\*(.+?)\*\*/g, class: 'md-strong', syntaxLen: 2 },
             { regex: /\*(.+?)\*/g, class: 'md-emphasis', syntaxLen: 1 },
@@ -1283,8 +1349,10 @@ const DocumentView = {
                 }
             }
         }
+    },
 
-        // Links [text](url)
+    // Decorator: markdown links [text](url)
+    decorateLinks(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
         const linkRegex = /\[(.+?)\]\((.+?)\)/g;
         let match;
         while ((match = linkRegex.exec(text)) !== null) {
@@ -1303,9 +1371,12 @@ const DocumentView = {
                 usedRanges.push({ from: matchFrom, to: matchTo });
             }
         }
+    },
 
-        // Bare URLs
+    // Decorator: bare URLs (http/https)
+    decorateBareUrls(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
         const bareUrlRegex = /https?:\/\/\S+/g;
+        let match;
         while ((match = bareUrlRegex.exec(text)) !== null) {
             const matchFrom = from + match.index;
             const matchTo = matchFrom + match[0].length;

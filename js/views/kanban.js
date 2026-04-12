@@ -96,18 +96,8 @@ const KanbanView = {
         `;
     },
 
-    attachEventListeners(container) {
-        const cards = container.querySelectorAll('.kanban-card');
-        const columns = container.querySelectorAll('.kanban-column .blocks');
-        const isMobile = window.innerWidth <= 768;
-        let dragInProgress = false;
-
-        // Disable native drag on mobile
-        if (isMobile) {
-            cards.forEach(card => card.setAttribute('draggable', 'false'));
-        }
-
-        const buildDragPayload = (card) => JSON.stringify({
+    buildDragPayload(card) {
+        return JSON.stringify({
             id: card.dataset.id,
             blockId: card.dataset.blockId,
             matchIndex: parseInt(card.dataset.matchIndex, 10),
@@ -115,123 +105,124 @@ const KanbanView = {
             prefix: card.dataset.prefix,
             columnId: card.dataset.columnId
         });
+    },
 
-        // Card dragging (desktop only)
-        cards.forEach(card => {
-            card.addEventListener('dragstart', (e) => {
-                card.classList.add('dragging');
-                dragInProgress = true;
+    setupCardDragDrop(card, dragState) {
+        card.addEventListener('dragstart', (e) => {
+            card.classList.add('dragging');
+            dragState.inProgress = true;
 
-                const payload = buildDragPayload(card);
-                if (e.dataTransfer) {
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', payload);
-                    e.dataTransfer.setData('application/json', payload);
-                }
-            });
-
-            card.addEventListener('dragend', () => {
-                card.classList.remove('dragging');
-                setTimeout(() => {
-                    dragInProgress = false;
-                }, 0);
-            });
-
-            // Edit modal on click
-            const editBtn = card.querySelector('.kanban-edit-btn');
-            if (editBtn) {
-                editBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const block = Store.blocks.find(b => b.id === card.dataset.blockId);
-                    if (block) {
-                        const tasks = KanbanView.extractTasks([block]);
-                        const taskToEdit = tasks.find(t => t.id === card.dataset.id);
-                        if (taskToEdit) {
-                            KanbanView.showEditModal(taskToEdit, block);
-                        }
-                    }
-                });
+            const payload = KanbanView.buildDragPayload(card);
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', payload);
+                e.dataTransfer.setData('application/json', payload);
             }
-
-            // Long-press to move on mobile
-            if (isMobile) {
-                let longPressTimer = null;
-                let longPressTriggered = false;
-
-                card.addEventListener('touchstart', (e) => {
-                    longPressTriggered = false;
-                    longPressTimer = setTimeout(() => {
-                        longPressTriggered = true;
-                        const payload = buildDragPayload(card);
-                        KanbanView.showMoveModal(JSON.parse(payload));
-                    }, 500);
-                }, { passive: true });
-
-                card.addEventListener('touchmove', () => {
-                    clearTimeout(longPressTimer);
-                }, { passive: true });
-
-                card.addEventListener('touchend', () => {
-                    clearTimeout(longPressTimer);
-                });
-            }
-
-            // Edit on card click
-            card.addEventListener('click', (e) => {
-                if (dragInProgress) return;
-                if (e.target.closest('.kanban-badge')) return; // Ignore if badge clicked
-                if (e.target.closest('.kanban-edit-btn')) return;
-                App.showBlockContentModal(card.dataset.blockId);
-            });
-
-            // Badge clicks
-            card.querySelectorAll('.kanban-badge').forEach(badge => {
-                badge.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const type = badge.dataset.type;
-                    if (type === 'assignee') {
-                        const blockId = card.dataset.blockId;
-                        const block = Store.blocks.find(b => b.id === blockId);
-                        if (!block) return;
-
-                        App.showAssigneeModal((contact) => {
-                            // Find the exact task in block content and update it
-                            // Re-extract tasks to find the exact one in current content
-                            const tasks = KanbanView.extractTasks([block]);
-                            const taskToUpdate = tasks.find(t => t.id === card.dataset.id);
-
-                            if (taskToUpdate) {
-                                // Update assignee in originalText
-                                let newText = taskToUpdate.originalText;
-                                if (newText.includes('[assignee::')) {
-                                    newText = newText.replace(/\[assignee::\s*[^\]]+\]/, `[assignee:: ${contact}]`);
-                                } else {
-                                    newText += ` [assignee:: ${contact}]`;
-                                }
-
-                                const content = block.content;
-                                const beforeTask = content.substring(0, taskToUpdate.matchIndex);
-                                let nextNewline = content.indexOf('\n', taskToUpdate.matchIndex);
-                                if (nextNewline === -1) nextNewline = content.length;
-
-                                const newLine = taskToUpdate.prefix + '[' + taskToUpdate.state + '] ' + newText;
-                                const newContent = beforeTask + newLine + content.substring(nextNewline);
-
-                                const commitMessage = `Update assignee for '${taskToUpdate.text}'`;
-                                App.saveBlockContent(block.id, newContent, { commit: true, commitMessage }).then(() => {
-                                    App.render();
-                                });
-                            }
-                        }, block.tags);
-                    }
-                });
-            });
         });
 
-        // Column dropping
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            setTimeout(() => {
+                dragState.inProgress = false;
+            }, 0);
+        });
+    },
+
+    setupCardClickHandlers(card, dragState) {
+        // Edit modal on click
+        const editBtn = card.querySelector('.kanban-edit-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const block = Store.blocks.find(b => b.id === card.dataset.blockId);
+                if (block) {
+                    const tasks = KanbanView.extractTasks([block]);
+                    const taskToEdit = tasks.find(t => t.id === card.dataset.id);
+                    if (taskToEdit) {
+                        KanbanView.showEditModal(taskToEdit, block);
+                    }
+                }
+            });
+        }
+
+        // Edit on card click
+        card.addEventListener('click', (e) => {
+            if (dragState.inProgress) return;
+            if (e.target.closest('.kanban-badge')) return; // Ignore if badge clicked
+            if (e.target.closest('.kanban-edit-btn')) return;
+            App.showBlockContentModal(card.dataset.blockId);
+        });
+
+        // Badge clicks
+        card.querySelectorAll('.kanban-badge').forEach(badge => {
+            badge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const type = badge.dataset.type;
+                if (type === 'assignee') {
+                    const blockId = card.dataset.blockId;
+                    const block = Store.blocks.find(b => b.id === blockId);
+                    if (!block) return;
+
+                    App.showAssigneeModal((contact) => {
+                        // Find the exact task in block content and update it
+                        // Re-extract tasks to find the exact one in current content
+                        const tasks = KanbanView.extractTasks([block]);
+                        const taskToUpdate = tasks.find(t => t.id === card.dataset.id);
+
+                        if (taskToUpdate) {
+                            // Update assignee in originalText
+                            let newText = taskToUpdate.originalText;
+                            if (newText.includes('[assignee::')) {
+                                newText = newText.replace(/\[assignee::\s*[^\]]+\]/, `[assignee:: ${contact}]`);
+                            } else {
+                                newText += ` [assignee:: ${contact}]`;
+                            }
+
+                            const content = block.content;
+                            const beforeTask = content.substring(0, taskToUpdate.matchIndex);
+                            let nextNewline = content.indexOf('\n', taskToUpdate.matchIndex);
+                            if (nextNewline === -1) nextNewline = content.length;
+
+                            const newLine = taskToUpdate.prefix + '[' + taskToUpdate.state + '] ' + newText;
+                            const newContent = beforeTask + newLine + content.substring(nextNewline);
+
+                            const commitMessage = `Update assignee for '${taskToUpdate.text}'`;
+                            App.saveBlockContent(block.id, newContent, { commit: true, commitMessage }).then(() => {
+                                App.render();
+                            });
+                        }
+                    }, block.tags);
+                }
+            });
+        });
+    },
+
+    setupMobileInteractions(card) {
+        let longPressTimer = null;
+        let longPressTriggered = false;
+
+        card.addEventListener('touchstart', (e) => {
+            longPressTriggered = false;
+            longPressTimer = setTimeout(() => {
+                longPressTriggered = true;
+                const payload = KanbanView.buildDragPayload(card);
+                KanbanView.showMoveModal(JSON.parse(payload));
+            }, 500);
+        }, { passive: true });
+
+        card.addEventListener('touchmove', () => {
+            clearTimeout(longPressTimer);
+        }, { passive: true });
+
+        card.addEventListener('touchend', () => {
+            clearTimeout(longPressTimer);
+        });
+    },
+
+    setupColumnDropTargets(columns) {
         columns.forEach(column => {
             const colContainer = column.closest('.kanban-column');
-            
+
             column.addEventListener('dragover', (e) => {
                 e.preventDefault(); // Necessary to allow dropping
                 colContainer.classList.add('drag-over');
@@ -244,18 +235,18 @@ const KanbanView = {
             column.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 colContainer.classList.remove('drag-over');
-                
+
                 const targetColumn = KanbanView.getColumnById(colContainer.dataset.columnId);
                 const targetState = targetColumn ? targetColumn.state : null;
                 const dataJson = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
-                
+
                 if (dataJson && targetState !== null) {
                     const data = JSON.parse(dataJson);
                     if (data.columnId === colContainer.dataset.columnId) {
                         return;
                     }
                     const block = Store.blocks.find(b => b.id === data.blockId);
-                    
+
                     if (block && block.content) {
                         // We need to update the file content
                         // the exact character sequence to replace is: [prefix][oldState]
@@ -263,7 +254,7 @@ const KanbanView = {
                         // A safer way: re-parse blocks or do string splice
                         const content = block.content;
                         const targetPos = data.matchIndex + data.prefix.length + 1; // +1 for the '['
-                        
+
                         // Check if the bracket is indeed at targetPos
                         if (content[targetPos - 1] === '[' && content[targetPos + 1] === ']') {
                             const newStateLabel = targetColumn?.label || targetState;
@@ -279,6 +270,28 @@ const KanbanView = {
                 }
             });
         });
+    },
+
+    attachEventListeners(container) {
+        const cards = container.querySelectorAll('.kanban-card');
+        const columns = container.querySelectorAll('.kanban-column .blocks');
+        const isMobile = window.innerWidth <= 768;
+        const dragState = { inProgress: false };
+
+        // Disable native drag on mobile
+        if (isMobile) {
+            cards.forEach(card => card.setAttribute('draggable', 'false'));
+        }
+
+        cards.forEach(card => {
+            KanbanView.setupCardDragDrop(card, dragState);
+            KanbanView.setupCardClickHandlers(card, dragState);
+            if (isMobile) {
+                KanbanView.setupMobileInteractions(card);
+            }
+        });
+
+        KanbanView.setupColumnDropTargets(columns);
     },
 
     showMoveModal(data) {
