@@ -435,6 +435,66 @@
     opacity: 0.6;
 }
 
+/* Pin Button */
+.pin-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
+}
+
+.document-view .block:hover .pin-btn,
+.document-view .block:focus-within .pin-btn {
+    opacity: 0.5;
+}
+
+.pin-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+/* Pinned (active) state - always visible with accent */
+.pin-btn.pinned {
+    opacity: 1 !important;
+    color: var(--accent);
+}
+
+.pin-btn.pinned:hover {
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+/* Pinned block visual indicator */
+.document-view .block.block-pinned {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-light, rgba(59, 130, 246, 0.15)), var(--shadow-sm);
+}
+
+/* Always show metadata bar on pinned blocks */
+.document-view .block.block-pinned .block-metadata {
+    opacity: 1;
+    height: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+/* Content modal pin button is always visible */
+.content-modal .pin-btn {
+    opacity: 0.6;
+}
+
 @media (max-width: 768px) {
     .tag-modal.content-modal {
         width: 95vw;

@@ -43,7 +43,7 @@ const DocumentView = {
 
         // Build HTML for blocks - use div containers for CodeMirror
         container.innerHTML = sorted.map(block => `
-            <article class="block" data-id="${block.id}">
+            <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${block.id}">
                 <div class="block-split-marker" data-id="${block.id}" title="Split note here">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
                 </div>
@@ -88,6 +88,13 @@ const DocumentView = {
         }
         this._tagHandler = this.handleTagClick.bind(this);
         container.addEventListener('click', this._tagHandler);
+
+        // Add event delegation for pin button click
+        if (this._pinHandler) {
+            container.removeEventListener('click', this._pinHandler);
+        }
+        this._pinHandler = this.handlePinClick.bind(this);
+        container.addEventListener('click', this._pinHandler);
 
         this.attachEventListeners();
     },
@@ -179,6 +186,13 @@ const DocumentView = {
             `);
         }
 
+        // Pin button
+        parts.push(`
+            <button class="pin-btn ${block.pinned ? 'pinned' : ''}" data-id="${block.id}" title="${block.pinned ? 'Unpin note' : 'Pin note'}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="${block.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z"/></svg>
+            </button>
+        `);
+
         // Delete button (always shown, far right)
         parts.push(`
             <button class="delete-btn" data-id="${block.id}" title="Delete note">
@@ -239,6 +253,21 @@ const DocumentView = {
         const blockId = tagBtn.dataset.id;
         if (blockId) {
             App.showTagModal(blockId);
+        }
+    },
+
+    handlePinClick(e) {
+        const pinBtn = e.target.closest('.pin-btn');
+        if (!pinBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const blockId = pinBtn.dataset.id;
+        if (blockId && blockId !== 'new') {
+            const block = Store.blocks.find(b => b.id === blockId);
+            if (block) {
+                App.updateBlockProperty(blockId, 'pinned', !block.pinned,
+                    block.pinned ? 'Unpin note' : 'Pin note');
+            }
         }
     },
 
