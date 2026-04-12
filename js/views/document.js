@@ -1532,19 +1532,14 @@ const DocumentView = {
 
     // Focus the "new note" block at the bottom
     focusNewBlock() {
-        const container = document.getElementById('viewContainer');
-        if (container) {
-            container.scrollTop = container.scrollHeight;
-        }
-
-        // Try to focus immediately; retry after a short delay if editor isn't ready yet
         const tryFocus = (attempts = 0) => {
+            const newBlock = document.querySelector('.block[data-id="new"]');
             const editor = this.editors.get('new');
-            if (editor) {
-                editor.focus();
-                // Scroll again after focus in case layout shifted
-                if (container) container.scrollTop = container.scrollHeight;
-            } else if (attempts < 10) {
+
+            if (newBlock && editor) {
+                newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => editor.focus(), 150);
+            } else if (attempts < 15) {
                 setTimeout(() => tryFocus(attempts + 1), 50);
             }
         };

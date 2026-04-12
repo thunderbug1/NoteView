@@ -76,16 +76,16 @@ const App = {
             if (initialized) {
                 await this.completeInitialization();
             } else {
-                this.showDirectoryPicker();
+                this.showManageVaultsModal();
             }
         } catch (err) {
             // If permission needed, show button with the handle
             if (err.needsPermission) {
-                this.showPermissionButton(err.handle);
+                this.showManageVaultsModal();
             } else if (err.name === 'NotAllowedError' || err.message?.includes('permission')) {
-                this.showPermissionButton();
+                this.showManageVaultsModal();
             } else if (err.name === 'AbortError') {
-                this.showDirectoryPicker();
+                this.showManageVaultsModal();
             } else {
                 this.showError(err.message || 'Failed to load directory');
             }
@@ -93,56 +93,7 @@ const App = {
     },
 
     showPermissionButton(handle = null) {
-        const container = document.getElementById('viewContainer');
-        container.innerHTML = `
-            <div class="directory-picker">
-                <div class="picker-content">
-                    <h1>NoteView</h1>
-                    <p>Click to access your notes folder</p>
-                    <button id="grantPermissionBtn" class="select-folder-btn">
-                        <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:bottom; margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></span>
-                        <span>Open Notes</span>
-                    </button>
-                    <button id="openVaultManagerBtn" class="select-folder-btn" style="margin-top: 0.5rem; background: var(--bg-secondary); color: var(--text); border: 1px solid var(--border);">
-                        <span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:bottom; margin-right:4px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 7 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
-                        <span>Manage Vaults</span>
-                    </button>
-                    <p class="picker-hint">Grant access to continue where you left off.</p>
-                </div>
-            </div>
-        `;
-
-        const grantBtn = document.getElementById('grantPermissionBtn');
-        if (grantBtn) {
-            grantBtn.addEventListener('click', async () => {
-                const container = document.getElementById('viewContainer');
-                container.innerHTML = '<div class="loading">Loading notes...</div>';
-
-                try {
-                    // Use passed handle or get from store
-                    const savedHandle = handle || await Store.getDirectoryHandle();
-                    if (savedHandle) {
-                        const permission = await savedHandle.requestPermission({ mode: 'readwrite' });
-                        if (permission === 'granted') {
-                            Store.directoryHandle = savedHandle;
-                            await GitStore.init(savedHandle);
-                            await Store.loadBlocks();
-                            await this.completeInitialization();
-                        } else {
-                            this.showDirectoryPicker();
-                        }
-                    } else {
-                        this.showDirectoryPicker();
-                    }
-                } catch (err) {
-                    this.showDirectoryPicker();
-                }
-            });
-        }
-        const vaultMgrBtn = document.getElementById('openVaultManagerBtn');
-        if (vaultMgrBtn) {
-            vaultMgrBtn.addEventListener('click', () => this.showManageVaultsModal());
-        }
+        this.showManageVaultsModal();
     },
 
     async completeInitialization() {
@@ -508,11 +459,24 @@ const App = {
     },
 
     setView(view) {
+        const previousView = Store.currentView;
         console.log('[App] setView', {
             requestedView: view,
-            previousView: Store.currentView
+            previousView
         });
+
+        // Leaving settings: restore sidebars
+        if (previousView === 'settings' && view !== 'settings') {
+            this._restoreSidebarState();
+        }
+
         Store.setCurrentView(view);
+
+        // Entering settings: save and close sidebars
+        if (view === 'settings') {
+            this._saveSidebarState();
+            this._closeSidebars();
+        }
 
         // Note: Don't invalidate timeline cache when switching away
         // The timeline cache should persist as long as git history hasn't changed
@@ -526,6 +490,73 @@ const App = {
         console.log('[App] setView:done', {
             currentView: Store.currentView
         });
+    },
+
+    _saveSidebarState() {
+        const sidebar = document.getElementById('sidebar');
+        const sidebarRight = document.getElementById('sidebarRight');
+        this._savedSidebarState = {
+            leftOpen: sidebar?.classList.contains('sidebar-open') || false,
+            rightOpen: sidebarRight?.classList.contains('sidebar-open') || false,
+            rightCollapsed: sidebarRight?.classList.contains('collapsed') || false
+        };
+    },
+
+    _closeSidebars() {
+        const sidebar = document.getElementById('sidebar');
+        const sidebarRight = document.getElementById('sidebarRight');
+        const overlay = document.getElementById('sidebarOverlay');
+        const sidebarEdgeLeft = document.getElementById('sidebarEdgeLeft');
+        const sidebarEdgeRight = document.getElementById('sidebarEdgeRight');
+        const sidebarRightToggle = document.getElementById('sidebarRightToggle');
+
+        if (sidebar) sidebar.classList.remove('sidebar-open');
+        if (sidebarEdgeLeft) sidebarEdgeLeft.classList.remove('hidden');
+
+        if (sidebarRight) sidebarRight.classList.remove('sidebar-open');
+        if (sidebarEdgeRight) sidebarEdgeRight.classList.remove('hidden');
+
+        if (overlay) overlay.classList.remove('active');
+        document.body.classList.remove('sidebar-open');
+
+        if (sidebarRight) sidebarRight.classList.add('collapsed');
+        if (sidebarRightToggle) sidebarRightToggle.classList.add('shifted', 'rotated');
+    },
+
+    _restoreSidebarState() {
+        if (!this._savedSidebarState) return;
+        const state = this._savedSidebarState;
+        const sidebar = document.getElementById('sidebar');
+        const sidebarRight = document.getElementById('sidebarRight');
+        const overlay = document.getElementById('sidebarOverlay');
+        const sidebarEdgeLeft = document.getElementById('sidebarEdgeLeft');
+        const sidebarEdgeRight = document.getElementById('sidebarEdgeRight');
+        const sidebarRightToggle = document.getElementById('sidebarRightToggle');
+
+        if (state.leftOpen) {
+            if (sidebar) sidebar.classList.add('sidebar-open');
+            if (sidebarEdgeLeft) sidebarEdgeLeft.classList.add('hidden');
+        }
+
+        if (state.rightOpen) {
+            if (sidebarRight) sidebarRight.classList.add('sidebar-open');
+            if (sidebarEdgeRight) sidebarEdgeRight.classList.add('hidden');
+        }
+
+        if (state.rightCollapsed) {
+            if (sidebarRight) sidebarRight.classList.add('collapsed');
+            if (sidebarRightToggle) sidebarRightToggle.classList.add('shifted', 'rotated');
+        } else {
+            if (sidebarRight) sidebarRight.classList.remove('collapsed');
+            if (sidebarRightToggle) sidebarRightToggle.classList.remove('shifted', 'rotated');
+        }
+
+        if (state.leftOpen || state.rightOpen) {
+            if (overlay) overlay.classList.add('active');
+            document.body.classList.add('sidebar-open');
+        }
+
+        this._savedSidebarState = null;
     },
 
     render() {

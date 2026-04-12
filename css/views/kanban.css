@@ -85,6 +85,33 @@
     word-break: break-word;
 }
 
+/* Priority badge colors */
+.kanban-badge.badge-priority[data-priority='urgent'] {
+    border-color: rgba(239, 68, 68, 0.3);
+    background-color: rgba(239, 68, 68, 0.05);
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.kanban-badge.badge-priority[data-priority='high'] {
+    border-color: rgba(249, 115, 22, 0.3);
+    background-color: rgba(249, 115, 22, 0.05);
+    color: #f97316;
+    font-weight: 600;
+}
+
+.kanban-badge.badge-priority[data-priority='medium'] {
+    border-color: rgba(59, 130, 246, 0.3);
+    background-color: rgba(59, 130, 246, 0.05);
+    color: #3b82f6;
+}
+
+.kanban-badge.badge-priority[data-priority='low'] {
+    border-color: rgba(148, 163, 184, 0.3);
+    background-color: rgba(148, 163, 184, 0.05);
+    color: #94a3b8;
+}
+
 @media (max-width: 768px) {
     .kanban-column {
         flex: 0 0 250px;
