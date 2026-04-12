@@ -8,7 +8,7 @@ console.log('Reading index.html...');
 let html = fs.readFileSync(htmlPath, 'utf8');
 
 // 1. Inline CSS
-html = html.replace(/<link\s+rel="stylesheet"\s+href="([^"]+)">/g, (match, href) => {
+html = html.replace(/<link\s+rel="stylesheet"\s+href="([^"?]+)">/g, (match, href) => {
     console.log(`Inlining CSS: ${href}`);
     const cssPath = path.join(projectRoot, href);
     const cssContent = fs.readFileSync(cssPath, 'utf8');
