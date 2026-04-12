@@ -114,18 +114,62 @@
 }
 
 .sidebar-footer {
-    padding: 1.25rem;
+    padding: 0.75rem 1rem;
     border-top: 1px solid var(--border);
     margin-top: auto;
-}
-
-.settings-badge {
-    display: flex !important;
+    display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 0.75rem !important;
-    width: 100%;
-    justify-content: center;
+}
+
+.vault-switcher {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.65rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm, 4px);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 0;
+}
+
+.vault-switcher:hover {
+    background: var(--bg-hover, rgba(255,255,255,0.06));
+    color: var(--text-primary);
+}
+
+.vault-switcher .vault-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.vault-switcher .vault-chevron {
+    opacity: 0.5;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+}
+
+.vault-switcher:hover .vault-chevron {
+    opacity: 0.8;
+}
+
+.sidebar-settings-btn {
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.sidebar-settings-btn:hover {
+    opacity: 1;
 }
 
 .section-header {
