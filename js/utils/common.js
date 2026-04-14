@@ -52,8 +52,9 @@ function capitalizeFirst(str) {
 }
 
 /**
- * Parse a hierarchical tag string (separated by ".")
- * @param {string} tag - Tag string (e.g., "Project.Frontend.UI")
+ * Parse a tag string with optional single-level grouping (separated by ".")
+ * Normalizes multi-dot tags to single-level: "A.B.C" → "A.C"
+ * @param {string} tag - Tag string (e.g., "project.ui")
  * @returns {{ segments: string[], leaf: string, full: string }}
  */
 function parseHierarchicalTag(tag) {
@@ -61,8 +62,13 @@ function parseHierarchicalTag(tag) {
     if (parts.length === 1) {
         return { segments: [], leaf: tag, full: tag };
     }
+    // Normalize to single-level: keep only first segment as group
+    if (parts.length > 2) {
+        const normalized = parts[0] + '.' + parts[parts.length - 1];
+        return { segments: [parts[0]], leaf: parts[parts.length - 1], full: normalized };
+    }
     return {
-        segments: parts.slice(0, -1),
+        segments: [parts[0]],
         leaf: parts[parts.length - 1],
         full: tag
     };
@@ -79,49 +85,35 @@ function formatTagDisplay(tag) {
 }
 
 /**
- * Build a nested tree from a flat list of tags.
- * Returns { tree: Map, flat: string[] }
- * Each tree node is a Map<string, { children: Map, tags: string[] }>
- * Flat tags (no dots) go into the flat array.
+ * Build a single-level grouping from a flat list of tags.
+ * Returns { groups: Map<string, string[]>, flat: string[] }
+ * Tags with one dot are grouped by the segment before the dot.
+ * Tags with no dots go into the flat array.
  */
 function buildTagTree(tags) {
-    const tree = new Map();
+    const groups = new Map();
     const flat = [];
 
     tags.forEach(tag => {
-        const { segments, leaf } = parseHierarchicalTag(tag);
+        const { segments } = parseHierarchicalTag(tag);
         if (segments.length === 0) {
             flat.push(tag);
             return;
         }
 
-        let node = tree;
-        for (let i = 0; i < segments.length; i++) {
-            const seg = segments[i];
-            if (!node.has(seg)) {
-                node.set(seg, { children: new Map(), tags: [] });
-            }
-            const entry = node.get(seg);
-            if (i === segments.length - 1) {
-                // Last segment — this is the parent, tag is a leaf here
-                entry.tags.push(tag);
-            }
-            node = entry.children;
+        const group = segments[0];
+        if (!groups.has(group)) {
+            groups.set(group, []);
         }
+        groups.get(group).push(tag);
     });
 
-    // Sort tags within each node
-    function sortNode(map) {
-        const sorted = new Map([...map.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-        sorted.forEach(entry => {
-            entry.tags.sort();
-            sortNode(entry.children);
-        });
-        return sorted;
-    }
+    // Sort tags within each group and sort groups by name
+    const sorted = new Map([...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+    sorted.forEach(tagList => tagList.sort());
 
     flat.sort();
-    return { tree: sortNode(tree), flat };
+    return { groups: sorted, flat };
 }
 
 /**

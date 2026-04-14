@@ -863,7 +863,7 @@ const Store = {
 
             // Context filter (multi-select)
             // - Individual tags: AND (block must have each)
-            // - Group paths (path:X): OR within group (block must have ANY tag in subtree)
+            // - Group paths (path:X): OR within group (block must have ANY tag with that group)
             // - Between items: AND
             if (contextSelection.size > 0) {
                 const blockTags = block.tags || [];
@@ -872,12 +872,11 @@ const Store = {
                     if (SelectionManager.isComputedContextTag(item)) continue;
 
                     if (item.startsWith('path:')) {
-                        // Group selection: block must have ANY tag in this subtree
-                        const prefix = item.slice(5);
+                        // Group selection: block must have ANY tag in this group
+                        const group = item.slice(5);
                         const hasMatch = blockTags.some(tag => {
                             const { segments } = Common.parseHierarchicalTag(tag);
-                            const tagPath = segments.join('.');
-                            return tagPath === prefix || tagPath.startsWith(prefix + '.');
+                            return segments.length > 0 && segments[0] === group;
                         });
                         if (!hasMatch) return false;
                     } else {

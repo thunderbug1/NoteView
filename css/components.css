@@ -281,16 +281,6 @@
     padding: 0.25rem 0.4rem;
 }
 
-/* Nested groups indent inside parent */
-.tag-group-children .tag-group-hierarchy {
-    margin-left: 0.5rem;
-    border-color: var(--border);
-}
-
-.tag-group-children .tag-group-hierarchy .tag-group-parent {
-    font-size: 0.65rem;
-}
-
 .tag-group-parent {
     display: flex;
     align-items: center;
@@ -341,16 +331,6 @@
     background: var(--accent-light);
 }
 
-/* Parent group with a descendant selected (subtle indicator) */
-.tag-group-hierarchy.has-child-selected {
-    border-left: 3px solid var(--accent);
-    border-color: var(--accent);
-}
-
-.tag-group-hierarchy.has-child-selected > .tag-group-parent .tag-group-name {
-    color: var(--accent);
-}
-
 /* Tags matched via group OR selection: outlined accent style (not filled) */
 .tag-radio-option.group-match .tag-badge {
     background: var(--accent-light);
@@ -387,11 +367,6 @@
 
 .tag-group-hierarchy.expanded > .tag-group-children {
     display: flex;
-}
-
-/* Nested sub-groups break to their own line */
-.tag-group-children > .tag-group-hierarchy {
-    flex-basis: 100%;
 }
 
 /* Computed tag distinction in sidebar */
@@ -689,11 +664,6 @@
 
 .tag-modal-group .tag-modal-item {
     padding-left: 1rem;
-}
-
-/* Nested groups in modal */
-.tag-modal-group-items > .tag-modal-group {
-    margin: 0.25rem 0.5rem;
 }
 
 /* Edit hint icon on tag items */

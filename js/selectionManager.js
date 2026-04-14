@@ -231,12 +231,11 @@ const SelectionManager = {
         for (const item of this.selections.context) {
             if (this.isComputedContextTag(item)) continue;
             if (item.startsWith('path:')) {
-                const prefix = item.slice(5);
-                // Match tags whose hierarchy starts with this prefix
+                const group = item.slice(5);
+                // Match tags whose group segment equals this prefix (single-level)
                 allTags.forEach(tag => {
                     const { segments } = Common.parseHierarchicalTag(tag);
-                    const tagPath = segments.join('.');
-                    if (tagPath === prefix || tagPath.startsWith(prefix + '.')) {
+                    if (segments.length > 0 && segments[0] === group) {
                         result.add(tag);
                     }
                 });
@@ -317,7 +316,7 @@ const SelectionManager = {
     },
 
     /**
-     * Render a list of tags into a container, grouping by hierarchy
+     * Render a list of tags into a container, grouping by single-level hierarchy
      * @param {HTMLElement} container - Target container
      * @param {string[]} tags - Tags to render
      * @param {boolean} isComputedSection - Whether this is the computed tags section
@@ -330,12 +329,44 @@ const SelectionManager = {
             return;
         }
 
-        const { tree, flat } = Common.buildTagTree(tags);
+        const { groups, flat } = Common.buildTagTree(tags);
 
         let html = '';
 
-        // Render tree recursively
-        html += this._renderTreeNode(tree, isComputedSection, 0);
+        // Render groups (single-level)
+        groups.forEach((groupTags, groupName) => {
+            const pathKey = 'path:' + groupName;
+            const groupSelected = this.selections.context.has(pathKey);
+            const hasSelected = groupTags.some(t => this.selections.context.has(t));
+            const expandedClass = 'expanded';
+
+            const groupClasses = ['tag-group-hierarchy', expandedClass];
+            if (groupSelected) groupClasses.push('group-selected');
+
+            html += `<div class="${groupClasses.join(' ')}" data-group-path="${groupName}">`;
+            html += `<div class="tag-group-parent">`;
+            html += `<span class="tag-group-toggle">&#9654;</span>`;
+            html += `<span class="tag-group-name">${Common.capitalizeFirst(groupName)}</span>`;
+            html += `</div>`;
+            html += `<div class="tag-group-children">`;
+
+            groupTags.forEach(tag => {
+                const directlySelected = this.selections.context.has(tag);
+                const coveredByGroup = !isComputedSection && !directlySelected && groupSelected;
+                const isSelected = isComputedSection
+                    ? this.selections.context.has(tag)
+                    : (directlySelected || coveredByGroup);
+                const selClass = isSelected ? 'selected' : '';
+                const groupMatchClass = coveredByGroup ? 'group-match' : '';
+                const computedClass = isComputedSection ? 'computed' : '';
+
+                html += `<div class="tag-radio-option ${selClass} ${groupMatchClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
+                html += `<span class="tag-badge">${this.getTagDisplayName(tag)}</span>`;
+                html += `</div>`;
+            });
+
+            html += `</div></div>`;
+        });
 
         // Render flat tags
         flat.forEach(tag => {
@@ -355,25 +386,11 @@ const SelectionManager = {
             option.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const tag = option.dataset.tag;
-
-                // Check if this tag is selected directly (not via group)
                 const directlySelected = this.selections.context.has(tag);
 
                 if (directlySelected) {
-                    // Deselect the specific tag
                     this.selections.context.delete(tag);
                 } else {
-                    // Remove any parent group selections that cover this tag
-                    // (since user is picking a specific child instead)
-                    const groupEl = option.closest('.tag-group-hierarchy');
-                    if (groupEl) {
-                        let parent = groupEl.parentElement?.closest('.tag-group-hierarchy');
-                        while (parent) {
-                            const pathKey = 'path:' + parent.dataset.groupPath;
-                            this.selections.context.delete(pathKey);
-                            parent = parent.parentElement?.closest('.tag-group-hierarchy');
-                        }
-                    }
                     this.selections.context.add(tag);
                 }
 
@@ -395,8 +412,6 @@ const SelectionManager = {
             }
 
             // Name click = toggle group as a whole
-            // For computed tag groups: select/deselect all descendant tags (AND)
-            // For user tag groups: toggle as a group path (OR filter)
             const nameEl = parentEl.querySelector('.tag-group-name');
             if (nameEl) {
                 nameEl.addEventListener('click', (e) => {
@@ -406,8 +421,8 @@ const SelectionManager = {
                     const pathKey = 'path:' + groupPath;
 
                     if (isComputedSection) {
-                        // Computed groups: toggle all descendant tags individually
-                        const allTags = Array.from(groupEl.querySelectorAll('.tag-radio-option'))
+                        // Computed groups: toggle all tags individually
+                        const allTags = Array.from(groupEl.querySelectorAll(':scope > .tag-group-children > .tag-radio-option'))
                             .map(opt => opt.dataset.tag);
                         const allSelected = allTags.every(t => this.selections.context.has(t));
 
@@ -434,129 +449,6 @@ const SelectionManager = {
     },
 
     /**
-     * Recursively render a tree node for the sidebar
-     * @param {Map} node - Tree node from buildTagTree
-     * @param {boolean} isComputedSection
-     * @param {number} depth - Nesting depth
-     * @returns {string} HTML
-     */
-    _renderTreeNode(node, isComputedSection, depth, parentPath = '') {
-        let html = '';
-
-        node.forEach((entry, segmentName) => {
-            const groupPath = parentPath ? parentPath + '.' + segmentName : segmentName;
-            const pathKey = 'path:' + groupPath;
-
-            // Check if an ancestor group path covers this subtree
-            let ancestorGroupMatch = false;
-            if (!isComputedSection) {
-                let checkPath = parentPath;
-                while (checkPath) {
-                    if (this.selections.context.has('path:' + checkPath)) {
-                        ancestorGroupMatch = true;
-                        break;
-                    }
-                    const parts = checkPath.split('.');
-                    parts.pop();
-                    checkPath = parts.join('.');
-                }
-            }
-
-            // Check if a descendant group path is selected (for parent indicator)
-            const hasDescendantSelected = !isComputedSection && this._hasDescendantPathSelected(groupPath);
-
-            // Check if any tag in this subtree is selected directly or via group selection
-            const hasSelected = this._treeHasSelected(entry) || this.selections.context.has(pathKey) || ancestorGroupMatch || hasDescendantSelected;
-            const expandedClass = (isComputedSection || hasSelected) ? 'expanded' : '';
-
-            // This group is directly selected (its path key is in selection)
-            let groupSelected;
-            if (isComputedSection) {
-                const allTags = this._collectTreeTags(entry);
-                groupSelected = allTags.length > 0 && allTags.every(t => this.selections.context.has(t));
-            } else {
-                groupSelected = this.selections.context.has(pathKey);
-            }
-
-            // Build class list for this group container
-            const groupClasses = ['tag-group-hierarchy', expandedClass];
-            if (groupSelected) groupClasses.push('group-selected');
-            else if (hasDescendantSelected) groupClasses.push('has-child-selected');
-            if (ancestorGroupMatch) groupClasses.push('group-match');
-
-            html += `<div class="${groupClasses.join(' ')}" data-depth="${depth}" data-group-path="${groupPath}">`;
-            html += `<div class="tag-group-parent">`;
-            html += `<span class="tag-group-toggle">&#9654;</span>`;
-            html += `<span class="tag-group-name">${Common.capitalizeFirst(segmentName)}</span>`;
-            html += `</div>`;
-            html += `<div class="tag-group-children">`;
-
-            // Render leaf tags at this level
-            entry.tags.forEach(tag => {
-                const directlySelected = this.selections.context.has(tag);
-                const coveredByThisGroup = !isComputedSection && !directlySelected && this.selections.context.has(pathKey);
-                const coveredByAncestor = !isComputedSection && !directlySelected && !coveredByThisGroup && ancestorGroupMatch;
-                const isSelected = isComputedSection
-                    ? this.selections.context.has(tag)
-                    : (directlySelected || coveredByThisGroup || coveredByAncestor);
-                const selClass = isSelected ? 'selected' : '';
-                const groupMatchClass = (coveredByThisGroup || coveredByAncestor) ? 'group-match' : '';
-                const computedClass = isComputedSection ? 'computed' : '';
-
-                html += `<div class="tag-radio-option ${selClass} ${groupMatchClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
-                html += `<span class="tag-badge">${this.getTagDisplayName(tag)}</span>`;
-                html += `</div>`;
-            });
-
-            // Recurse into children
-            if (entry.children.size > 0) {
-                html += this._renderTreeNode(entry.children, isComputedSection, depth + 1, groupPath);
-            }
-
-            html += `</div></div>`;
-        });
-
-        return html;
-    },
-
-    /**
-     * Check if any path: entry in the selection is a descendant of the given group path
-     */
-    _hasDescendantPathSelected(groupPath) {
-        for (const item of this.selections.context) {
-            if (item.startsWith('path:')) {
-                const path = item.slice(5);
-                if (path !== groupPath && (path.startsWith(groupPath + '.'))) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    },
-
-    /**
-     * Check if any tag in a subtree is selected
-     */
-    _treeHasSelected(entry) {
-        if (entry.tags.some(t => this.selections.context.has(t))) return true;
-        for (const [, child] of entry.children) {
-            if (this._treeHasSelected(child)) return true;
-        }
-        return false;
-    },
-
-    /**
-     * Collect all leaf tags from a subtree (recursive)
-     */
-    _collectTreeTags(entry) {
-        let tags = [...entry.tags];
-        for (const [, child] of entry.children) {
-            tags.push(...this._collectTreeTags(child));
-        }
-        return tags;
-    },
-
-    /**
      * Update the UI to reflect current selections
      */
     updateSelectionUI() {
@@ -575,14 +467,9 @@ const SelectionManager = {
                 // Also check if a parent group path covers this tag
                 if (!directlySelected && !this.isComputedContextTag(tag)) {
                     const { segments } = Common.parseHierarchicalTag(tag);
-                    let path = '';
-                    for (const seg of segments) {
-                        path = path ? path + '.' + seg : seg;
-                        if (this.selections.context.has('path:' + path)) {
-                            isSelected = true;
-                            isGroupMatch = true;
-                            break;
-                        }
+                    if (segments.length > 0 && this.selections.context.has('path:' + segments[0])) {
+                        isSelected = true;
+                        isGroupMatch = true;
                     }
                 }
             } else if (group === 'contact') {

@@ -1,6 +1,6 @@
 /**
  * Tag Modal - Tag management for notes
- * Supports nested hierarchical tags with grouped browse, smart autocomplete,
+ * Supports single-level tag grouping with grouped browse, smart autocomplete,
  * quick-remove selected bar, inline tag renaming, and guided tag creation.
  */
 
@@ -210,7 +210,7 @@ const TagModal = {
             header.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const group = header.closest('.tag-modal-group');
-                const allTags = Array.from(group.querySelectorAll(':scope .tag-modal-item'))
+                const allTags = Array.from(group.querySelectorAll(':scope > .tag-modal-group-items > .tag-modal-item'))
                     .map(item => item.dataset.tag);
                 const allSelected = allTags.every(t => selectedTags.has(t));
 
@@ -322,43 +322,21 @@ const TagModal = {
                 return;
             }
 
-            const typedSegments = val.split('.');
-            const partialSegment = typedSegments[typedSegments.length - 1];
-            const parentSegments = typedSegments.slice(0, -1);
-
-            // Walk the tree to the parent node
-            let node = treeData.tree;
-            let matchedPath = [];
-            for (const seg of parentSegments) {
-                const key = Array.from(node.keys()).find(k => k.toLowerCase() === seg.toLowerCase());
-                if (key) {
-                    matchedPath.push(key);
-                    node = node.get(key).children;
-                } else {
-                    node = null;
-                    break;
-                }
-            }
-
+            const dotPos = val.indexOf('.');
             const suggestions = [];
 
-            if (node) {
-                // Sub-groups at this level
-                node.forEach((entry, segName) => {
-                    if (segName.toLowerCase().startsWith(partialSegment)) {
-                        suggestions.push({
-                            text: segName,
-                            completed: [...matchedPath, segName].join('.') + '.',
-                            isGroup: true
-                        });
-                    }
-                });
+            if (dotPos !== -1) {
+                // Typed "group." — suggest tags in that group
+                const groupName = val.substring(0, dotPos).toLowerCase();
+                const partial = val.substring(dotPos + 1).toLowerCase();
 
-                // Leaf tags at this level
-                node.forEach((entry) => {
-                    entry.tags.forEach(tag => {
+                // Find the group (case-insensitive)
+                const groupKey = Array.from(treeData.groups.keys()).find(k => k.toLowerCase() === groupName);
+                if (groupKey) {
+                    const groupTags = treeData.groups.get(groupKey);
+                    groupTags.forEach(tag => {
                         const { leaf } = Common.parseHierarchicalTag(tag);
-                        if (leaf.toLowerCase().startsWith(partialSegment)) {
+                        if (leaf.toLowerCase().startsWith(partial)) {
                             suggestions.push({
                                 text: leaf,
                                 completed: tag,
@@ -366,11 +344,19 @@ const TagModal = {
                             });
                         }
                     });
+                }
+            } else {
+                // Bare text — match group names and flat tags
+                treeData.groups.forEach((_, groupName) => {
+                    if (groupName.toLowerCase().startsWith(val)) {
+                        suggestions.push({
+                            text: groupName,
+                            completed: groupName + '.',
+                            isGroup: true
+                        });
+                    }
                 });
-            }
 
-            // Also match flat tags
-            if (parentSegments.length === 0) {
                 treeData.flat.forEach(tag => {
                     if (tag.toLowerCase().startsWith(val)) {
                         suggestions.push({
@@ -392,14 +378,13 @@ const TagModal = {
 
             // Filter the main list (existing behavior)
             if (lastDot !== -1) {
-                const pathPrefix = val.substring(0, lastDot).toLowerCase();
+                const groupName = val.substring(0, lastDot).toLowerCase();
                 const leafSearch = val.substring(lastDot + 1).toLowerCase();
 
                 modal.querySelectorAll('.tag-modal-item').forEach(item => {
                     const tag = item.dataset.tag;
                     const { segments, leaf } = Common.parseHierarchicalTag(tag);
-                    const tagPrefix = segments.join('.').toLowerCase();
-                    if (tagPrefix === pathPrefix || tagPrefix.startsWith(pathPrefix + '.')) {
+                    if (segments.length > 0 && segments[0].toLowerCase() === groupName) {
                         item.style.display = (leaf.toLowerCase().includes(leafSearch) || leafSearch === '') ? 'block' : 'none';
                     } else {
                         item.style.display = 'none';
@@ -546,11 +531,29 @@ const TagModal = {
     /**
      * Render the full tag tree (groups + flat tags) for the modal
      */
-    _renderTree({ tree, flat }, selectedTags) {
+    _renderTree({ groups, flat }, selectedTags) {
         let html = '';
 
-        // Render nested tree
-        html += this._renderTreeNodes(tree, selectedTags, []);
+        // Render single-level groups
+        groups.forEach((groupTags, groupName) => {
+            const allSelected = groupTags.every(t => selectedTags.has(t));
+            const selClass = allSelected ? 'group-selected' : '';
+
+            html += `<div class="tag-modal-group ${selClass}" data-group-path="${groupName}">`;
+            html += `<div class="tag-modal-group-header">${Common.capitalizeFirst(groupName)}</div>`;
+            html += `<div class="tag-modal-group-items">`;
+
+            groupTags.forEach(tag => {
+                const { leaf } = Common.parseHierarchicalTag(tag);
+                html += `<div class="tag-modal-item ${selectedTags.has(tag) ? 'selected' : ''}" data-tag="${tag}">`;
+                html += `<span class="tag-checkbox">${selectedTags.has(tag) ? '✓' : ''}</span>`;
+                html += `${Common.capitalizeFirst(leaf)}`;
+                html += `<span class="tag-edit-hint">&#9998;</span>`;
+                html += `</div>`;
+            });
+
+            html += `</div></div>`;
+        });
 
         // Render flat tags
         flat.forEach(tag => {
@@ -565,97 +568,21 @@ const TagModal = {
     },
 
     /**
-     * Recursively render tree nodes as nested framed groups
-     * @param {Map} node - Tree node from buildTagTree
-     * @param {Set} selectedTags
-     * @param {string[]} pathSegments - Parent segments for this depth level
-     * @returns {string} HTML
-     */
-    _renderTreeNodes(node, selectedTags, pathSegments) {
-        let html = '';
-
-        node.forEach((entry, segmentName) => {
-            const fullPath = [...pathSegments, segmentName].join('.');
-
-            // Check if all descendants are selected
-            const allTags = this._collectNodeTags(entry);
-            const allSelected = allTags.length > 0 && allTags.every(t => selectedTags.has(t));
-            const selClass = allSelected ? 'group-selected' : '';
-
-            html += `<div class="tag-modal-group ${selClass}" data-group-path="${fullPath}">`;
-            html += `<div class="tag-modal-group-header">${Common.capitalizeFirst(segmentName)}</div>`;
-            html += `<div class="tag-modal-group-items">`;
-
-            // Render leaf tags at this level
-            entry.tags.forEach(tag => {
-                const { leaf } = Common.parseHierarchicalTag(tag);
-                html += `<div class="tag-modal-item ${selectedTags.has(tag) ? 'selected' : ''}" data-tag="${tag}">`;
-                html += `<span class="tag-checkbox">${selectedTags.has(tag) ? '✓' : ''}</span>`;
-                html += `${Common.capitalizeFirst(leaf)}`;
-                html += `<span class="tag-edit-hint">&#9998;</span>`;
-                html += `</div>`;
-            });
-
-            // Recurse into children
-            if (entry.children.size > 0) {
-                html += this._renderTreeNodes(entry.children, selectedTags, [...pathSegments, segmentName]);
-            }
-
-            html += `</div></div>`;
-        });
-
-        return html;
-    },
-
-    /**
-     * Show/hide a group based on whether it has visible children/items.
-     * Recursively checks sub-groups.
+     * Show/hide a group based on whether it has visible items.
      */
     _updateGroupVisibility(group) {
         const items = group.querySelectorAll(':scope > .tag-modal-group-items > .tag-modal-item');
-        const subGroups = group.querySelectorAll(':scope > .tag-modal-group-items > .tag-modal-group');
         let hasVisible = false;
 
         items.forEach(item => {
             if (item.style.display !== 'none') hasVisible = true;
         });
 
-        subGroups.forEach(sub => {
-            this._updateGroupVisibility(sub);
-            if (sub.style.display !== 'none') hasVisible = true;
-        });
-
         group.style.display = hasVisible ? 'block' : 'none';
     },
 
     /**
-     * Collect all leaf tags from a tree node (recursive)
-     */
-    _collectLeaves(node) {
-        let tags = [];
-        node.forEach(entry => {
-            tags.push(...entry.tags);
-            tags.push(...this._collectLeaves(entry.children));
-        });
-        return tags;
-    },
-
-    /**
-     * Collect all leaf tags from a single entry (tags + recursive children)
-     */
-    _collectNodeTags(entry) {
-        let tags = [...entry.tags];
-        if (entry.children) {
-            entry.children.forEach(child => {
-                tags.push(...this._collectNodeTags(child));
-            });
-        }
-        return tags;
-    },
-
-    /**
      * Insert a newly created tag into the list at the correct position.
-     * Appends at end for simplicity — the tag will appear after a re-render anyway.
      */
     _insertTagIntoList(modal, tag, toggleFn, inputEl) {
         const list = modal.querySelector('#tagModalList');
@@ -666,48 +593,37 @@ const TagModal = {
         newItem.dataset.tag = tag;
 
         if (segments.length > 0) {
-            // Find or create the group chain
-            let parentContainer = list;
-            let currentPath = '';
+            const groupName = segments[0];
+            let group = list.querySelector(`:scope > .tag-modal-group[data-group-path="${groupName}"]`);
 
-            for (let i = 0; i < segments.length; i++) {
-                currentPath = currentPath ? currentPath + '.' + segments[i] : segments[i];
-                let group = parentContainer.querySelector(`:scope > .tag-modal-group[data-group-path="${currentPath}"]`);
-
-                if (!group) {
-                    // Create the group
-                    group = document.createElement('div');
-                    group.className = 'tag-modal-group';
-                    group.dataset.groupPath = currentPath;
-                    group.innerHTML = `
-                        <div class="tag-modal-group-header">${Common.capitalizeFirst(segments[i])}</div>
-                        <div class="tag-modal-group-items"></div>
-                    `;
-                    // Insert before flat tags or at end
-                    const firstFlat = parentContainer.querySelector(':scope > .tag-modal-flat-item');
-                    const firstGroup = parentContainer.querySelector(':scope > .tag-modal-group');
-                    if (firstFlat) {
-                        parentContainer.insertBefore(group, firstFlat);
-                    } else if (firstGroup) {
-                        // Insert in sorted order among groups
-                        const existingGroups = Array.from(parentContainer.querySelectorAll(':scope > .tag-modal-group'));
-                        let inserted = false;
-                        for (const existing of existingGroups) {
-                            if (existing.dataset.groupPath.localeCompare(currentPath) > 0) {
-                                parentContainer.insertBefore(group, existing);
-                                inserted = true;
-                                break;
-                            }
+            if (!group) {
+                // Create the group
+                group = document.createElement('div');
+                group.className = 'tag-modal-group';
+                group.dataset.groupPath = groupName;
+                group.innerHTML = `
+                    <div class="tag-modal-group-header">${Common.capitalizeFirst(groupName)}</div>
+                    <div class="tag-modal-group-items"></div>
+                `;
+                // Insert before flat tags or in sorted order among groups
+                const firstFlat = list.querySelector(':scope > .tag-modal-flat-item');
+                if (firstFlat) {
+                    list.insertBefore(group, firstFlat);
+                } else {
+                    const existingGroups = Array.from(list.querySelectorAll(':scope > .tag-modal-group'));
+                    let inserted = false;
+                    for (const existing of existingGroups) {
+                        if (existing.dataset.groupPath.localeCompare(groupName) > 0) {
+                            list.insertBefore(group, existing);
+                            inserted = true;
+                            break;
                         }
-                        if (!inserted) parentContainer.appendChild(group);
-                    } else {
-                        parentContainer.appendChild(group);
                     }
+                    if (!inserted) list.appendChild(group);
                 }
-
-                parentContainer = group.querySelector('.tag-modal-group-items');
             }
 
+            const parentContainer = group.querySelector('.tag-modal-group-items');
             newItem.innerHTML = `<span class="tag-checkbox">✓</span> ${Common.capitalizeFirst(leaf)}<span class="tag-edit-hint">&#9998;</span>`;
 
             // Insert in sorted order
@@ -861,12 +777,12 @@ const TagModal = {
     },
 
     /**
-     * Render a badge HTML for a tag (hierarchical-aware)
+     * Render a badge HTML for a tag (group-aware, single-level)
      */
     _renderBadge(tag) {
         const { segments, leaf } = Common.parseHierarchicalTag(tag);
         if (segments.length > 0) {
-            const parentText = segments.map(s => Common.capitalizeFirst(s)).join('.');
+            const parentText = Common.capitalizeFirst(segments[0]);
             return `<span class="badge badge-hierarchical" data-tag="${tag}"><span class="badge-parent">${parentText}</span>${Common.formatTagDisplay(tag)}</span>`;
         }
         return `<span class="badge" data-tag="${tag}">${Common.capitalizeFirst(tag)}</span>`;
