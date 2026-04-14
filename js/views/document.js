@@ -842,7 +842,7 @@ const DocumentView = {
                 outline: 'none'
             },
             ".cm-tooltip.cm-tooltip-autocomplete": {
-                border: '1px solid var(--border-color, #e2e8f0)',
+                border: '1px solid var(--border)',
                 backgroundColor: 'var(--bg-primary, #ffffff)',
                 borderRadius: '10px',
                 boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
@@ -901,7 +901,7 @@ const DocumentView = {
                 fontSize: '0.9em'
             },
             ".md-link-text": {
-                color: 'var(--accent-color, #3b82f6)',
+                color: 'var(--accent)',
                 textDecoration: 'underline'
             },
             ".md-strikethrough": {
@@ -913,7 +913,7 @@ const DocumentView = {
                 justifyContent: 'center',
                 width: '18px',
                 height: '18px',
-                border: '1.5px solid var(--border-color, #cbd5e1)',
+                border: '1.5px solid var(--border-light)',
                 borderRadius: '4px',
                 marginRight: '8px',
                 verticalAlign: 'text-bottom',
@@ -922,11 +922,11 @@ const DocumentView = {
                 transition: 'all 0.15s ease'
             },
             ".md-task-checkbox:hover": {
-                borderColor: 'var(--accent-color, #3b82f6)'
+                borderColor: 'var(--accent)'
             },
             ".state-done": {
-                backgroundColor: 'var(--accent-color, #3b82f6)',
-                borderColor: 'var(--accent-color, #3b82f6)',
+                backgroundColor: 'var(--accent)',
+                borderColor: 'var(--accent)',
                 color: 'white'
             },
             ".state-progress": {
@@ -945,7 +945,7 @@ const DocumentView = {
             },
             ".state-canceled": {
                 backgroundColor: 'var(--bg-tertiary, #f1f5f9)',
-                borderColor: 'var(--border-color, #cbd5e1)',
+                borderColor: 'var(--border-light)',
                 color: 'var(--text-muted, #94a3b8)'
             },
             ".md-task-done": {
@@ -960,7 +960,7 @@ const DocumentView = {
                 borderRadius: '12px',
                 backgroundColor: 'var(--bg-secondary, #f8fafc)',
                 color: 'var(--text-secondary, #64748b)',
-                border: '1px solid var(--border-color, #e2e8f0)',
+                border: '1px solid var(--border)',
                 margin: '0 4px',
                 verticalAlign: 'text-bottom',
                 cursor: 'pointer',
@@ -982,7 +982,7 @@ const DocumentView = {
                 color: 'var(--badge-time-text, #6b21a8)'
             },
             ".badge-priority": {
-                borderColor: 'var(--border-color, #e2e8f0)',
+                borderColor: 'var(--border)',
                 backgroundColor: 'var(--bg-secondary, #f8fafc)',
                 color: 'var(--text-secondary, #64748b)'
             },
@@ -1026,7 +1026,7 @@ const DocumentView = {
                 borderRadius: '4px'
             },
             ".md-add-deadline:hover, .md-add-action:hover": {
-                color: 'var(--accent-color, #3b82f6)',
+                color: 'var(--accent)',
                 backgroundColor: 'var(--bg-hover, #f1f5f9)'
             },
             ".cm-line:hover .md-add-deadline, .cm-line:hover .md-add-action": {

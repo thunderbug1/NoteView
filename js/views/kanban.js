@@ -294,7 +294,7 @@ const KanbanView = {
             <div style="padding-top: 10px; display: flex; flex-direction: column; gap: 8px;">
                 ${columns.map(col => `
                     <button class="kanban-move-btn" data-target-column="${col.id}" style="
-                        width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px;
+                        width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px;
                         background: var(--bg-primary, #fff); cursor: pointer; font-family: inherit;
                         font-size: 14px; font-weight: 500; text-align: left;
                     ">${col.label}</button>
@@ -341,20 +341,20 @@ const KanbanView = {
             <div style="padding-top: 10px;">
                 <div style="margin-bottom: 10px;">
                     <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:12px; color:var(--text-secondary);">Deadline</label>
-                    <input type="date" id="editModalDue" value="${due}" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid var(--border-color); border-radius:4px; font-family:inherit;">
+                    <input type="date" id="editModalDue" value="${due}" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid var(--border); border-radius:4px; font-family:inherit;">
                 </div>
                 <div style="margin-bottom: 10px;">
                     <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:12px; color:var(--text-secondary);">Assignee</label>
                     <div style="display: flex; gap: 8px;">
-                        <input type="text" id="editModalAssignee" value="${assignee}" placeholder="@username" style="flex:1; padding:8px; box-sizing:border-box; border:1px solid var(--border-color); border-radius:4px; font-family:inherit;">
-                        <button id="editModalAssigneeBtn" style="padding: 0 10px; background:var(--bg-hover, #f1f5f9); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;" title="Select from Contacts">
+                        <input type="text" id="editModalAssignee" value="${assignee}" placeholder="@username" style="flex:1; padding:8px; box-sizing:border-box; border:1px solid var(--border); border-radius:4px; font-family:inherit;">
+                        <button id="editModalAssigneeBtn" style="padding: 0 10px; background:var(--bg-hover, #f1f5f9); border:1px solid var(--border); border-radius:4px; cursor:pointer;" title="Select from Contacts">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                         </button>
                     </div>
                 </div>
                 <div style="margin-bottom: 15px;">
                     <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:12px; color:var(--text-secondary);">Priority</label>
-                    <select id="editModalPriority" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid var(--border-color); border-radius:4px; font-family:inherit;">
+                    <select id="editModalPriority" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid var(--border); border-radius:4px; font-family:inherit;">
                         <option value="" ${!priority ? 'selected' : ''}>None</option>
                         <option value="Urgent" ${priority === 'Urgent' ? 'selected' : ''}>Urgent</option>
                         <option value="High" ${priority === 'High' ? 'selected' : ''}>High</option>
@@ -362,8 +362,8 @@ const KanbanView = {
                         <option value="Low" ${priority === 'Low' ? 'selected' : ''}>Low</option>
                     </select>
                 </div>
-                <button id="editModalSave" style="width:100%; padding:8px; background:var(--accent-color, #3b82f6); color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
-                <button id="editModalOpenDoc" style="width:100%; padding:8px; background:transparent; color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer; margin-top:8px;">Open Document</button>
+                <button id="editModalSave" style="width:100%; padding:8px; background:var(--accent); color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Save</button>
+                <button id="editModalOpenDoc" style="width:100%; padding:8px; background:transparent; color:var(--text-secondary); border:1px solid var(--border); border-radius:4px; cursor:pointer; margin-top:8px;">Open Document</button>
             </div>
         `;
 

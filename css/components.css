@@ -219,7 +219,7 @@
 
 .sort-config-primary {
     border: none;
-    background: var(--accent-color, #3b82f6);
+    background: var(--accent);
     color: white;
 }
 
@@ -1169,7 +1169,7 @@
 
 .icon-btn {
     background: transparent;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 6px;
     cursor: pointer;
