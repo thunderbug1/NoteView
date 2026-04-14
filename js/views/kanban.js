@@ -134,10 +134,8 @@ const KanbanView = {
         return `
             <div class="block kanban-card${nestedClass}${urgencyClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
                 <div class="kanban-card-content">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <p class="kanban-task-text">${escapeHtml(task.text)}</p>
-                        <div class="kanban-action-btns">${actionBtns}</div>
-                    </div>
+                    <p class="kanban-task-text">${escapeHtml(task.text)}</p>
+                    <div class="kanban-action-btns">${actionBtns}</div>
                     <div class="kanban-card-footer">
                         ${task.badges.map(b => {
                             const dueUrgencyCls = (b.type === 'due' && urgency) ? ` badge-due-${urgency}` : '';
