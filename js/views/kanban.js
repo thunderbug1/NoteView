@@ -51,15 +51,7 @@ const KanbanView = {
             return tasks;
         }
 
-        // Build set of pinned block IDs for O(1) lookup
-        const pinnedBlockIds = new Set(
-            Store.blocks.filter(b => b.pinned).map(b => b.id)
-        );
-
         return tasks.filter(task => {
-            // Tasks from pinned blocks always pass through
-            if (pinnedBlockIds.has(task.blockId)) return true;
-
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }

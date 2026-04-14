@@ -101,9 +101,10 @@ TaskParser exposes predicate functions used by filtering, kanban, and timeline:
 | `isBlockedTask(task)` | `state === 'b'` **or** `hasDependency(task)` |
 | `isUnblockedTask(task)` | `isOpenTask(task) && !hasDependency(task)` |
 | `hasAssignee(task)` | Any badge with `type === 'assignee'` and non-empty value |
+| `hasMention(task)` | Task text contains an `@mention` contact |
 | `hasDependency(task)` | Any badge with `type === 'dependsOn'` |
-| `isUnassignedTask(task)` | `!hasAssignee(task)` (optionally filtering out closed tasks) |
-| `hasUnassignedTasks(tasks)` | Any task in the array is unassigned |
+| `isUnassignedTask(task)` | No assignee badge, including inherited assignee context from parent tasks (optionally filtering out closed tasks) |
+| `hasUnassignedTasks(tasks)` | Any task in the array is unassigned (optionally ignoring closed tasks) |
 
 ### Key insight: blocked vs has dependency
 
@@ -139,7 +140,9 @@ columns: [
 `KanbanView.extractTasks(blocks)` first parses all tasks, then applies sidebar filters:
 
 - Contact filter: checks `ContactHelper.hasTaskContact(task, contactSelection)`
-- Computed tag filters: `openTodos`, `blockedTodos`, `unblockedTodos`, `unassigned` — each checks the corresponding TaskParser predicate
+- Computed tag filters: `openTodos`, `blockedTodos`, `unblockedTodos`, `unassigned` — each checks the corresponding TaskParser predicate. `unassigned` is based on assignee badges across all task states, and nested tasks inherit assignee context from assigned parent tasks.
+
+Nested tasks inherit assignment context from their ancestor tasks, so a child checkbox under an assigned parent is not treated as unassigned unless it sits under an unassigned branch.
 
 ### Drag-and-drop state changes
 
@@ -216,7 +219,7 @@ These sidebar filter options are computed at runtime from block content:
 | `openTodos` | Block content matches `/\[[ \/]\]/` | Block filtering, Kanban |
 | `blockedTodos` | `TaskParser.isBlockedTask()` for any task | Block filtering, Kanban |
 | `unblockedTodos` | `TaskParser.isUnblockedTask()` for any task | Block filtering, Kanban |
-| `unassigned` | `TaskParser.hasUnassignedTasks()` for block tasks | Block filtering, Kanban |
+| `unassigned` | `TaskParser.hasUnassignedTasks(..., { onlyActive: true })` for block tasks, plus task-level matching in Kanban/Timeline | Block filtering, Kanban, Timeline |
 | `untagged` | `block.tags` is empty or absent | Block filtering |
 
 In `Store.getFilteredBlocks()`, computed tags are checked after regular tag matching. A block must pass ALL selected filters (AND logic).

@@ -20,6 +20,7 @@ const KNOWN_BADGE_KEYS = ['due', 'assignee', 'dependsOn', 'priority'];
 // Regex patterns
 const CHECKBOX_REGEX = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm;
 const BADGE_REGEX = /\[([a-zA-Z0-9_]+)::\s*([^\]]+)\]/g;
+const TASK_MENTION_REGEX = /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g;
 const PRIORITY_RANKS = {
     urgent: 0,
     high: 1,
@@ -60,6 +61,62 @@ function extractBadges(text) {
     }
 
     return { badges, cleanText: cleanText.trim() };
+}
+
+function normalizeContactToken(value) {
+    if (!value) return '';
+
+    let normalized = String(value).trim().toLowerCase();
+    if (normalized.startsWith('@')) {
+        normalized = normalized.substring(1);
+    }
+
+    return normalized;
+}
+
+function getTaskIndent(prefix) {
+    const leadingWhitespace = (prefix.match(/^\s*/) || [''])[0];
+    return leadingWhitespace.replace(/\t/g, '    ').length;
+}
+
+function extractMentionContacts(text) {
+    const contacts = new Set();
+    if (!text) return contacts;
+
+    let match;
+    TASK_MENTION_REGEX.lastIndex = 0;
+    while ((match = TASK_MENTION_REGEX.exec(text)) !== null) {
+        const normalized = normalizeContactToken(match[1]);
+        if (normalized) {
+            contacts.add(normalized);
+        }
+    }
+
+    return contacts;
+}
+
+function extractBadgeContacts(badges) {
+    const contacts = new Set();
+    (badges || []).forEach(badge => {
+        if (badge.type !== 'assignee') return;
+        const normalized = normalizeContactToken(badge.value);
+        if (normalized) {
+            contacts.add(normalized);
+        }
+    });
+    return contacts;
+}
+
+function mergeContactSets(...sets) {
+    return new Set(sets.flatMap(set => Array.from(set || [])));
+}
+
+function getAssignmentContacts(task) {
+    if (Array.isArray(task?.assignmentContacts)) {
+        return new Set(task.assignmentContacts.map(normalizeContactToken).filter(Boolean));
+    }
+
+    return extractBadgeContacts(task?.badges || []);
 }
 
 /**
@@ -136,6 +193,15 @@ function hasAssignee(task) {
 }
 
 /**
+ * Check whether a task mentions a contact in its text
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task text contains an @mention
+ */
+function hasMention(task) {
+    return extractMentionContacts(task?.originalText || task?.text || '').size > 0;
+}
+
+/**
  * Check whether a task has a dependency badge
  * @param {Object} task - Parsed task object
  * @returns {boolean} True when task depends on another task
@@ -182,7 +248,7 @@ function isUnassignedTask(task, { onlyActive = false } = {}) {
     if (onlyActive && isClosedTask(task)) {
         return false;
     }
-    return !hasAssignee(task);
+    return getAssignmentContacts(task).size === 0;
 }
 
 /**
@@ -206,6 +272,7 @@ function parseTasksFromBlock(block) {
     if (!block.content) return tasks;
 
     let match;
+    const ancestorStack = [];
     // Reset regex state
     CHECKBOX_REGEX.lastIndex = 0;
 
@@ -213,10 +280,21 @@ function parseTasksFromBlock(block) {
         const prefix = match[1];
         const state = normalizeState(match[2]);
         const originalText = match[3].trim();
+        const indent = getTaskIndent(prefix);
 
         const { badges, cleanText } = extractBadges(originalText);
+        const directAssignmentContacts = extractBadgeContacts(badges);
 
-        tasks.push({
+        while (ancestorStack.length > 0 && ancestorStack[ancestorStack.length - 1].indent >= indent) {
+            ancestorStack.pop();
+        }
+
+        const inheritedAssignmentContacts = mergeContactSets(
+            ...ancestorStack.map(ancestor => ancestor.assignmentContacts)
+        );
+        const assignmentContacts = mergeContactSets(inheritedAssignmentContacts, directAssignmentContacts);
+
+        const task = {
             id: `task-${block.id}-${match.index}`,
             blockId: block.id,
             state,
@@ -225,8 +303,14 @@ function parseTasksFromBlock(block) {
             matchIndex: match.index,
             matchLength: match[0].length,
             badges,
-            prefix
-        });
+            prefix,
+            indent,
+            assignmentContacts: Array.from(assignmentContacts),
+            inheritedAssignmentContacts: Array.from(inheritedAssignmentContacts)
+        };
+
+        tasks.push(task);
+        ancestorStack.push({ indent, assignmentContacts });
     }
 
     return tasks;
@@ -256,13 +340,26 @@ function parseTasksFromContent(content) {
     if (!content) return tasks;
 
     let match;
+    const ancestorStack = [];
     // Reset regex state
     CHECKBOX_REGEX.lastIndex = 0;
 
     while ((match = CHECKBOX_REGEX.exec(content)) !== null) {
+        const prefix = match[1];
         const state = normalizeState(match[2]);
         const originalText = match[3].trim();
         const { badges, cleanText } = extractBadges(originalText);
+        const indent = getTaskIndent(prefix);
+
+        while (ancestorStack.length > 0 && ancestorStack[ancestorStack.length - 1].indent >= indent) {
+            ancestorStack.pop();
+        }
+
+        const directAssignmentContacts = extractBadgeContacts(badges);
+        const inheritedAssignmentContacts = mergeContactSets(
+            ...ancestorStack.map(ancestor => ancestor.assignmentContacts)
+        );
+        const assignmentContacts = mergeContactSets(inheritedAssignmentContacts, directAssignmentContacts);
 
         if (cleanText) {
             // Use clean text as key. If duplicate task text exists, append index
@@ -271,8 +368,18 @@ function parseTasksFromContent(content) {
             while (tasks.has(key)) {
                 key = `${cleanText}#${i++}`;
             }
-            tasks.set(key, { state, text: cleanText, originalText, badges });
+            tasks.set(key, {
+                state,
+                text: cleanText,
+                originalText,
+                badges,
+                indent,
+                assignmentContacts: Array.from(assignmentContacts),
+                inheritedAssignmentContacts: Array.from(inheritedAssignmentContacts)
+            });
         }
+
+        ancestorStack.push({ indent, assignmentContacts });
     }
 
     return tasks;
@@ -289,6 +396,8 @@ window.TaskParser = {
     stripBadges,
     isClosedTask,
     hasAssignee,
+    hasMention,
+    getAssignmentContacts,
     hasDependency,
     isOpenTask,
     isBlockedTask,

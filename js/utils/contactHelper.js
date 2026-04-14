@@ -100,6 +100,10 @@ function hasTaskContact(task, contactName) {
     const searchLower = normalizeContactName(contactName);
     if (!searchLower) return false;
 
+    if (Array.isArray(task.assignmentContacts) && task.assignmentContacts.some(contact => normalizeContactName(contact) === searchLower)) {
+        return true;
+    }
+
     const taskText = task.originalText || task.text || '';
     if (hasMention(taskText, searchLower)) return true;
 
