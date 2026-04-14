@@ -63,7 +63,7 @@ The sidebar exposes four filter groups with different selection semantics:
 - **Container**: `#computedTags` in `index.html`
 - **`data-group="context"`** — shares the `selections.context` Set with user tags
 - **Fixed options**: `allTodos`, `openTodos`, `blockedTodos`, `unblockedTodos`, `untagged`, `unassigned`
-- **Filter logic**: Handled separately in `Store.getFilteredBlocks()` — each has custom matching logic (regex for content, TaskParser predicates for task properties)
+- **Filter logic**: Handled separately in `Store.getFilteredBlocks()` and per-view task/event filters. `unassigned` matches tasks without an assignee badge regardless of state. For nested checklists, child tasks inherit assignee context from assigned parent tasks.
 
 ### People (radio)
 
@@ -133,7 +133,7 @@ This enables context-aware sorting: when context tags are selected, contacts sha
 
 `ContactHelper.hasContact(content, name)` checks both mentions and assignee badges. Used in `Store.getFilteredBlocks()` to filter blocks by contact.
 
-`ContactHelper.hasTaskContact(task, name)` checks task-level badges and mentions in the task's `originalText`.
+`ContactHelper.hasTaskContact(task, name)` checks task-level badges and mentions in the task's `originalText`, plus inherited assignment context from ancestor tasks for nested checklists.
 
 `ContactHelper.hasEventContact(event, name)` wraps task contact checking for timeline events.
 

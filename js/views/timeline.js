@@ -350,7 +350,7 @@ const TimelineView = {
                 }
                 if (contextSelection.has('unassigned')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                        if (!TaskParser.isUnassignedTask(eventTask)) return false;
+                    if (!TaskParser.isUnassignedTask(eventTask)) return false;
                 }
             }
             
