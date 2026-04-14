@@ -19,25 +19,63 @@ const KanbanView = {
         return this.columns.find(col => col.id === id) || null;
     },
 
+    /**
+     * Build parent-child relationships from task indentation.
+     * Returns a Map of taskId -> { parentId: string|null, children: string[] }.
+     */
+    buildTaskHierarchy(tasks) {
+        const hierarchy = new Map();
+
+        // Group tasks by blockId (hierarchy is scoped per document)
+        const byBlock = new Map();
+        for (const task of tasks) {
+            if (!byBlock.has(task.blockId)) byBlock.set(task.blockId, []);
+            byBlock.get(task.blockId).push(task);
+            hierarchy.set(task.id, { parentId: null, children: [] });
+        }
+
+        // Walk each block's tasks in document order using an ancestor stack
+        for (const [, blockTasks] of byBlock) {
+            const stack = []; // { taskId, indent }
+            for (const task of blockTasks) {
+                while (stack.length > 0 && stack[stack.length - 1].indent >= task.indent) {
+                    stack.pop();
+                }
+                if (stack.length > 0) {
+                    const parent = stack[stack.length - 1];
+                    hierarchy.get(task.id).parentId = parent.taskId;
+                    hierarchy.get(parent.taskId).children.push(task.id);
+                }
+                stack.push({ taskId: task.id, indent: task.indent });
+            }
+        }
+
+        return hierarchy;
+    },
+
     render(blocks) {
         const container = document.getElementById('viewContainer');
         container.className = 'kanban-view';
-        
+
         const tasks = this.extractTasks(blocks);
-        
+        const hierarchy = this.buildTaskHierarchy(tasks);
+
         let html = '';
         this.columns.forEach(col => {
-            const colTasks = SortManager.sortItems('kanban', tasks.filter(t => t.state === col.state));
+            const colTasks = tasks.filter(t => t.state === col.state);
+            const tasksById = new Map(colTasks.map(t => [t.id, t]));
+            const colHtml = this.renderColumnTasks(colTasks, hierarchy, tasksById);
+
             html += `
                 <div class="kanban-column" data-column-id="${col.id}">
                     <h4>${col.label} <span class="count">(${colTasks.length})</span></h4>
                     <div class="blocks">
-                        ${colTasks.map(task => this.renderTaskCard(task)).join('')}
+                        ${colHtml}
                     </div>
                 </div>
             `;
         });
-        
+
         container.innerHTML = `<div class="kanban-board">${html}</div>`;
         this.attachEventListeners(container);
     },
@@ -71,10 +109,12 @@ const KanbanView = {
         });
     },
 
-    renderTaskCard(task) {
+    renderTaskCard(task, depth = 0) {
         const column = this.getColumnByState(task.state);
+        const nestedClass = depth > 0 ? ' kanban-card--nested' : '';
+        const nestedStyle = depth > 0 ? ` style="margin-left: ${depth * 1.25}rem;"` : '';
         return `
-            <div class="block kanban-card" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}">
+            <div class="block kanban-card${nestedClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
                 <div class="kanban-card-content">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <p class="kanban-task-text">${escapeHtml(task.text)}</p>
@@ -86,6 +126,45 @@ const KanbanView = {
                 </div>
             </div>
         `;
+    },
+
+    /**
+     * Render a column's tasks with hierarchy nesting.
+     * Only root tasks (those without a parent in this column) are sorted;
+     * children maintain document order under their parent.
+     */
+    renderColumnTasks(colTasks, hierarchy, tasksById) {
+        const colTaskIds = new Set(colTasks.map(t => t.id));
+
+        // Roots: parentId is null OR parent not in this column
+        const rootTasks = colTasks.filter(t => {
+            const entry = hierarchy.get(t.id);
+            return !entry.parentId || !colTaskIds.has(entry.parentId);
+        });
+
+        const sortedRoots = SortManager.sortItems('kanban', rootTasks);
+        let html = '';
+        for (const root of sortedRoots) {
+            html += this.renderTaskWithChildren(root, hierarchy, tasksById, colTaskIds, 0);
+        }
+        return html;
+    },
+
+    /**
+     * Recursively render a task card and its children that are in the same column.
+     */
+    renderTaskWithChildren(task, hierarchy, tasksById, colTaskIds, depth) {
+        let html = this.renderTaskCard(task, depth);
+        const entry = hierarchy.get(task.id);
+        for (const childId of entry.children) {
+            if (colTaskIds.has(childId)) {
+                const childTask = tasksById.get(childId);
+                if (childTask) {
+                    html += this.renderTaskWithChildren(childTask, hierarchy, tasksById, colTaskIds, depth + 1);
+                }
+            }
+        }
+        return html;
     },
 
     buildDragPayload(card) {

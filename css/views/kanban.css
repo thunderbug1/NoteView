@@ -112,6 +112,20 @@
     color: #94a3b8;
 }
 
+/* Task hierarchy nesting */
+.kanban-card--nested {
+    border-left: 2px solid var(--border-light);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.kanban-card--nested .kanban-task-text {
+    font-size: 0.8rem;
+}
+
+.kanban-card--nested .kanban-card-content {
+    padding: 0.6rem 0.8rem;
+}
+
 @media (max-width: 768px) {
     .kanban-column {
         flex: 0 0 250px;
