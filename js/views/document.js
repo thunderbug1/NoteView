@@ -976,6 +976,23 @@ const DocumentView = {
                 backgroundColor: 'var(--badge-work-bg, #f0f9ff)',
                 color: 'var(--badge-work-text, #075985)'
             },
+            ".badge-due[data-urgency='overdue']": {
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                color: '#ef4444',
+                fontWeight: '600'
+            },
+            ".badge-due[data-urgency='upcoming-soon']": {
+                borderColor: 'rgba(245, 158, 11, 0.3)',
+                backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                color: '#f59e0b',
+                fontWeight: '600'
+            },
+            ".badge-due[data-urgency='upcoming']": {
+                borderColor: 'rgba(59, 130, 246, 0.25)',
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                color: 'var(--accent)'
+            },
             ".badge-assignee": {
                 borderColor: 'var(--badge-time-border, #d8b4fe)',
                 backgroundColor: 'var(--badge-time-bg, #faf5ff)',

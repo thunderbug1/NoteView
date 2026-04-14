@@ -113,15 +113,20 @@ const KanbanView = {
         const column = this.getColumnByState(task.state);
         const nestedClass = depth > 0 ? ' kanban-card--nested' : '';
         const nestedStyle = depth > 0 ? ` style="margin-left: ${depth * 1.25}rem;"` : '';
+        const urgency = TaskParser.getDeadlineUrgency(task);
+        const urgencyClass = urgency ? ` deadline-${urgency}` : '';
         return `
-            <div class="block kanban-card${nestedClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
+            <div class="block kanban-card${nestedClass}${urgencyClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
                 <div class="kanban-card-content">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                         <p class="kanban-task-text">${escapeHtml(task.text)}</p>
                         <button class="kanban-edit-btn" title="Edit properties" style="background:transparent; border:none; cursor:pointer; color:var(--text-muted); padding:2px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
                     </div>
                     <div class="kanban-card-footer">
-                        ${task.badges.map(b => `<span class="badge badge-${b.type} kanban-badge" data-type="${b.type}" data-value="${b.value}"${b.type === 'priority' ? ` data-priority="${b.value.toLowerCase()}"` : ''}>${escapeHtml(b.type)}: ${escapeHtml(b.value)}</span>`).join('')}
+                        ${task.badges.map(b => {
+                            const dueUrgencyCls = (b.type === 'due' && urgency) ? ` badge-due-${urgency}` : '';
+                            return `<span class="badge badge-${b.type} kanban-badge${dueUrgencyCls}" data-type="${b.type}" data-value="${b.value}"${b.type === 'priority' ? ` data-priority="${b.value.toLowerCase()}"` : ''}>${escapeHtml(b.type)}: ${escapeHtml(b.value)}</span>`;
+                        }).join('')}
                     </div>
                 </div>
             </div>

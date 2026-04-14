@@ -28,6 +28,8 @@ const PRIORITY_RANKS = {
     low: 4
 };
 
+const UPCOMING_DAYS = 3;
+
 /**
  * Normalize task state character
  * @param {string} state - Raw state character from checkbox
@@ -263,6 +265,71 @@ function hasUnassignedTasks(tasks, { onlyActive = false } = {}) {
 }
 
 /**
+ * Classify a task's deadline urgency
+ * @param {Object} task - Parsed task object
+ * @returns {'overdue'|'upcoming-soon'|'upcoming'|null} Urgency level or null
+ */
+function getDeadlineUrgency(task) {
+    if (isClosedTask(task)) return null;
+    const ts = getDueTimestamp(task);
+    if (Number.isNaN(ts)) return null;
+
+    const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfToday = today.getTime();
+    const endOfToday = startOfToday + 86400000;
+
+    if (ts < startOfToday) return 'overdue';
+    if (ts < endOfToday) return 'upcoming-soon';
+    if (ts < now + UPCOMING_DAYS * 86400000) return 'upcoming';
+    return null;
+}
+
+/**
+ * Get a human-readable relative date label for a task's due date
+ * @param {Object} task - Parsed task object
+ * @returns {string} e.g. "2 days overdue", "Due today", "Due in 3 days", or raw date
+ */
+function getDueDateString(task) {
+    const due = getBadgeValue(task, 'due').trim();
+    if (!due) return '';
+    const ts = new Date(due).getTime();
+    if (Number.isNaN(ts)) return due;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfToday = today.getTime();
+
+    const diffDays = Math.round((ts - startOfToday) / 86400000);
+    if (diffDays < 0) return `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`;
+    if (diffDays === 0) return 'Due today';
+    return `Due in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+}
+
+/**
+ * Extract all open tasks with deadline urgency from blocks
+ * @param {Array} blocks - Array of block objects
+ * @returns {Array<{task: Object, urgency: string}>} Sorted by urgency then due date
+ */
+function getTasksWithUrgency(blocks) {
+    const tasks = parseTasksFromBlocks(blocks);
+    const results = [];
+    for (const task of tasks) {
+        const urgency = getDeadlineUrgency(task);
+        if (urgency) results.push({ task, urgency });
+    }
+    const order = { overdue: 0, 'upcoming-soon': 1, upcoming: 2 };
+    results.sort((a, b) => {
+        const ao = order[a.urgency] ?? 9;
+        const bo = order[b.urgency] ?? 9;
+        if (ao !== bo) return ao - bo;
+        return getDueTimestamp(a.task) - getDueTimestamp(b.task);
+    });
+    return results;
+}
+
+/**
  * Parse tasks from a single block's content
  * @param {Object} block - Block object with content property
  * @returns {Array} Array of task objects
@@ -392,6 +459,9 @@ window.TaskParser = {
     getBadgeValue,
     getPriorityRank,
     getDueTimestamp,
+    getDeadlineUrgency,
+    getDueDateString,
+    getTasksWithUrgency,
     getSourceOrderKey,
     stripBadges,
     isClosedTask,
@@ -408,6 +478,7 @@ window.TaskParser = {
     parseTasksFromBlocks,
     parseTasksFromContent,
     PRIORITY_RANKS,
+    UPCOMING_DAYS,
     KNOWN_BADGE_KEYS,
     CHECKBOX_REGEX,
     BADGE_REGEX

@@ -1,0 +1,246 @@
+/* ============================================
+   NoteView - Deadline Panel (Right Sidebar)
+   ============================================ */
+
+/* Panel container */
+.deadline-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.deadline-panel .section-header {
+    padding: 1rem 1.25rem 0.5rem;
+}
+
+/* Urgency group */
+.deadline-group {
+    padding: 0 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.deadline-group-header {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 0.4rem 0.5rem 0.25rem;
+}
+
+.deadline-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Individual deadline item */
+.deadline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.deadline-item:hover {
+    background: var(--bg-hover);
+}
+
+/* Urgency indicator dot */
+.deadline-item-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+
+.deadline-indicator-overdue {
+    background: var(--danger-color, #ef4444);
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+}
+
+.deadline-indicator-upcoming-soon {
+    background: var(--warning-color, #f59e0b);
+    box-shadow: 0 0 3px rgba(245, 158, 11, 0.3);
+}
+
+.deadline-indicator-upcoming {
+    background: var(--accent);
+    opacity: 0.6;
+}
+
+.deadline-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.deadline-item-text {
+    display: block;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.deadline-item-date {
+    display: inline-block;
+    font-size: 0.68rem;
+    margin-top: 0.15rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-full, 9999px);
+    border: 1px solid var(--border);
+}
+
+.deadline-item-date.date-overdue {
+    border-color: rgba(239, 68, 68, 0.3);
+    background-color: rgba(239, 68, 68, 0.08);
+    color: var(--danger-color, #ef4444);
+    font-weight: 600;
+}
+
+.deadline-item-date.date-upcoming-soon {
+    border-color: rgba(245, 158, 11, 0.3);
+    background-color: rgba(245, 158, 11, 0.08);
+    color: var(--warning-color, #f59e0b);
+    font-weight: 600;
+}
+
+.deadline-item-date.date-upcoming {
+    border-color: rgba(59, 130, 246, 0.25);
+    background-color: rgba(59, 130, 246, 0.05);
+    color: var(--accent);
+}
+
+/* Empty state */
+.deadline-empty {
+    padding: 1.5rem 1.25rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+/* ============================================
+   Due Badge Urgency Variants (shared)
+   ============================================ */
+
+.badge-due-overdue {
+    border-color: rgba(239, 68, 68, 0.3) !important;
+    background-color: rgba(239, 68, 68, 0.08) !important;
+    color: var(--danger-color, #ef4444) !important;
+    font-weight: 600;
+}
+
+.badge-due-upcoming-soon {
+    border-color: rgba(245, 158, 11, 0.3) !important;
+    background-color: rgba(245, 158, 11, 0.08) !important;
+    color: var(--warning-color, #f59e0b) !important;
+    font-weight: 600;
+}
+
+.badge-due-upcoming {
+    border-color: rgba(59, 130, 246, 0.25) !important;
+    background-color: rgba(59, 130, 246, 0.05) !important;
+    color: var(--accent) !important;
+}
+
+/* ============================================
+   Kanban Card Deadline Emphasis
+   ============================================ */
+
+.kanban-card.deadline-overdue {
+    border-color: rgba(239, 68, 68, 0.3);
+    border-left: 3px solid var(--danger-color, #ef4444);
+}
+
+.kanban-card.deadline-upcoming-soon {
+    border-color: rgba(245, 158, 11, 0.25);
+    border-left: 3px solid var(--warning-color, #f59e0b);
+}
+
+.kanban-badge.badge-due.badge-due-overdue {
+    border-color: rgba(239, 68, 68, 0.3);
+    background-color: rgba(239, 68, 68, 0.08);
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.kanban-badge.badge-due.badge-due-upcoming-soon {
+    border-color: rgba(245, 158, 11, 0.3);
+    background-color: rgba(245, 158, 11, 0.08);
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+.kanban-badge.badge-due.badge-due-upcoming {
+    border-color: rgba(59, 130, 246, 0.25);
+    background-color: rgba(59, 130, 246, 0.05);
+    color: var(--accent);
+}
+
+/* ============================================
+   Due Date Popover (editor badge click)
+   ============================================ */
+
+.due-popover {
+    position: fixed;
+    z-index: 10000;
+    width: 220px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 8px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.due-popover-input {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    box-sizing: border-box;
+}
+
+.due-popover-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.due-popover-btn {
+    flex: 1;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.due-popover-btn:active {
+    opacity: 0.8;
+}
+
+.due-popover-save {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.due-popover-remove {
+    color: var(--danger-color, #ef4444);
+    border-color: rgba(239, 68, 68, 0.25);
+}

@@ -562,6 +562,9 @@ const App = {
 
         // Update undo/redo button states
         this.updateUndoRedoUI();
+
+        // Update deadline panel in right sidebar (uses all blocks, not filtered)
+        DeadlinePanel.render(Store.blocks);
     },
 
     updateUndoRedoUI() {
@@ -598,11 +601,13 @@ const App = {
 
         // Pass new content in options to allow Store.saveBlock to correctly capture before/after state
         await Store.saveBlock(block, { ...options, content });
-        
+
         // Invalidate timeline cache after saving
         TimelineView.invalidateCache();
         // Update tag counts to refresh contacts sidebar
         SelectionManager.updateTagCounts();
+        // Update deadline panel after content changes
+        DeadlinePanel.render(Store.blocks);
     },
 
     async deleteBlock(id) {
