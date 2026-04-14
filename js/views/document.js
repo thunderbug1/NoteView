@@ -1066,6 +1066,53 @@ const DocumentView = {
     },
 
     /**
+     * Compute which line indices should be hidden based on active task filters.
+     * Returns a Set of 0-based indices.
+     * Shared by buildDecorations (display) and export (file output).
+     */
+    getHiddenTaskLineIndices(lineTexts, activeTaskFilters) {
+        const hidden = new Set();
+        if (!activeTaskFilters || activeTaskFilters.size === 0) return hidden;
+
+        let hideBelowIndent = null;
+
+        for (let i = 0; i < lineTexts.length; i++) {
+            const text = lineTexts[i];
+            const indent = text.match(/^(\s*)/)[1].length;
+            const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
+            const matchesFilter = isTask && this.taskLineMatchesFilter(text, activeTaskFilters);
+
+            if (isTask && matchesFilter) {
+                hideBelowIndent = null;
+            } else if (isTask) {
+                if (hideBelowIndent === null) {
+                    hideBelowIndent = indent;
+                }
+            } else if (hideBelowIndent !== null && indent <= hideBelowIndent) {
+                hideBelowIndent = null;
+            }
+
+            const shouldHide = isTask
+                ? !matchesFilter
+                : (hideBelowIndent !== null && indent > hideBelowIndent);
+
+            if (shouldHide) hidden.add(i);
+        }
+
+        return hidden;
+    },
+
+    /**
+     * Filter markdown content, removing lines that don't match active task filters.
+     */
+    filterContentLines(content, activeTaskFilters) {
+        if (!activeTaskFilters || activeTaskFilters.size === 0) return content;
+        const lines = content.split('\n');
+        const hidden = this.getHiddenTaskLineIndices(lines, activeTaskFilters);
+        return lines.filter((_, i) => !hidden.has(i)).join('\n');
+    },
+
+    /**
      * Build the decoration set from editor state.
      */
     buildDecorations(state, hasFocus) {
@@ -1115,7 +1162,11 @@ const DocumentView = {
         }
 
         const activeTaskFilters = this.getActiveTaskFilter();
-        let hideBelowIndent = null;
+
+        // Build 0-based index set of hidden lines (shared with export)
+        const allLineTexts = [];
+        for (let i = 1; i <= state.doc.lines; i++) allLineTexts.push(state.doc.line(i).text);
+        const hiddenLines = this.getHiddenTaskLineIndices(allLineTexts, activeTaskFilters);
 
         for (let i = 1; i <= state.doc.lines; i++) {
             if (fencedBlockLines.has(i)) {
@@ -1124,34 +1175,12 @@ const DocumentView = {
 
             const line = state.doc.line(i);
 
-            // Per-line task filtering with sub-content hiding
-            if (activeTaskFilters.size > 0) {
-                const indent = line.text.match(/^(\s*)/)[1].length;
-                const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(line.text);
-                const matchesFilter = isTask && this.taskLineMatchesFilter(line.text, activeTaskFilters);
-
-                // Update hide threshold (always, regardless of cursor position)
-                if (isTask && matchesFilter) {
-                    hideBelowIndent = null;
-                } else if (isTask) {
-                    // Non-matching task — set threshold only if not already hiding
-                    // (keep parent's threshold so sibling content stays hidden)
-                    if (hideBelowIndent === null) {
-                        hideBelowIndent = indent;
-                    }
-                } else if (hideBelowIndent !== null && indent <= hideBelowIndent) {
-                    // Non-task at or above threshold — exited hidden scope
-                    hideBelowIndent = null;
-                }
-
-                // Apply hiding (skip lines with cursor)
-                const shouldHide = isTask ? !matchesFilter : (hideBelowIndent !== null && indent > hideBelowIndent);
-                if (shouldHide && !cursorLines.has(i)) {
-                    builder.push(Decoration.line({
-                        attributes: { class: 'md-task-filter-hidden-line' }
-                    }).range(line.from));
-                    continue;
-                }
+            // Per-line task filtering (skip lines with cursor)
+            if (hiddenLines.has(i - 1) && !cursorLines.has(i)) {
+                builder.push(Decoration.line({
+                    attributes: { class: 'md-task-filter-hidden-line' }
+                }).range(line.from));
+                continue;
             }
 
             const hideSyntax = !cursorLines.has(i);

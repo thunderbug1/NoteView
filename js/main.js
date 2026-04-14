@@ -435,6 +435,11 @@ const App = {
             });
         }
 
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.exportFilteredBlocks());
+        }
+
         this.setupKeyboardShortcuts();
     },
 
@@ -758,6 +763,36 @@ const App = {
 
     async showManageVaultsModal() {
         VaultModal.showManager();
+    },
+
+    exportFilteredBlocks() {
+        const blocks = Store.getFilteredBlocks();
+        if (blocks.length === 0) return;
+
+        const activeTaskFilters = DocumentView.getActiveTaskFilter();
+
+        const markdown = blocks.map(block => {
+            const filtered = DocumentView.filterContentLines(block.content || '', activeTaskFilters);
+            const parts = [];
+            const headingLine = filtered.split('\n').find(l => /^#+\s+/.test(l.trim()));
+            const title = headingLine ? headingLine.replace(/^#+\s*/, '').trim() : block.id;
+            parts.push(`# ${title}`);
+            if (block.tags && block.tags.length > 0) {
+                parts.push(block.tags.map(t => `#${t}`).join(' '));
+            }
+            parts.push('');
+            parts.push(filtered);
+            return parts.join('\n');
+        }).join('\n\n---\n\n');
+
+        const date = new Date().toISOString().split('T')[0];
+        const blob = new Blob([markdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `noteview-export-${date}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
     },
 
     handleNewNote() {
