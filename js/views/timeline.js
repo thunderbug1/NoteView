@@ -330,25 +330,25 @@ const TimelineView = {
                     if (!hasAllTags) return false;
                 }
                 
-                if (contextSelection.has('untagged')) {
+                if (contextSelection.has('Status.untagged')) {
                     if (event.tags && event.tags.length > 0) return false;
                 }
-                if (contextSelection.has('allTodos')) {
+                if (contextSelection.has('Todo.all')) {
                         // Timeline events are always task events.
                 }
-                if (contextSelection.has('openTodos')) {
+                if (contextSelection.has('Todo.open')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                         if (!TaskParser.isOpenTask(eventTask)) return false;
                 }
-                if (contextSelection.has('blockedTodos')) {
+                if (contextSelection.has('Todo.blocked')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                         if (!TaskParser.isBlockedTask(eventTask)) return false;
                 }
-                if (contextSelection.has('unblockedTodos')) {
+                if (contextSelection.has('Todo.unblocked')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                         if (!TaskParser.isUnblockedTask(eventTask)) return false;
                 }
-                if (contextSelection.has('unassigned')) {
+                if (contextSelection.has('Status.unassigned')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                         if (!TaskParser.isUnassignedTask(eventTask)) return false;
                 }

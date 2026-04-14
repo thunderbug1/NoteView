@@ -155,7 +155,7 @@ const DocumentView = {
         if (selectedTags.length === 0) return '';
 
         return selectedTags
-            .map(tag => `<span class="badge">${Common.capitalizeFirst(tag)}</span>`)
+            .map(tag => TagModal._renderBadge(tag))
             .join('');
     },
 
@@ -180,9 +180,7 @@ const DocumentView = {
 
         parts.push(`
             <div class="block-tags">
-                ${sortedTags.map(tag => `
-                    <span class="badge">${Common.capitalizeFirst(tag)}</span>
-                `).join('')}
+                ${sortedTags.map(tag => TagModal._renderBadge(tag)).join('')}
                 <button class="add-tag-btn" data-id="${block.id}">+ Tag</button>
             </div>
         `);
@@ -773,7 +771,7 @@ const DocumentView = {
         if (block?.tags?.length) {
             block.tags.forEach(tag => referenceContext.add(tag));
         } else {
-            SelectionManager.getActiveTags().forEach(tag => referenceContext.add(tag));
+            SelectionManager.getExpandedActiveTags().forEach(tag => referenceContext.add(tag));
         }
 
         return allContacts.sort((a, b) => {

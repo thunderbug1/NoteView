@@ -16,6 +16,19 @@
     border: 1px solid var(--border);
 }
 
+/* Hierarchical badges in note metadata */
+.badge-hierarchical {
+    gap: 0.15rem;
+}
+
+.badge-parent {
+    font-size: 0.6rem;
+    opacity: 0.55;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-right: 0.1rem;
+}
+
 /* Badge color variants */
 .badge.work {
     background: #dbeafe;
@@ -249,7 +262,7 @@
     border: 1px solid var(--border);
 }
 
-.tag-radio-option.selected .tag-badge {
+.tag-radio-option.selected:not(.group-match) .tag-badge {
     background: var(--accent);
     color: white;
     border-color: var(--accent);
@@ -257,6 +270,134 @@
 
 .tag-radio-option:hover .tag-badge {
     opacity: 0.8;
+}
+
+/* Hierarchical tag groups in sidebar */
+.tag-group-hierarchy {
+    margin-bottom: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    padding: 0.25rem 0.4rem;
+}
+
+/* Nested groups indent inside parent */
+.tag-group-children .tag-group-hierarchy {
+    margin-left: 0.5rem;
+    border-color: var(--border);
+}
+
+.tag-group-children .tag-group-hierarchy .tag-group-parent {
+    font-size: 0.65rem;
+}
+
+.tag-group-parent {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0;
+    user-select: none;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tag-group-toggle {
+    cursor: pointer;
+}
+
+.tag-group-name {
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    padding: 0.1rem 0.3rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tag-group-name:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Group header highlight when OR-selected */
+.tag-group-hierarchy.group-selected > .tag-group-parent .tag-group-name {
+    background: var(--accent);
+    color: white;
+    border-radius: var(--radius-sm);
+}
+
+/* Group OR-selected: outline the entire subtree */
+.tag-group-hierarchy.group-selected {
+    border-color: var(--accent);
+    border-left: 3px solid var(--accent);
+    background: var(--accent-light);
+}
+
+/* Subgroups covered by a parent OR selection */
+.tag-group-hierarchy.group-match {
+    border-color: var(--accent);
+    border-left: 2px solid var(--accent);
+    background: var(--accent-light);
+}
+
+/* Parent group with a descendant selected (subtle indicator) */
+.tag-group-hierarchy.has-child-selected {
+    border-left: 3px solid var(--accent);
+    border-color: var(--accent);
+}
+
+.tag-group-hierarchy.has-child-selected > .tag-group-parent .tag-group-name {
+    color: var(--accent);
+}
+
+/* Tags matched via group OR selection: outlined accent style (not filled) */
+.tag-radio-option.group-match .tag-badge {
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1.5px solid var(--accent);
+}
+
+.tag-radio-option.group-match:hover .tag-badge {
+    opacity: 0.75;
+}
+
+.tag-group-toggle {
+    font-size: 0.6rem;
+    transition: transform 0.15s;
+    width: 0.8em;
+    text-align: center;
+}
+
+.tag-group-hierarchy.expanded > .tag-group-parent > .tag-group-toggle {
+    transform: rotate(90deg);
+}
+
+.tag-group-children {
+    display: none;
+    padding: 0.25rem 0 0.25rem 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: flex-start;
+}
+
+.tag-group-hierarchy:not(.expanded) > .tag-group-children {
+    display: none;
+}
+
+.tag-group-hierarchy.expanded > .tag-group-children {
+    display: flex;
+}
+
+/* Nested sub-groups break to their own line */
+.tag-group-children > .tag-group-hierarchy {
+    flex-basis: 100%;
+}
+
+/* Computed tag distinction in sidebar */
+.tag-radio-option.computed .tag-badge {
+    font-style: italic;
+    opacity: 0.85;
 }
 
 /* Hide radio indicator, label and count */
@@ -420,11 +561,11 @@
 }
 
 .tag-modal-list {
-    max-height: 200px;
+    max-height: 250px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.35rem;
 }
 
 .tag-modal-item {
@@ -450,6 +591,139 @@
     width: 1.2em;
     margin-right: 0.5rem;
     font-weight: bold;
+}
+
+/* Tag modal selected bar */
+.tag-modal-selected {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+    min-height: 2rem;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+}
+
+.tag-modal-selected-empty {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+.tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.tag-pill .badge {
+    pointer-events: none;
+}
+
+.tag-pill-remove {
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    padding: 0 0.15rem;
+    line-height: 1;
+    border-radius: 50%;
+    transition: color 0.15s;
+}
+
+.tag-pill-remove:hover {
+    color: var(--text-primary);
+}
+
+/* Inline rename input on selected pill */
+.tag-pill .badge {
+    cursor: pointer;
+}
+
+.pill-rename-input {
+    padding: 0.15rem 0.4rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    outline: none;
+    width: auto;
+    min-width: 80px;
+}
+
+/* Tag modal framed groups */
+.tag-modal-group {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.tag-modal-group-header {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tag-modal-group-header:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tag-modal-group.group-selected > .tag-modal-group-header {
+    background: var(--accent);
+    color: white;
+}
+
+.tag-modal-group-items {
+    padding: 0.25rem 0;
+}
+
+.tag-modal-group .tag-modal-item {
+    padding-left: 1rem;
+}
+
+/* Nested groups in modal */
+.tag-modal-group-items > .tag-modal-group {
+    margin: 0.25rem 0.5rem;
+}
+
+/* Edit hint icon on tag items */
+.tag-modal-item .tag-edit-hint {
+    display: none;
+    float: right;
+    opacity: 0.35;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+.tag-modal-item:hover .tag-edit-hint {
+    display: inline;
+}
+
+/* Rename input in tag modal */
+.tag-rename-input {
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.tag-rename-input:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 
 .tag-modal-footer {
@@ -486,6 +760,67 @@
     font-size: 0.85rem;
     background: var(--bg-secondary);
     border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.tag-modal-create:hover {
+    background: var(--bg-hover);
+    color: var(--accent);
+}
+
+/* Autocomplete dropdown for tag input */
+.tag-autocomplete {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+
+.ac-item {
+    padding: 0.4rem 0.65rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ac-item:hover {
+    background: var(--bg-hover);
+}
+
+.ac-item.ac-active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.ac-group-icon {
+    font-size: 0.6rem;
+    opacity: 0.5;
+}
+
+.ac-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-left: auto;
 }
 
 /* Directory Picker */

@@ -861,12 +861,29 @@ const Store = {
                 }
             }
 
-            // Context filter (multi-select - must have ALL selected tags)
+            // Context filter (multi-select)
+            // - Individual tags: AND (block must have each)
+            // - Group paths (path:X): OR within group (block must have ANY tag in subtree)
+            // - Between items: AND
             if (contextSelection.size > 0) {
-                const requiredTags = Array.from(contextSelection).filter(t => !SelectionManager.isComputedContextTag(t));
-                const hasAllTags = requiredTags.every(tag => block.tags?.includes(tag));
-                if (!hasAllTags) {
-                    return false;
+                const blockTags = block.tags || [];
+
+                for (const item of contextSelection) {
+                    if (SelectionManager.isComputedContextTag(item)) continue;
+
+                    if (item.startsWith('path:')) {
+                        // Group selection: block must have ANY tag in this subtree
+                        const prefix = item.slice(5);
+                        const hasMatch = blockTags.some(tag => {
+                            const { segments } = Common.parseHierarchicalTag(tag);
+                            const tagPath = segments.join('.');
+                            return tagPath === prefix || tagPath.startsWith(prefix + '.');
+                        });
+                        if (!hasMatch) return false;
+                    } else {
+                        // Individual tag: block must have this specific tag
+                        if (!blockTags.includes(item)) return false;
+                    }
                 }
 
                 let tasks = null;
@@ -876,25 +893,25 @@ const Store = {
                     }
                     return tasks;
                 };
-                
-                if (contextSelection.has('allTodos')) {
+
+                if (contextSelection.has('Todo.all')) {
                     if (!block.content?.match(/\[[ xX\/bB\-]\]/)) return false;
                 }
-                if (contextSelection.has('openTodos')) {
+                if (contextSelection.has('Todo.open')) {
                     if (!block.content?.match(/\[[ \/]\]/)) return false;
                 }
-                if (contextSelection.has('blockedTodos')) {
+                if (contextSelection.has('Todo.blocked')) {
                     const hasBlocked = getTasks().some(t => TaskParser.isBlockedTask(t));
                     if (!hasBlocked) return false;
                 }
-                if (contextSelection.has('unblockedTodos')) {
+                if (contextSelection.has('Todo.unblocked')) {
                     const hasUnblocked = getTasks().some(t => TaskParser.isUnblockedTask(t));
                     if (!hasUnblocked) return false;
                 }
-                if (contextSelection.has('untagged')) {
+                if (contextSelection.has('Status.untagged')) {
                     if (block.tags && block.tags.length > 0) return false;
                 }
-                if (contextSelection.has('unassigned')) {
+                if (contextSelection.has('Status.unassigned')) {
                     const hasUnassigned = TaskParser.hasUnassignedTasks(getTasks());
                     if (!hasUnassigned) return false;
                 }

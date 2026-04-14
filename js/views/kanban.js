@@ -63,16 +63,16 @@ const KanbanView = {
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }
-            if (contextSelection.has('openTodos') && !TaskParser.isOpenTask(task)) {
+            if (contextSelection.has('Todo.open') && !TaskParser.isOpenTask(task)) {
                 return false;
             }
-            if (contextSelection.has('blockedTodos') && !TaskParser.isBlockedTask(task)) {
+            if (contextSelection.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('unblockedTodos') && !TaskParser.isUnblockedTask(task)) {
+            if (contextSelection.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('unassigned') && !TaskParser.isUnassignedTask(task, { onlyActive: true })) {
+            if (contextSelection.has('Status.unassigned') && !TaskParser.isUnassignedTask(task, { onlyActive: true })) {
                 return false;
             }
             return true;

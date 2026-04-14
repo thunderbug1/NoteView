@@ -13,7 +13,7 @@ const AssigneeModal = {
         if (currentTags && currentTags.length > 0) {
             currentTags.forEach(t => referenceContext.add(t));
         } else if (SelectionManager.selections.context.size > 0) {
-            referenceContext = new Set(SelectionManager.getActiveTags());
+            referenceContext = new Set(SelectionManager.getExpandedActiveTags());
         }
 
         if (referenceContext.size > 0) {
