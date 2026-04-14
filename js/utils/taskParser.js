@@ -15,7 +15,7 @@ const TASK_STATES = {
 };
 
 // Badge keys that we want to extract
-const KNOWN_BADGE_KEYS = ['due', 'assignee', 'dependsOn', 'priority'];
+const KNOWN_BADGE_KEYS = ['due', 'assignee', 'priority'];
 
 // Regex patterns
 const CHECKBOX_REGEX = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm;
@@ -204,15 +204,6 @@ function hasMention(task) {
 }
 
 /**
- * Check whether a task has a dependency badge
- * @param {Object} task - Parsed task object
- * @returns {boolean} True when task depends on another task
- */
-function hasDependency(task) {
-    return task.badges.some(b => b.type === 'dependsOn');
-}
-
-/**
  * Check whether a task is open
  * @param {Object} task - Parsed task object
  * @returns {boolean} True when task is todo or in progress
@@ -224,19 +215,19 @@ function isOpenTask(task) {
 /**
  * Check whether a task is blocked
  * @param {Object} task - Parsed task object
- * @returns {boolean} True when task is blocked by state or dependency
+ * @returns {boolean} True when task is in blocked state
  */
 function isBlockedTask(task) {
-    return task.state === 'b' || hasDependency(task);
+    return task.state === 'b';
 }
 
 /**
  * Check whether a task is unblocked and actionable
  * @param {Object} task - Parsed task object
- * @returns {boolean} True when task is open and has no dependency
+ * @returns {boolean} True when task is open (todo or in progress)
  */
 function isUnblockedTask(task) {
-    return isOpenTask(task) && !hasDependency(task);
+    return isOpenTask(task);
 }
 
 /**
@@ -468,7 +459,6 @@ window.TaskParser = {
     hasAssignee,
     hasMention,
     getAssignmentContacts,
-    hasDependency,
     isOpenTask,
     isBlockedTask,
     isUnblockedTask,

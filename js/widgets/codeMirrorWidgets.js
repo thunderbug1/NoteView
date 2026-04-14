@@ -173,9 +173,6 @@ function createCodeMirrorWidgets(documentView) {
                 const color = colors[this.value.toLowerCase()] || 'currentColor';
                 wrap.dataset.priority = this.value.toLowerCase();
                 wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="3" style="margin-right:2px; vertical-align:text-top;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg></span> ${this.value}`;
-            } else if (this.type === 'dependsOn') {
-                const blockerName = documentView.resolveTaskName(this.value);
-                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg></span> Blocked by: ${blockerName}`;
             } else if (this.type === 'id') {
                 wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span> ${this.value}`;
             }
@@ -421,36 +418,6 @@ function createCodeMirrorWidgets(documentView) {
         ignoreEvent() { return true; }
     }
 
-    class AddDependencyWidget extends WidgetType {
-        constructor(from, to) {
-            super();
-            this.from = from;
-            this.to = to;
-        }
-        eq(other) {
-            return other.from === this.from && other.to === this.to;
-        }
-        toDOM(view) {
-            const wrap = document.createElement("span");
-            wrap.className = "md-add-deadline md-add-action";
-            wrap.style.position = "relative";
-            wrap.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>`;
-            wrap.title = "Add Dependency";
-
-            wrap.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const dep = prompt('Enter task ID or block ID it depends on (e.g. ^task-123):');
-                if (dep) {
-                    const cleanDep = dep.startsWith('^') ? dep : '^' + dep;
-                    documentView.appendInlineField(view, this.from, this.to, 'dependsOn', cleanDep);
-                }
-            };
-            return wrap;
-        }
-        ignoreEvent() { return true; }
-    }
-
     return {
         CheckboxWidget,
         BadgeWidget,
@@ -458,8 +425,7 @@ function createCodeMirrorWidgets(documentView) {
         FencedBlockWidget,
         AddDeadlineWidget,
         AddAssigneeWidget,
-        AddPriorityWidget,
-        AddDependencyWidget
+        AddPriorityWidget
     };
 }
 

@@ -67,7 +67,7 @@ A **block** is a single markdown note with:
 - `content` — Raw markdown text
 - `tags` — Array of tag strings (from frontmatter)
 - `lastUpdated`, `createdAt` — Timestamps from git
-- Tasks parsed inline from markdown checkboxes with metadata (`[due:: ...]`, `[priority:: ...]`, `[assignee:: ...]`, `[dependsOn:: ...]`)
+- Tasks parsed inline from markdown checkboxes with metadata (`[due:: ...]`, `[priority:: ...]`, `[assignee:: ...]`)
 
 Blocks are stored as individual `.md` files in the user's chosen directory. Frontmatter (`---` block at top of file) holds tags. Every save triggers a git commit.
 

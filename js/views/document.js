@@ -741,26 +741,6 @@ const DocumentView = {
         });
     },
 
-    resolveTaskName(idStr) {
-        if (!idStr.startsWith('^')) return idStr;
-        const blocks = (window.Store && Store.blocks) || [];
-        for (const block of blocks) {
-            if ('^' + block.id === idStr) return block.id;
-            if (block.content && block.content.includes(idStr)) {
-                const lines = block.content.split('\n');
-                for (const line of lines) {
-                    if (line.includes(idStr)) {
-                        let text = line.replace(/^\s*[-*+]\s+\[.*?\]\s*/, '');
-                        text = text.replace(/\[(due|dependsOn)::[^\]]+\]/g, '');
-                        text = text.replace(idStr, '');
-                        return text.trim() || idStr;
-                    }
-                }
-            }
-        }
-        return idStr;
-    },
-
     getMentionSuggestions(blockId) {
         const allContacts = Array.from(Store.contacts.keys());
         if (allContacts.length === 0) return [];
@@ -966,11 +946,6 @@ const DocumentView = {
                 cursor: 'pointer',
                 whiteSpace: 'nowrap'
             },
-            ".badge-dependsOn": {
-                borderColor: 'var(--badge-todos-border, #fca5a5)',
-                backgroundColor: 'var(--badge-todos-bg, #fff1f2)',
-                color: 'var(--badge-todos-text, #9f1239)'
-            },
             ".badge-due": {
                 borderColor: 'var(--badge-work-border, #bae6fd)',
                 backgroundColor: 'var(--badge-work-bg, #f0f9ff)',
@@ -1079,13 +1054,12 @@ const DocumentView = {
         const state = checkboxMatch[1];
         const isOpen = state === ' ' || state === '/';
         const isBlockedState = state === 'b' || state === 'B';
-        const hasDependsOn = lineText.includes('[dependsOn::');
         const hasAssignee = lineText.includes('[assignee::');
 
         for (const filter of activeFilters) {
             if (filter === 'Todo.open' && isOpen) return true;
-            if (filter === 'Todo.blocked' && (isBlockedState || hasDependsOn)) return true;
-            if (filter === 'Todo.unblocked' && isOpen && !hasDependsOn) return true;
+            if (filter === 'Todo.blocked' && isBlockedState) return true;
+            if (filter === 'Todo.unblocked' && isOpen) return true;
             if (filter === 'Status.unassigned' && !hasAssignee) return true;
         }
         return false;
@@ -1459,12 +1433,6 @@ const DocumentView = {
                     side: 1
                 }).range(line.to));
             }
-            if (!text.includes('[dependsOn::')) {
-                builder.push(Decoration.widget({
-                    widget: new widgets.AddDependencyWidget(from, line.to),
-                    side: 1
-                }).range(line.to));
-            }
         }
 
         // 3. Run registered line decorators
@@ -1490,9 +1458,9 @@ const DocumentView = {
         ];
     },
 
-    // Decorator: inline fields (e.g. [due:: 2026-03-25], [dependsOn:: ^id])
+    // Decorator: inline fields (e.g. [due:: 2026-03-25], [assignee:: @user])
     decorateInlineFields(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
-        const inlineFieldRegex = /\[(due|dependsOn|assignee|priority)::\s*([^\]]+)\]/g;
+        const inlineFieldRegex = /\[(due|assignee|priority)::\s*([^\]]+)\]/g;
         let fieldMatch;
         while ((fieldMatch = inlineFieldRegex.exec(text)) !== null) {
             const matchFrom = from + fieldMatch.index;

@@ -12,7 +12,7 @@ Tasks are markdown checkboxes with custom states and inline metadata:
 - [ ] Design new landing page [due:: 2026-04-15] [priority:: high]
 - [/] Implement search feature [assignee:: @alice]
 - [x] Fix login bug [due:: 2026-04-10] [completed:: 2026-04-09]
-- [b] Waiting on API docs [dependsOn:: ^backend-api]
+- [b] Waiting on API docs
 - [-] Deprecated approach
 ```
 
@@ -37,9 +37,8 @@ Badges use the syntax `[key:: value]` and can appear in any order after the task
 | `due` | `[due:: 2026-04-15]` | Deadline date |
 | `assignee` | `[assignee:: alice]` | Person responsible |
 | `priority` | `[priority:: high]` | Priority level |
-| `dependsOn` | `[dependsOn:: ^backend-api]` | Cross-task dependency |
 | `completed` | `[completed:: 2026-04-09]` | Completion date |
-| `id` | `[id:: ^task-123]` | Explicit task ID for dependency references |
+| `id` | `[id:: ^task-123]` | Explicit task ID |
 
 Priority values (with sort rank): `urgent` (0), `high` (1), `medium` (2), `low` (4). Unknown priorities rank at 3.
 
@@ -98,17 +97,12 @@ TaskParser exposes predicate functions used by filtering, kanban, and timeline:
 |----------|-------|
 | `isOpenTask(task)` | `state === ' '` or `state === '/'` |
 | `isClosedTask(task)` | `state === 'x'` or `state === '-'` |
-| `isBlockedTask(task)` | `state === 'b'` **or** `hasDependency(task)` |
-| `isUnblockedTask(task)` | `isOpenTask(task) && !hasDependency(task)` |
+| `isBlockedTask(task)` | `state === 'b'` |
+| `isUnblockedTask(task)` | `isOpenTask(task)` |
 | `hasAssignee(task)` | Any badge with `type === 'assignee'` and non-empty value |
 | `hasMention(task)` | Task text contains an `@mention` contact |
-| `hasDependency(task)` | Any badge with `type === 'dependsOn'` |
 | `isUnassignedTask(task)` | No assignee badge, including inherited assignee context from parent tasks (optionally filtering out closed tasks) |
 | `hasUnassignedTasks(tasks)` | Any task in the array is unassigned (optionally ignoring closed tasks) |
-
-### Key insight: blocked vs has dependency
-
-A task is considered "blocked" if it either has the `[b]` state **or** has a `[dependsOn::]` badge. A task can be unblocked (`isUnblockedTask`) only if it's open (todo or in-progress) and has no dependency badge.
 
 ---
 
@@ -154,17 +148,18 @@ When a card is dropped on a different column:
 4. Guard check: verifies `[` and `]` brackets are at expected positions before replacing
 5. Calls `App.saveBlockContent()` with `commit: true` and message `"Move task to {state}"`
 
-### Edit modal
+### Action buttons
 
-Clicking the edit button on a kanban card opens `KanbanView.showEditModal(task, block)`:
+Hovering over a kanban card reveals action buttons for missing metadata fields:
+- Calendar icon to add a due date (hidden if `[due::]` already present)
+- Person icon to add an assignee (hidden if `[assignee::]` already present)
+- Flag icon to add a priority (hidden if `[priority::]` already present)
 
-- Fields: due date (date input), assignee (text + contacts button), priority (select)
-- On save: strips all due/assignee/priority badges from `originalText`, re-appends non-empty values
-- Rebuilds the task line and splices it into block content at `matchIndex`
+Each button opens the corresponding picker (date input, assignee modal, or priority menu) and updates the task inline. On mobile, buttons are always visible.
 
 ### Card click
 
-Clicking a kanban card (not a badge, not the edit button) opens `App.showBlockContentModal(blockId)` — a modal with a full CodeMirror editor for the source note.
+Clicking a kanban card (not a badge, not an action button) opens `App.showBlockContentModal(blockId)` — a modal with a full CodeMirror editor for the source note.
 
 ---
 
@@ -225,30 +220,6 @@ These sidebar filter options are computed at runtime from block content:
 In `Store.getFilteredBlocks()`, computed tags are checked after regular tag matching. A block must pass ALL selected filters (AND logic).
 
 ---
-
-## Dependencies
-
-### Syntax
-
-```markdown
-- [b] Waiting on API docs [dependsOn:: ^backend-api]
-```
-
-The `^` prefix is a convention for task IDs but is not enforced by the parser.
-
-### In the editor
-
-- `dependsOn` badges render with a "Blocked by" label and the resolved task name
-- The `AddDependencyWidget` prompts for a task ID and prepends `^` if missing
-- `DocumentView.resolveTaskName(ref)` resolves `^task-id` references to readable names
-
-### Blocking logic
-
-A task is "blocked" (`isBlockedTask`) if:
-1. Its state is `[b]`, OR
-2. It has a `[dependsOn::]` badge
-
-A task is "unblocked" (`isUnblockedTask`) only if it's open (todo or in-progress) AND has no dependency badge. This means a `[b]` task without a `[dependsOn::]` badge is blocked but NOT unblocked, and a `[ ]` task WITH a `[dependsOn::]` badge IS blocked.
 
 ### Priority sorting
 

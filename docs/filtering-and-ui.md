@@ -218,7 +218,7 @@ Returns `Promise<string|null>`. Text input dialog with Enter/Escape handling.
 | Content modal | `App.showBlockContentModal(blockId)` | Full CodeMirror editor in modal |
 | New note modal | `App.showNewNoteModal()` | Create note from non-document views |
 | Sort config | `SortManager.openSortModal(view, onChange)` | Multi-clause sort configuration |
-| Kanban edit | `KanbanView.showEditModal(task, block)` | Edit task metadata |
+| Kanban action buttons | Hover-revealed icons on cards | Add due, assignee, priority inline |
 | History | `HistoryView.openHistory(blockId)` | Version browser with diff |
 | Timeline diff | `TimelineView.openDiffModal(...)` | Diff view for timeline events |
 

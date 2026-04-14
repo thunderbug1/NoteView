@@ -95,7 +95,6 @@ Supported types with icons:
 - `due` — Calendar icon
 - `assignee` — Person icon, clicking opens `App.showAssigneeModal()`
 - `priority` — Flag icon with color (urgent=red, high=orange, medium=blue, low=gray)
-- `dependsOn` — Blocked icon, resolves `^task-id` to readable name
 - `id` — Link icon
 
 ### LinkWidget
@@ -113,13 +112,12 @@ Shows:
 - "Edit" button (focuses the block in the editor)
 - "Open" button (opens a modal with the full block content)
 
-### Action Widgets (AddDeadlineWidget, AddAssigneeWidget, AddPriorityWidget, AddDependencyWidget)
+### Action Widgets (AddDeadlineWidget, AddAssigneeWidget, AddPriorityWidget)
 
 Small icon buttons appended to task lines that don't yet have the corresponding metadata. Each opens the appropriate picker:
 - **AddDeadlineWidget**: Hidden `<input type="date">` that opens the browser calendar
 - **AddAssigneeWidget**: Opens `App.showAssigneeModal()`
 - **AddPriorityWidget**: Opens `DocumentView.showPriorityMenu()` (a positioned context menu)
-- **AddDependencyWidget**: Opens a `prompt()` dialog for task ID input
 
 All action widgets call `documentView.appendInlineField(view, from, to, fieldName, value)` to insert the badge text into the editor.
 

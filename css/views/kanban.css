@@ -126,8 +126,91 @@
     padding: 0.6rem 0.8rem;
 }
 
+/* Action buttons — hidden by default, shown on card hover */
+.kanban-action-btns {
+    display: none;
+    gap: 2px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.kanban-card:hover .kanban-action-btns {
+    display: inline-flex;
+}
+
+.kanban-action-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted, #94a3b8);
+    padding: 2px 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.kanban-action-btn:hover {
+    color: var(--accent);
+    background: var(--bg-hover, #f1f5f9);
+}
+
+/* Badge cursor */
+.kanban-badge {
+    cursor: pointer;
+}
+
+/* Floating due date picker */
+.kanban-due-menu {
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 160px;
+}
+
+.kanban-due-clear:hover {
+    color: var(--danger, #ef4444);
+}
+
+/* Floating priority picker */
+.kanban-priority-menu {
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 120px;
+}
+
+.kanban-priority-option {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 4px;
+    font-family: inherit;
+}
+
+.kanban-priority-option:hover {
+    background: var(--bg-hover, #f1f5f9);
+}
+
 @media (max-width: 768px) {
     .kanban-column {
         flex: 0 0 250px;
+    }
+
+    .kanban-action-btns {
+        display: inline-flex;
     }
 }
