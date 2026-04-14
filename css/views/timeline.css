@@ -328,19 +328,30 @@
     color: var(--text-primary);
 }
 
-.tl-modal-body {
+.tl-modal .tag-modal-body {
     flex: 1;
     overflow: hidden;
     position: relative;
     background: var(--bg-secondary);
+    padding: 0;
+    min-height: 0;
 }
 
 .tl-diff-container {
     height: 100%;
 }
 
-.tl-diff-container .cm-editor {
+.tl-diff-container .cm-mergeView {
     height: 100%;
+}
+
+.tl-diff-container .cm-mergeView .cm-editor {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+.tl-diff-container .cm-mergeView .cm-scroller {
+    overflow-y: auto !important;
 }
 
 .tl-loading-small {

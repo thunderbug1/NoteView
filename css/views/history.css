@@ -95,39 +95,3 @@
     overflow: auto;
 }
 
-/* Timeline Diff Modal */
-.tl-modal-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.tl-modal {
-    width: 90%;
-    max-width: 900px;
-    height: 80vh;
-    background: var(--bg-primary);
-    border-radius: var(--radius-lg);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.tl-modal-header {
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.tl-modal-body {
-    flex: 1;
-    overflow: hidden;
-    background: var(--bg-secondary);
-}
