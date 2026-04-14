@@ -1037,6 +1037,44 @@ const DocumentView = {
     },
 
     /**
+     * Get the set of active task-related context filters that require per-line filtering.
+     * Returns only filters that should hide non-matching task lines (excludes Todo.all).
+     */
+    getActiveTaskFilter() {
+        const context = SelectionManager.selections?.context;
+        if (!context || context.size === 0) return new Set();
+        const taskFilters = ['Todo.open', 'Todo.blocked', 'Todo.unblocked', 'Status.unassigned'];
+        const active = new Set();
+        for (const f of taskFilters) {
+            if (context.has(f)) active.add(f);
+        }
+        return active;
+    },
+
+    /**
+     * Check whether a task line matches any of the active task filters.
+     * Non-task lines (no checkbox) always return true (stay visible).
+     */
+    taskLineMatchesFilter(lineText, activeFilters) {
+        const checkboxMatch = lineText.match(/^\s*[-*+]\s+\[([ xX\/bB\-])\]/);
+        if (!checkboxMatch) return true; // non-task line, always visible
+
+        const state = checkboxMatch[1];
+        const isOpen = state === ' ' || state === '/';
+        const isBlockedState = state === 'b' || state === 'B';
+        const hasDependsOn = lineText.includes('[dependsOn::');
+        const hasAssignee = lineText.includes('[assignee::');
+
+        for (const filter of activeFilters) {
+            if (filter === 'Todo.open' && isOpen) return true;
+            if (filter === 'Todo.blocked' && (isBlockedState || hasDependsOn)) return true;
+            if (filter === 'Todo.unblocked' && isOpen && !hasDependsOn) return true;
+            if (filter === 'Status.unassigned' && !hasAssignee) return true;
+        }
+        return false;
+    },
+
+    /**
      * Build the decoration set from editor state.
      */
     buildDecorations(state, hasFocus) {
@@ -1085,12 +1123,46 @@ const DocumentView = {
             }
         }
 
+        const activeTaskFilters = this.getActiveTaskFilter();
+        let hideBelowIndent = null;
+
         for (let i = 1; i <= state.doc.lines; i++) {
             if (fencedBlockLines.has(i)) {
                 continue;
             }
 
             const line = state.doc.line(i);
+
+            // Per-line task filtering with sub-content hiding
+            if (activeTaskFilters.size > 0) {
+                const indent = line.text.match(/^(\s*)/)[1].length;
+                const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(line.text);
+                const matchesFilter = isTask && this.taskLineMatchesFilter(line.text, activeTaskFilters);
+
+                // Update hide threshold (always, regardless of cursor position)
+                if (isTask && matchesFilter) {
+                    hideBelowIndent = null;
+                } else if (isTask) {
+                    // Non-matching task — set threshold only if not already hiding
+                    // (keep parent's threshold so sibling content stays hidden)
+                    if (hideBelowIndent === null) {
+                        hideBelowIndent = indent;
+                    }
+                } else if (hideBelowIndent !== null && indent <= hideBelowIndent) {
+                    // Non-task at or above threshold — exited hidden scope
+                    hideBelowIndent = null;
+                }
+
+                // Apply hiding (skip lines with cursor)
+                const shouldHide = isTask ? !matchesFilter : (hideBelowIndent !== null && indent > hideBelowIndent);
+                if (shouldHide && !cursorLines.has(i)) {
+                    builder.push(Decoration.line({
+                        attributes: { class: 'md-task-filter-hidden-line' }
+                    }).range(line.from));
+                    continue;
+                }
+            }
+
             const hideSyntax = !cursorLines.has(i);
             this.applyLineDecorations(line, builder, hideSyntax, Decoration, i === state.doc.lines);
         }

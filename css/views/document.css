@@ -281,6 +281,10 @@
     display: none;
 }
 
+.cm-line.md-task-filter-hidden-line {
+    display: none;
+}
+
 .cm-line.md-fenced-block-summary-line {
     padding: 0;
 }
