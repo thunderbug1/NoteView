@@ -29,8 +29,8 @@
 
 .settings-back-btn:hover {
     background: var(--bg-tertiary);
-    color: var(--accent-primary);
-    border-color: var(--accent-primary);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
     transform: translateX(-2px);
 }
 
@@ -97,7 +97,7 @@
 }
 
 .directory-path-display svg {
-    color: var(--accent-primary);
+    color: var(--accent-color);
     opacity: 0.8;
 }
 
@@ -174,7 +174,7 @@
 
 .sync-input:focus {
     outline: none;
-    border-color: var(--accent-primary);
+    border-color: var(--accent-color);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -207,7 +207,7 @@
 .sync-status-indicator.error { background: var(--danger-color, #ef4444); }
 
 .settings-btn.primary {
-    background: var(--accent-primary);
+    background: var(--accent-color);
     color: white;
 }
 
@@ -223,7 +223,7 @@
     padding: 0.5rem 0.75rem;
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     font-size: 0.85rem;
-    color: var(--accent-primary);
+    color: var(--accent-color);
     cursor: pointer;
     min-width: 120px;
     text-align: center;
@@ -233,15 +233,15 @@
 
 .shortcut-key:hover {
     background: var(--bg-primary);
-    border-color: var(--accent-primary);
+    border-color: var(--accent-color);
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
 }
 
 .shortcut-key.recording {
-    background: var(--accent-primary);
+    background: var(--accent-color);
     color: white;
-    border-color: var(--accent-primary);
+    border-color: var(--accent-color);
     animation: pulse 1.5s infinite;
 }
 
@@ -324,7 +324,7 @@
     flex: 1;
     padding: 0.35rem 0.6rem;
     background: var(--bg-primary);
-    border: 1px solid var(--accent-primary);
+    border: 1px solid var(--accent-color);
     border-radius: 6px;
     font-family: inherit;
     font-size: 0.95rem;
@@ -334,9 +334,9 @@
 }
 
 .tag-editor-row .tag-action-btn.save {
-    background: var(--accent-primary);
+    background: var(--accent-color);
     color: white;
-    border-color: var(--accent-primary);
+    border-color: var(--accent-color);
 }
 
 .tag-editor-row .tag-action-btn.save:hover {

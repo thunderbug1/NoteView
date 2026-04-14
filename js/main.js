@@ -764,9 +764,47 @@ const App = {
     },
 
     showNewNoteModal() {
+        const modalBlockId = 'new-modal';
+        let modalTags = SelectionManager.getActiveTags();
+
+        const renderModalTags = () => {
+            const tagsDiv = modal.querySelector('.block-tags');
+            if (!tagsDiv) return;
+            const badgesHtml = modalTags.map(tag => TagModal._renderBadge(tag)).join('');
+            tagsDiv.innerHTML = `${badgesHtml}<button class="add-tag-btn" data-id="${modalBlockId}">+ Tag</button>`;
+            // Re-attach tag listeners
+            modal.querySelectorAll('.add-tag-btn').forEach(btn => {
+                btn.addEventListener('click', () => openTagModal());
+            });
+        };
+
+        const openTagModal = () => {
+            // Inject a temporary block so TagModal reads the correct initial tags
+            const tempId = 'new';
+            const existingIdx = Store.blocks.findIndex(b => b.id === tempId);
+            const tempBlock = { id: tempId, tags: [...modalTags], content: '' };
+            if (existingIdx === -1) {
+                Store.blocks.push(tempBlock);
+            } else {
+                Store.blocks[existingIdx] = tempBlock;
+            }
+            DocumentView.pendingNewTags = [...modalTags];
+            TagModal.show(tempId);
+        };
+
         const content = `
+            <div class="block-metadata">
+                <div class="block-tags">
+                    ${modalTags.map(tag => TagModal._renderBadge(tag)).join('')}
+                    <button class="add-tag-btn" data-id="${modalBlockId}">+ Tag</button>
+                </div>
+                ${DocumentView.isSpeechRecognitionSupported() ? `
+                <button class="mic-btn" data-id="${modalBlockId}" title="Dictate text">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                </button>` : ''}
+            </div>
             <div class="block-editor">
-                <div class="codemirror-container" data-id="new-modal"></div>
+                <div class="codemirror-container" data-id="${modalBlockId}"></div>
                 <div style="display: flex; justify-content: flex-end; margin-top: 15px; gap: 10px;">
                     <button id="cancelNewNoteBtn" class="settings-btn secondary">Cancel</button>
                     <button id="saveNewNoteBtn" class="settings-btn primary">Save Note</button>
@@ -775,41 +813,76 @@ const App = {
         `;
 
         const modal = Modal.create({
-            title: 'New Note',
+            headerContent: '',
             content,
-            modalClass: 'tag-modal content-modal active-recording-preventer'
+            modalClass: 'tag-modal content-modal active-recording-preventer',
+            onClose: () => {
+                DocumentView.stopSpeechRecognition();
+            }
         });
+
+        // Tag add button
+        modal.querySelectorAll('.add-tag-btn').forEach(btn => {
+            btn.addEventListener('click', () => openTagModal());
+        });
+
+        // Watch for pending tag changes from TagModal
+        const checkPendingTags = setInterval(() => {
+            if (DocumentView.pendingNewTags && DocumentView.pendingNewTags.length >= 0) {
+                const pending = DocumentView.pendingNewTags;
+                if (JSON.stringify(pending) !== JSON.stringify(modalTags)) {
+                    modalTags = [...pending];
+                    renderModalTags();
+                }
+            }
+            // Clean up temp block once tag modal is gone
+            Store.blocks = Store.blocks.filter(b => b.id !== 'new');
+        }, 300);
+        // Clean up interval when modal overlay is removed
+        const origClose = modal.close.bind(modal);
+        modal.close = () => {
+            clearInterval(checkPendingTags);
+            // Clean up any temp block
+            Store.blocks = Store.blocks.filter(b => b.id !== 'new');
+            origClose();
+        };
+
+        // Mic button
+        const micBtn = modal.querySelector('.mic-btn');
+        if (micBtn) {
+            micBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                DocumentView.handleMicClick(e);
+            });
+        }
 
         // Initialize CodeMirror for the modal
         const cmContainer = modal.querySelector('.codemirror-container');
-        
+
         DocumentView.waitForCodeMirror().then(() => {
-            DocumentView.createEditor(cmContainer, 'new-modal', '');
+            DocumentView.createEditor(cmContainer, modalBlockId, '');
             setTimeout(() => {
-                const editor = DocumentView.editors.get('new-modal');
+                const editor = DocumentView.editors.get(modalBlockId);
                 if (editor) editor.focus();
             }, 100);
         });
 
         const saveNote = async () => {
-            const editor = DocumentView.editors.get('new-modal');
+            const editor = DocumentView.editors.get(modalBlockId);
             if (editor) {
                 const content = editor.state.doc.toString();
                 if (content.trim()) {
-                    await Store.createBlock(content);
+                    await Store.createBlock(content, { tags: modalTags });
                     modal.close();
-                    if (Store.currentView === 'document') {
-                        this.render(); // Refresh list if in document view (though we usually use the inline one)
-                    } else if (Store.currentView === 'kanban' || Store.currentView === 'timeline') {
-                        this.render(); // Refresh other views to show new note
-                    }
+                    this.render();
                 }
             }
         };
 
         modal.querySelector('#saveNewNoteBtn').addEventListener('click', saveNote);
         modal.querySelector('#cancelNewNoteBtn').addEventListener('click', () => modal.close());
-        
+
         // Handle Ctrl+Enter to save
         cmContainer.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
