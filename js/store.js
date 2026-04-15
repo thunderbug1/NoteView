@@ -377,6 +377,14 @@ const Store = {
         // Try to get previously saved handle
         let savedHandle = await this.getDirectoryHandle();
 
+        // Fallback: try last active vault by name (handles can be lost on mobile)
+        if (!savedHandle) {
+            const lastVaultName = await this.getLastActiveVault();
+            if (lastVaultName) {
+                savedHandle = await this.getVaultHandle(lastVaultName);
+            }
+        }
+
         if (savedHandle) {
             try {
                 // Check if we still have permission

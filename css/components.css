@@ -1038,6 +1038,59 @@
     color: var(--text-muted);
 }
 
+.reopen-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 0.75rem;
+    text-align: center;
+    padding: 2rem;
+}
+
+.reopen-prompt h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+}
+
+.reopen-prompt p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.reopen-btn {
+    margin-top: 0.5rem;
+    padding: 0.7rem 2rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.reopen-btn:hover {
+    opacity: 0.9;
+}
+
+.reopen-other-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0.4rem 0.8rem;
+}
+
+.reopen-other-btn:hover {
+    color: var(--text-primary);
+}
+
 .empty-state {
     text-align: center;
     padding: 4rem 2rem;

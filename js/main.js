@@ -79,9 +79,9 @@ const App = {
                 this.showManageVaultsModal();
             }
         } catch (err) {
-            // If permission needed, show button with the handle
-            if (err.needsPermission) {
-                this.showManageVaultsModal();
+            // If permission needed, show reopen button for the last vault
+            if (err.needsPermission && err.handle) {
+                this.showReopenPrompt(err.handle);
             } else if (err.name === 'NotAllowedError' || err.message?.includes('permission')) {
                 this.showManageVaultsModal();
             } else if (err.name === 'AbortError') {
@@ -92,8 +92,39 @@ const App = {
         }
     },
 
+    async showReopenPrompt(handle) {
+        const container = document.getElementById('viewContainer');
+        if (!container) return;
+        const name = handle.name;
+        container.innerHTML = `
+            <div class="reopen-prompt">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                <h3>${name}</h3>
+                <p>Tap to reopen your vault</p>
+                <button class="reopen-btn">Open</button>
+                <button class="reopen-other-btn">Choose another vault</button>
+            </div>
+        `;
+        container.querySelector('.reopen-btn').addEventListener('click', async () => {
+            container.innerHTML = '<div class="loading">Loading notes...</div>';
+            try {
+                await Store.switchToVault(handle);
+                await this.completeInitialization();
+            } catch (e) {
+                this.showManageVaultsModal();
+            }
+        });
+        container.querySelector('.reopen-other-btn').addEventListener('click', () => {
+            this.showManageVaultsModal();
+        });
+    },
+
     showPermissionButton(handle = null) {
-        this.showManageVaultsModal();
+        if (handle) {
+            this.showReopenPrompt(handle);
+        } else {
+            this.showManageVaultsModal();
+        }
     },
 
     async completeInitialization() {
