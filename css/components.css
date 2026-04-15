@@ -613,6 +613,7 @@
 /* Inline rename input on selected pill */
 .tag-pill .badge {
     cursor: pointer;
+    pointer-events: auto;
 }
 
 .pill-rename-input {

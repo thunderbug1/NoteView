@@ -186,6 +186,9 @@ const TagModal = {
             modal.close();
         };
 
+        // Attach handlers to initially rendered selected pills
+        updateSelectedBar();
+
         // --- Item click + double-click rename ---
 
         modal.querySelectorAll('.tag-modal-item').forEach(item => {
