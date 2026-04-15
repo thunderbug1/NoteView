@@ -270,7 +270,9 @@ const KanbanView = {
             if (dragState.inProgress) return;
             if (e.target.closest('.kanban-badge')) return;
             if (e.target.closest('.kanban-action-btn')) return;
-            App.showBlockContentModal(card.dataset.blockId);
+            App.showBlockContentModal(card.dataset.blockId, {
+                matchIndex: card.dataset.matchIndex ? parseInt(card.dataset.matchIndex, 10) : null
+            });
         });
 
         // Badge clicks — allow editing/removing existing badges

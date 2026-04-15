@@ -695,7 +695,7 @@ const App = {
         this.render();
     },
 
-    async showBlockContentModal(blockId) {
+    async showBlockContentModal(blockId, options = {}) {
         const block = Store.blocks.find(b => b.id === blockId);
         if (!block) return;
 
@@ -729,6 +729,15 @@ const App = {
         // We need to wait for CodeMirror to be ready
         await DocumentView.waitForCodeMirror();
         DocumentView.createEditor(cmContainer, blockId, initialContent);
+
+        // Scroll to and highlight the task line if matchIndex was provided.
+        // Delay to let the modal layout settle and CodeMirror render lines.
+        if (options.matchIndex != null) {
+            const view = DocumentView.editors.get(blockId);
+            if (view) {
+                setTimeout(() => DocumentView.highlightAndScrollTo(blockId, view, options.matchIndex), 100);
+            }
+        }
 
         // Attach metadata event listeners (tags, history button)
         this.attachModalMetadataListeners(modal, block);

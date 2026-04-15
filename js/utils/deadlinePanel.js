@@ -15,8 +15,15 @@ const DeadlinePanel = {
                 const item = e.target.closest('.deadline-item');
                 if (item) {
                     const blockId = item.dataset.blockId;
+                    const matchIndex = item.dataset.matchIndex ? parseInt(item.dataset.matchIndex, 10) : null;
                     if (blockId && typeof App !== 'undefined') {
-                        App.editBlock(blockId);
+                        const editor = DocumentView.editors.get(blockId);
+                        if (editor) {
+                            DocumentView.highlightAndScrollTo(blockId, editor, matchIndex);
+                            editor.focus();
+                        } else {
+                            App.showBlockContentModal(blockId, { matchIndex });
+                        }
                     }
                 }
             };
@@ -63,7 +70,7 @@ const DeadlinePanel = {
 
     renderDeadlineItem(task, urgency) {
         const dateLabel = TaskParser.getDueDateString(task);
-        return `<div class="deadline-item" data-block-id="${task.blockId}" data-task-id="${task.id}">
+        return `<div class="deadline-item" data-block-id="${task.blockId}" data-task-id="${task.id}" data-match-index="${task.matchIndex}">
             <span class="deadline-item-indicator deadline-indicator-${urgency}"></span>
             <div class="deadline-item-content">
                 <span class="deadline-item-text">${escapeHtml(task.text)}</span>

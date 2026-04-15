@@ -162,6 +162,13 @@
     display: none;
 }
 
+/* Task line highlight when navigating from kanban or deadline panel */
+.codemirror-container .cm-line.cm-task-highlight {
+    background: var(--accent-light) !important;
+    box-shadow: inset 3px 0 0 var(--accent) !important;
+    border-radius: 0 4px 4px 0 !important;
+}
+
 /* Markdown Preview Styles */
 .block-preview {
     padding: 0.75rem 1rem 1rem;

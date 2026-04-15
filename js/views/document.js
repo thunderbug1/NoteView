@@ -7,6 +7,8 @@
 const DocumentView = {
     // Track CodeMirror editor instances by block ID
     editors: new Map(),
+    // Track highlight positions by block ID (set before dispatching to trigger decoration)
+    _highlightPositions: new Map(),
     newBlockContent: '',
     pendingNewTags: null,
     saveTimeouts: new Map(), // blockId -> timeoutId
@@ -1405,13 +1407,93 @@ const DocumentView = {
                 this.getEditorTheme(),
                 this.createUpdateListener(container, blockId, handleContentChange),
                 this.createDomEventHandlers(container),
-                this.createNewBlockKeymap(container, createNewBlock)
+                this.createNewBlockKeymap(container, createNewBlock),
+                this.createHighlightExtension(blockId)
             ],
             parent: container
         });
 
         this.editors.set(blockId, view);
         this.originalContents.set(blockId, initialContent);
+    },
+
+    /**
+     * Create a CM6 extension that manages task-highlight line decorations.
+     * blockId is captured in the closure so the field knows which position to look up.
+     */
+    createHighlightExtension(blockId) {
+        const { StateField, Decoration, EditorView } = window.CodeMirror;
+        const self = this;
+
+        const field = StateField.define({
+            create() { return Decoration.none; },
+            update(deco, tr) {
+                const pos = self._highlightPositions.get(blockId);
+                if (pos == null) return Decoration.none;
+                const p = Math.min(pos, tr.state.doc.length);
+                const line = tr.state.doc.lineAt(p);
+                const d = Decoration.line({ attributes: { class: 'cm-task-highlight' } });
+                return Decoration.set([d.range(line.from)]);
+            },
+            provide: f => EditorView.decorations.from(f)
+        });
+
+        return field;
+    },
+
+    /**
+     * Scroll a CodeMirror editor to a task line and apply a persistent highlight.
+     * @param {string} blockId - Block ID (key into _highlightPositions)
+     * @param {EditorView} view - CodeMirror EditorView instance
+     * @param {number} matchIndex - Character offset of the task in the document
+     */
+    highlightAndScrollTo(blockId, view, matchIndex) {
+        if (matchIndex == null) return;
+        const pos = Math.min(matchIndex, view.state.doc.length);
+        this._highlightPositions.set(blockId, pos);
+
+        const line = view.state.doc.lineAt(pos);
+        const scroller = view.scrollDOM;
+
+        console.log('[scroll] line:', line.number, '/', view.state.doc.lines, 'matchIndex:', matchIndex, 'pos:', pos);
+
+        // Dispatch to trigger StateField update (highlight decoration)
+        view.dispatch({
+            selection: { anchor: line.from },
+            scrollIntoView: true
+        });
+
+        console.log('[scroll] after dispatch scrollHeight:', scroller.scrollHeight, 'clientHeight:', scroller.clientHeight, 'scrollTop:', scroller.scrollTop);
+
+        // Refine scroll position using actual coordinates
+        const refineScroll = (label) => {
+            const coords = view.coordsAtPos(line.from);
+            console.log('[scroll] refine', label, 'coords:', coords);
+            if (coords) {
+                const editorRect = scroller.getBoundingClientRect();
+                const lineY = coords.top - editorRect.top + scroller.scrollTop;
+                console.log('[scroll] centering to:', Math.max(0, lineY - scroller.clientHeight / 2));
+                scroller.scrollTop = Math.max(0, lineY - scroller.clientHeight / 2);
+                return true;
+            }
+            return false;
+        };
+
+        if (refineScroll('immediate')) return;
+
+        // scrollIntoView didn't reach the line — estimate proportionally using total scroll height
+        const totalLines = view.state.doc.lines;
+        if (totalLines > 1 && scroller.scrollHeight > scroller.clientHeight) {
+            const ratio = (line.number - 1) / (totalLines - 1);
+            const estimated = ratio * scroller.scrollHeight - scroller.clientHeight / 2;
+            console.log('[scroll] estimating: ratio:', ratio, 'scrollHeight:', scroller.scrollHeight, 'target:', Math.max(0, estimated));
+            scroller.scrollTop = Math.max(0, estimated);
+        }
+
+        // After CM renders at the estimated position, refine with actual coords
+        setTimeout(() => {
+            if (!refineScroll('50ms')) setTimeout(() => refineScroll('150ms'), 100);
+        }, 50);
     },
 
     // Apply decorations per line. If hideSyntax is true, we replace the markdown markers.
