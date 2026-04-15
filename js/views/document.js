@@ -114,6 +114,18 @@ const DocumentView = {
         container.addEventListener('click', this._micHandler);
 
         this.attachEventListeners();
+
+        // On mobile, disable scrolling when content fits to prevent elastic bouncing
+        requestAnimationFrame(() => this.adjustScrollability());
+    },
+
+    adjustScrollability() {
+        const container = document.getElementById('viewContainer');
+        if (window.innerWidth > 768) {
+            container.style.overflowY = '';
+            return;
+        }
+        container.style.overflowY = container.scrollHeight <= container.clientHeight ? 'hidden' : '';
     },
 
     handleSplitMarkerClick(e) {
