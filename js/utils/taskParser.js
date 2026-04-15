@@ -231,28 +231,21 @@ function isUnblockedTask(task) {
 }
 
 /**
- * Check whether a task has no assignee
+ * Check whether a task has no direct assignee (ignores inherited assignees from parent tasks)
  * @param {Object} task - Parsed task object
- * @param {Object} options - Matching options
- * @param {boolean} options.onlyActive - Ignore done/canceled tasks when true
- * @returns {boolean} True when task has no assignee
+ * @returns {boolean} True when task has no assignee badge
  */
-function isUnassignedTask(task, { onlyActive = false } = {}) {
-    if (onlyActive && isClosedTask(task)) {
-        return false;
-    }
-    return getAssignmentContacts(task).size === 0;
+function isUnassignedTask(task) {
+    return !task?.badges?.some(b => b.type === 'assignee' && b.value);
 }
 
 /**
  * Check whether a task collection contains unassigned tasks
  * @param {Array} tasks - Parsed task objects
- * @param {Object} options - Matching options
- * @param {boolean} options.onlyActive - Ignore done/canceled tasks when true
  * @returns {boolean} True when any matching task is unassigned
  */
-function hasUnassignedTasks(tasks, { onlyActive = false } = {}) {
-    return tasks.some(task => isUnassignedTask(task, { onlyActive }));
+function hasUnassignedTasks(tasks) {
+    return tasks.some(task => isUnassignedTask(task));
 }
 
 /**

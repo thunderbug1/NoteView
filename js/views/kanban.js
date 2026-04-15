@@ -57,14 +57,34 @@ const KanbanView = {
         const container = document.getElementById('viewContainer');
         container.className = 'kanban-view';
 
-        const tasks = this.extractTasks(blocks);
-        const hierarchy = this.buildTaskHierarchy(tasks);
+        // Parse all tasks and build full hierarchy BEFORE filtering,
+        // so parent-child relationships stay correct when parents are filtered out.
+        const allTasks = TaskParser.parseTasksFromBlocks(blocks);
+        const fullHierarchy = this.buildTaskHierarchy(allTasks);
+        const allTasksById = new Map(allTasks.map(t => [t.id, t]));
+
+        // Apply sidebar filters
+        const tasks = this.applyTaskFilters(allTasks);
 
         let html = '';
         this.columns.forEach(col => {
             const colTasks = tasks.filter(t => t.state === col.state);
+            const colTaskIds = new Set(colTasks.map(t => t.id));
             const tasksById = new Map(colTasks.map(t => [t.id, t]));
-            const colHtml = this.renderColumnTasks(colTasks, hierarchy, tasksById);
+
+            // Detect orphaned tasks: parent exists in same column but was filtered out
+            const orphanedIds = new Set();
+            for (const task of colTasks) {
+                const entry = fullHierarchy.get(task.id);
+                if (entry?.parentId) {
+                    const parentTask = allTasksById.get(entry.parentId);
+                    if (parentTask && parentTask.state === col.state && !colTaskIds.has(entry.parentId)) {
+                        orphanedIds.add(task.id);
+                    }
+                }
+            }
+
+            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds);
 
             html += `
                 <div class="kanban-column" data-column-id="${col.id}">
@@ -78,6 +98,37 @@ const KanbanView = {
 
         container.innerHTML = `<div class="kanban-board">${html}</div>`;
         this.attachEventListeners(container);
+    },
+
+    /**
+     * Apply sidebar filters to a parsed task list.
+     */
+    applyTaskFilters(tasks) {
+        const contextSelection = SelectionManager.selections?.context;
+        const contactSelection = SelectionManager.selections?.contact;
+
+        if ((!contextSelection || contextSelection.size === 0) && !contactSelection) {
+            return tasks;
+        }
+
+        return tasks.filter(task => {
+            if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
+                return false;
+            }
+            if (contextSelection.has('Todo.open') && !TaskParser.isOpenTask(task)) {
+                return false;
+            }
+            if (contextSelection.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
+                return false;
+            }
+            if (contextSelection.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
+                return false;
+            }
+            if (contextSelection.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
+                return false;
+            }
+            return true;
+        });
     },
 
     extractTasks(blocks) {
@@ -102,16 +153,17 @@ const KanbanView = {
             if (contextSelection.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('Status.unassigned') && !TaskParser.isUnassignedTask(task, { onlyActive: true })) {
+            if (contextSelection.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
                 return false;
             }
             return true;
         });
     },
 
-    renderTaskCard(task, depth = 0) {
+    renderTaskCard(task, depth = 0, isOrphaned = false) {
         const column = this.getColumnByState(task.state);
         const nestedClass = depth > 0 ? ' kanban-card--nested' : '';
+        const orphanedClass = isOrphaned ? ' kanban-card--orphaned' : '';
         const nestedStyle = depth > 0 ? ` style="margin-left: ${depth * 1.25}rem;"` : '';
         const urgency = TaskParser.getDeadlineUrgency(task);
         const urgencyClass = urgency ? ` deadline-${urgency}` : '';
@@ -134,7 +186,7 @@ const KanbanView = {
         actionBtns += `<button class="kanban-action-btn" data-action="copy" title="Copy task text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>`;
 
         return `
-            <div class="block kanban-card${nestedClass}${urgencyClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
+            <div class="block kanban-card${nestedClass}${orphanedClass}${urgencyClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
                 <div class="kanban-card-content">
                     <p class="kanban-task-text">${escapeHtml(task.text)}</p>
                     <div class="kanban-action-btns">${actionBtns}</div>
@@ -154,9 +206,7 @@ const KanbanView = {
      * Only root tasks (those without a parent in this column) are sorted;
      * children maintain document order under their parent.
      */
-    renderColumnTasks(colTasks, hierarchy, tasksById) {
-        const colTaskIds = new Set(colTasks.map(t => t.id));
-
+    renderColumnTasks(colTasks, hierarchy, tasksById, colTaskIds, orphanedIds = new Set()) {
         // Roots: parentId is null OR parent not in this column
         const rootTasks = colTasks.filter(t => {
             const entry = hierarchy.get(t.id);
@@ -166,7 +216,7 @@ const KanbanView = {
         const sortedRoots = SortManager.sortItems('kanban', rootTasks);
         let html = '';
         for (const root of sortedRoots) {
-            html += this.renderTaskWithChildren(root, hierarchy, tasksById, colTaskIds, 0);
+            html += this.renderTaskWithChildren(root, hierarchy, tasksById, colTaskIds, 0, orphanedIds);
         }
         return html;
     },
@@ -174,14 +224,15 @@ const KanbanView = {
     /**
      * Recursively render a task card and its children that are in the same column.
      */
-    renderTaskWithChildren(task, hierarchy, tasksById, colTaskIds, depth) {
-        let html = this.renderTaskCard(task, depth);
+    renderTaskWithChildren(task, hierarchy, tasksById, colTaskIds, depth, orphanedIds = new Set()) {
+        const isOrphaned = orphanedIds.has(task.id);
+        let html = this.renderTaskCard(task, depth, isOrphaned);
         const entry = hierarchy.get(task.id);
         for (const childId of entry.children) {
             if (colTaskIds.has(childId)) {
                 const childTask = tasksById.get(childId);
                 if (childTask) {
-                    html += this.renderTaskWithChildren(childTask, hierarchy, tasksById, colTaskIds, depth + 1);
+                    html += this.renderTaskWithChildren(childTask, hierarchy, tasksById, colTaskIds, depth + 1, orphanedIds);
                 }
             }
         }

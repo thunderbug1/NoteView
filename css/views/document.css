@@ -277,14 +277,6 @@
     background: color-mix(in srgb, var(--bg-secondary) 84%, transparent);
 }
 
-.cm-line.md-fenced-block-hidden-line {
-    display: none;
-}
-
-.cm-line.md-task-filter-hidden-line {
-    display: none;
-}
-
 .cm-line.md-fenced-block-summary-line {
     padding: 0;
 }

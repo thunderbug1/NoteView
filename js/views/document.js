@@ -1236,7 +1236,7 @@ const DocumentView = {
         const hidden = new Set();
         if (!activeTaskFilters || activeTaskFilters.size === 0) return hidden;
 
-        // Phase 1: Pre-compute line metadata
+        // Pre-compute line metadata
         const lineInfo = lineTexts.map(text => {
             const indent = text.match(/^(\s*)/)[1].length;
             const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
@@ -1244,22 +1244,7 @@ const DocumentView = {
             return { indent, isTask, matchesFilter };
         });
 
-        // Phase 2: For each non-matching task, check if any descendants match
-        const hasMatchingDescendant = new Set();
-        for (let i = 0; i < lineInfo.length; i++) {
-            const info = lineInfo[i];
-            if (info.isTask && !info.matchesFilter) {
-                for (let j = i + 1; j < lineInfo.length; j++) {
-                    if (lineInfo[j].indent <= info.indent) break;
-                    if (lineInfo[j].isTask && lineInfo[j].matchesFilter) {
-                        hasMatchingDescendant.add(i);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Phase 3: Build hidden set
+        // Build hidden set
         let hideBelowIndent = null;
 
         for (let i = 0; i < lineInfo.length; i++) {
@@ -1267,7 +1252,7 @@ const DocumentView = {
 
             if (isTask && matchesFilter) {
                 hideBelowIndent = null;
-            } else if (isTask && !hasMatchingDescendant.has(i)) {
+            } else if (isTask) {
                 if (hideBelowIndent === null) {
                     hideBelowIndent = indent;
                 }
@@ -1276,7 +1261,7 @@ const DocumentView = {
             }
 
             const shouldHide = isTask
-                ? !matchesFilter && !hasMatchingDescendant.has(i)
+                ? !matchesFilter
                 : (hideBelowIndent !== null && indent > hideBelowIndent);
 
             if (shouldHide) hidden.add(i);
@@ -1331,13 +1316,15 @@ const DocumentView = {
                     }
                 }).range(startLine.from));
 
-                for (let lineNumber = startLine.number + 1; lineNumber <= endLine.number; lineNumber += 1) {
-                    const blockLine = state.doc.line(lineNumber);
-                    builder.push(Decoration.line({
-                        attributes: {
-                            class: 'md-fenced-block-hidden-line'
-                        }
-                    }).range(blockLine.from));
+                // Replace interior lines (including closing ```) with nothing.
+                // Decoration.replace() updates CM's height map so the gutter
+                // collapses in sync with the content.
+                if (endLine.number > startLine.number) {
+                    const interiorFrom = state.doc.line(startLine.number + 1).from;
+                    const interiorTo = endLine.number < state.doc.lines
+                        ? state.doc.line(endLine.number + 1).from
+                        : endLine.to;
+                    builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
                 }
             } else if (!selectionInsideBlock) {
                 builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
@@ -1351,6 +1338,27 @@ const DocumentView = {
         for (let i = 1; i <= state.doc.lines; i++) allLineTexts.push(state.doc.line(i).text);
         const hiddenLines = this.getHiddenTaskLineIndices(allLineTexts, activeTaskFilters);
 
+        // Detect orphaned tasks: visible tasks whose parent task was hidden
+        const orphanedLines = new Set();
+        const taskAncestors = []; // stack of { indent, hidden }
+        for (let i = 0; i < allLineTexts.length; i++) {
+            const text = allLineTexts[i];
+            const indent = text.match(/^(\s*)/)[1].length;
+            const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
+
+            if (isTask) {
+                while (taskAncestors.length > 0 && taskAncestors[taskAncestors.length - 1].indent >= indent) {
+                    taskAncestors.pop();
+                }
+
+                if (!hiddenLines.has(i) && taskAncestors.length > 0 && taskAncestors[taskAncestors.length - 1].hidden) {
+                    orphanedLines.add(i);
+                }
+
+                taskAncestors.push({ indent, hidden: hiddenLines.has(i) });
+            }
+        }
+
         for (let i = 1; i <= state.doc.lines; i++) {
             if (fencedBlockLines.has(i)) {
                 continue;
@@ -1360,10 +1368,19 @@ const DocumentView = {
 
             // Per-line task filtering (skip lines with cursor)
             if (hiddenLines.has(i - 1) && !cursorLines.has(i)) {
-                builder.push(Decoration.line({
-                    attributes: { class: 'md-task-filter-hidden-line' }
-                }).range(line.from));
+                // Hide line content without crossing line breaks (CM6 plugin restriction).
+                // Replace only the text, then collapse the line via a line decoration.
+                const contentEnd = line.from + line.text.length;
+                if (contentEnd > line.from) {
+                    builder.push(Decoration.replace({}).range(line.from, contentEnd));
+                }
+                builder.push(Decoration.line({ attributes: { class: 'cm-hidden-task-line' } }).range(line.from));
                 continue;
+            }
+
+            // Mark orphaned tasks whose parent was filtered out
+            if (orphanedLines.has(i - 1)) {
+                builder.push(Decoration.line({ attributes: { class: 'cm-orphaned-task-line' } }).range(line.from));
             }
 
             const hideSyntax = !cursorLines.has(i);

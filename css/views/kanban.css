@@ -119,6 +119,12 @@
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
+/* Orphaned tasks — parent was filtered out */
+.kanban-card--orphaned {
+    border-left: 2px dashed var(--border-light);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
 .kanban-card--nested .kanban-task-text {
     font-size: 0.8rem;
 }
