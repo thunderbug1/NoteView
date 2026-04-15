@@ -1236,17 +1236,38 @@ const DocumentView = {
         const hidden = new Set();
         if (!activeTaskFilters || activeTaskFilters.size === 0) return hidden;
 
-        let hideBelowIndent = null;
-
-        for (let i = 0; i < lineTexts.length; i++) {
-            const text = lineTexts[i];
+        // Phase 1: Pre-compute line metadata
+        const lineInfo = lineTexts.map(text => {
             const indent = text.match(/^(\s*)/)[1].length;
             const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
             const matchesFilter = isTask && this.taskLineMatchesFilter(text, activeTaskFilters);
+            return { indent, isTask, matchesFilter };
+        });
+
+        // Phase 2: For each non-matching task, check if any descendants match
+        const hasMatchingDescendant = new Set();
+        for (let i = 0; i < lineInfo.length; i++) {
+            const info = lineInfo[i];
+            if (info.isTask && !info.matchesFilter) {
+                for (let j = i + 1; j < lineInfo.length; j++) {
+                    if (lineInfo[j].indent <= info.indent) break;
+                    if (lineInfo[j].isTask && lineInfo[j].matchesFilter) {
+                        hasMatchingDescendant.add(i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Phase 3: Build hidden set
+        let hideBelowIndent = null;
+
+        for (let i = 0; i < lineInfo.length; i++) {
+            const { indent, isTask, matchesFilter } = lineInfo[i];
 
             if (isTask && matchesFilter) {
                 hideBelowIndent = null;
-            } else if (isTask) {
+            } else if (isTask && !hasMatchingDescendant.has(i)) {
                 if (hideBelowIndent === null) {
                     hideBelowIndent = indent;
                 }
@@ -1255,7 +1276,7 @@ const DocumentView = {
             }
 
             const shouldHide = isTask
-                ? !matchesFilter
+                ? !matchesFilter && !hasMatchingDescendant.has(i)
                 : (hideBelowIndent !== null && indent > hideBelowIndent);
 
             if (shouldHide) hidden.add(i);
