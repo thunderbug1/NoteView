@@ -130,6 +130,8 @@ const KanbanView = {
         if (!hasPriority) {
             actionBtns += `<button class="kanban-action-btn" data-action="priority" title="Add priority"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg></button>`;
         }
+        // Copy button — always shown
+        actionBtns += `<button class="kanban-action-btn" data-action="copy" title="Copy task text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>`;
 
         return `
             <div class="block kanban-card${nestedClass}${urgencyClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
@@ -261,6 +263,19 @@ const KanbanView = {
 
                 if (action === 'priority') {
                     KanbanView.showPriorityMenu(btn, card);
+                }
+
+                if (action === 'copy') {
+                    const taskText = card.querySelector('.kanban-task-text')?.textContent || '';
+                    navigator.clipboard.writeText(taskText).then(() => {
+                        const origSvg = btn.innerHTML;
+                        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                        btn.style.color = 'var(--success, #22c55e)';
+                        setTimeout(() => {
+                            btn.innerHTML = origSvg;
+                            btn.style.color = '';
+                        }, 1500);
+                    });
                 }
             });
         });

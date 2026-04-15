@@ -566,6 +566,58 @@
     padding-bottom: 0.5rem;
 }
 
+/* Copy Button */
+.copy-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
+}
+
+.document-view .block:hover .copy-btn,
+.document-view .block:focus-within .copy-btn {
+    opacity: 0.5;
+}
+
+.copy-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+.copy-btn .copied-icon {
+    display: none;
+}
+
+.copy-btn.copied .copy-icon {
+    display: none;
+}
+
+.copy-btn.copied .copied-icon {
+    display: inline;
+}
+
+.copy-btn.copied {
+    opacity: 1 !important;
+    color: var(--success, #22c55e);
+}
+
+/* Content modal copy button is always visible */
+.content-modal .copy-btn {
+    opacity: 0.6;
+}
+
 /* Microphone / Speech-to-Text Button */
 .mic-btn {
     background: transparent;

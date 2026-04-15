@@ -255,6 +255,14 @@ const DocumentView = {
             `);
         }
 
+        // Copy button
+        parts.push(`
+            <button class="copy-btn" data-id="${block.id}" title="Copy note text">
+                <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <svg class="copied-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </button>
+        `);
+
         // Delete button (always shown, far right)
         parts.push(`
             <button class="delete-btn" data-id="${block.id}" title="Delete note">
@@ -290,6 +298,20 @@ const DocumentView = {
                 if (blockId && blockId !== 'new') {
                     HistoryView.openHistory(blockId);
                 }
+            });
+        });
+
+        // Copy buttons
+        container.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const blockId = e.currentTarget.dataset.id;
+                if (!blockId) return;
+                const editor = this.editors.get(blockId);
+                const content = editor ? editor.state.doc.toString() : (Store.blocks.find(b => b.id === blockId)?.content || '');
+                navigator.clipboard.writeText(content).then(() => {
+                    btn.classList.add('copied');
+                    setTimeout(() => btn.classList.remove('copied'), 1500);
+                });
             });
         });
 
