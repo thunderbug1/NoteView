@@ -130,8 +130,8 @@
 
 /* Content Modal (used for editing block content) */
 .tag-modal.content-modal {
-    width: 800px;
-    height: 600px;
+    width: min(960px, calc(100vw - 2rem));
+    height: min(680px, calc(100vh - 4rem));
     max-height: 85vh;
 }
 
