@@ -40,6 +40,29 @@
     align-items: center;
 }
 
+.history-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.close-history-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s ease;
+}
+
+.close-history-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
 .history-timeline {
     flex: 1;
     overflow-y: auto;
@@ -64,6 +87,26 @@
 .commit-msg {
     font-size: 0.9rem;
     font-weight: 500;
+}
+
+.commit-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+}
+
+.commit-oid {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.no-history {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem 1rem;
+    font-size: 0.9rem;
 }
 
 .history-main {
