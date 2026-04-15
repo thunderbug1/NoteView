@@ -37,11 +37,14 @@ const Store = {
         const contextSelection = window.SelectionManager?.selections?.context
             ? Array.from(window.SelectionManager.selections.context).sort().join(',')
             : '';
+        const excludedSelection = window.SelectionManager?.selections?.excluded
+            ? Array.from(window.SelectionManager.selections.excluded).sort().join(',')
+            : '';
         const contactSelection = window.SelectionManager?.selections?.contact || '';
         const searchQuery = Store.searchQuery || '';
         const timeProperty = Store.timeProperty || 'lastUpdated';
         const blocksHash = Store.blocks?.map(b => b.id).join(',') || '';
-        return `${timeSelection}|${contextSelection}|${contactSelection}|${searchQuery}|${timeProperty}|${blocksHash}`;
+        return `${timeSelection}|${contextSelection}|${excludedSelection}|${contactSelection}|${searchQuery}|${timeProperty}|${blocksHash}`;
     }),
 
     // IndexedDB for persistence
@@ -921,6 +924,38 @@ const Store = {
                 if (contextSelection.has('Status.unassigned')) {
                     const hasUnassigned = TaskParser.hasUnassignedTasks(getTasks());
                     if (!hasUnassigned) return false;
+                }
+            }
+
+            // Excluded tags: block must NOT have any excluded tag
+            const excludedSelection = SelectionManager.selections.excluded;
+            if (excludedSelection.size > 0) {
+                const blockTags = block.tags || [];
+
+                for (const item of excludedSelection) {
+                    if (SelectionManager.isComputedContextTag(item)) {
+                        if (item === 'Todo.all') {
+                            if (block.content?.match(/\[[ xX\/bB\-]\]/)) return false;
+                        } else if (item === 'Todo.open') {
+                            if (block.content?.match(/\[[ \/]\]/)) return false;
+                        } else if (item === 'Todo.blocked') {
+                            if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isBlockedTask(t))) return false;
+                        } else if (item === 'Todo.unblocked') {
+                            if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isUnblockedTask(t))) return false;
+                        } else if (item === 'Status.untagged') {
+                            if (!block.tags || block.tags.length === 0) return false;
+                        } else if (item === 'Status.unassigned') {
+                            if (TaskParser.hasUnassignedTasks(TaskParser.parseTasksFromBlock(block))) return false;
+                        }
+                    } else if (item.startsWith('path:')) {
+                        const group = item.slice(5);
+                        if (blockTags.some(tag => {
+                            const { segments } = Common.parseHierarchicalTag(tag);
+                            return segments.length > 0 && segments[0] === group;
+                        })) return false;
+                    } else {
+                        if (blockTags.includes(item)) return false;
+                    }
                 }
             }
 

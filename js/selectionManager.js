@@ -10,8 +10,11 @@ const SelectionManager = {
     selections: {
         time: '',
         context: new Set(),
+        excluded: new Set(),
         contact: ''
     },
+
+    LONG_PRESS_MS: 400,
 
     computedContextTags: ['Todo.all', 'Todo.open', 'Todo.blocked', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
 
@@ -53,8 +56,14 @@ const SelectionManager = {
             context = context.map(tag => tagMigration[tag] || tag);
 
             this.selections.context = new Set(context.filter(tag => typeof tag === 'string' && tag.trim() !== ''));
+
+            let excluded = Array.isArray(parsed?.excluded) ? parsed.excluded : [];
+            excluded = excluded.map(tag => tagMigration[tag] || tag);
+            this.selections.excluded = new Set(excluded.filter(tag => typeof tag === 'string' && tag.trim() !== ''));
+
             console.log('[SelectionManager] loadSelectionState:parsed', {
-                context: Array.from(this.selections.context)
+                context: Array.from(this.selections.context),
+                excluded: Array.from(this.selections.excluded)
             });
         } catch (error) {
             console.warn('Could not load selection state:', error);
@@ -65,7 +74,8 @@ const SelectionManager = {
     saveSelectionState() {
         try {
             const payload = JSON.stringify({
-                context: Array.from(this.selections.context)
+                context: Array.from(this.selections.context),
+                excluded: Array.from(this.selections.excluded)
             });
             localStorage.setItem(this.STORAGE_KEY, payload);
             console.log('[SelectionManager] saveSelectionState', payload);
@@ -79,10 +89,14 @@ const SelectionManager = {
         this.selections.context = new Set(
             Array.from(this.selections.context).filter(tag => typeof tag === 'string' && tag.trim() !== '')
         );
+        this.selections.excluded = new Set(
+            Array.from(this.selections.excluded).filter(tag => typeof tag === 'string' && tag.trim() !== '')
+        );
 
         console.log('[SelectionManager] normalizeContextSelection', {
             before,
-            after: Array.from(this.selections.context)
+            after: Array.from(this.selections.context),
+            excluded: Array.from(this.selections.excluded)
         });
 
         this.saveSelectionState();
@@ -137,6 +151,7 @@ const SelectionManager = {
             this.selections.context.delete('Status.untagged');
         }
         this.selections.context.add(tag);
+        this.selections.excluded.delete(tag);
         this.saveSelectionState();
         this.updateSelectionUI();
         console.log('[SelectionManager] addContextTag:after', {
@@ -177,6 +192,40 @@ const SelectionManager = {
     },
 
     /**
+     * Add a tag to the excluded set (mutual exclusion with context)
+     * @param {string} tag - Tag to exclude
+     */
+    addExcludedTag(tag) {
+        this.selections.context.delete(tag);
+        this.selections.excluded.add(tag);
+        this.saveSelectionState();
+        this.updateSelectionUI();
+    },
+
+    /**
+     * Remove a tag from the excluded set
+     * @param {string} tag - Tag to un-exclude
+     */
+    removeExcludedTag(tag) {
+        this.selections.excluded.delete(tag);
+        this.saveSelectionState();
+        this.updateSelectionUI();
+    },
+
+    /**
+     * Toggle a tag's excluded state
+     * @param {string} tag - Tag to toggle
+     * @param {boolean} wasExcluded - Whether the tag was previously excluded
+     */
+    toggleExcludedTag(tag, wasExcluded) {
+        if (wasExcluded) {
+            this.removeExcludedTag(tag);
+        } else {
+            this.addExcludedTag(tag);
+        }
+    },
+
+    /**
      * Get all context tags
      * @returns {Array} Array of context tags
      */
@@ -189,6 +238,7 @@ const SelectionManager = {
      */
     clearContextTags() {
         this.selections.context.clear();
+        this.selections.excluded.clear();
         this.saveSelectionState();
         this.updateSelectionUI();
     },
@@ -352,15 +402,17 @@ const SelectionManager = {
 
             groupTags.forEach(tag => {
                 const directlySelected = this.selections.context.has(tag);
+                const isExcluded = this.selections.excluded.has(tag);
                 const coveredByGroup = !isComputedSection && !directlySelected && groupSelected;
                 const isSelected = isComputedSection
                     ? this.selections.context.has(tag)
                     : (directlySelected || coveredByGroup);
                 const selClass = isSelected ? 'selected' : '';
+                const exclClass = isExcluded ? 'excluded' : '';
                 const groupMatchClass = coveredByGroup ? 'group-match' : '';
                 const computedClass = isComputedSection ? 'computed' : '';
 
-                html += `<div class="tag-radio-option ${selClass} ${groupMatchClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
+                html += `<div class="tag-radio-option ${selClass} ${exclClass} ${groupMatchClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
                 html += `<span class="tag-badge">${this.getTagDisplayName(tag)}</span>`;
                 html += `</div>`;
             });
@@ -371,30 +423,83 @@ const SelectionManager = {
         // Render flat tags
         flat.forEach(tag => {
             const isSelected = this.selections.context.has(tag);
+            const isExcluded = this.selections.excluded.has(tag);
             const selClass = isSelected ? 'selected' : '';
+            const exclClass = isExcluded ? 'excluded' : '';
             const computedClass = isComputedSection ? 'computed' : '';
 
-            html += `<div class="tag-radio-option ${selClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
+            html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
             html += `<span class="tag-badge">${this.getTagDisplayName(tag)}</span>`;
             html += `</div>`;
         });
 
         container.innerHTML = html;
 
-        // Attach tag click handlers
+        // Attach tag click/long-press/shift-click handlers
         container.querySelectorAll('.tag-radio-option').forEach(option => {
+            let pressTimer = null;
+            let longPressed = false;
+
+            // Suppress browser context menu on tag badges
+            option.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            option.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0) return; // Only primary button
+                if (e.shiftKey) return; // Let shift+click handle via click handler
+                longPressed = false;
+                pressTimer = setTimeout(() => {
+                    longPressed = true;
+                    const tag = option.dataset.tag;
+                    const wasExcluded = this.selections.excluded.has(tag);
+                    this.toggleExcludedTag(tag, wasExcluded);
+                    this.renderContextSidebar();
+                    App.render();
+                }, this.LONG_PRESS_MS);
+            });
+
+            const cancelPress = () => {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+            };
+
+            option.addEventListener('pointerup', cancelPress);
+            option.addEventListener('pointerleave', cancelPress);
+            option.addEventListener('pointercancel', cancelPress);
+
             option.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const tag = option.dataset.tag;
-                const directlySelected = this.selections.context.has(tag);
-
-                if (directlySelected) {
-                    this.selections.context.delete(tag);
-                } else {
-                    this.selections.context.add(tag);
+                if (longPressed) {
+                    longPressed = false;
+                    return;
                 }
 
-                this.saveSelectionState();
+                const tag = option.dataset.tag;
+
+                // Shift+click: toggle exclusion
+                if (e.shiftKey) {
+                    const wasExcluded = this.selections.excluded.has(tag);
+                    this.toggleExcludedTag(tag, wasExcluded);
+                    this.renderContextSidebar();
+                    App.render();
+                    return;
+                }
+
+                const directlySelected = this.selections.context.has(tag);
+                const isExcluded = this.selections.excluded.has(tag);
+
+                if (isExcluded) {
+                    // Clicking an excluded tag → make it included
+                    this.addContextTag(tag);
+                } else if (directlySelected) {
+                    this.selections.context.delete(tag);
+                    this.saveSelectionState();
+                } else {
+                    this.selections.context.add(tag);
+                    this.saveSelectionState();
+                }
+
                 this.renderContextSidebar();
                 App.render();
             });
@@ -458,11 +563,13 @@ const SelectionManager = {
 
             let isSelected = false;
             let isGroupMatch = false;
+            let isExcluded = false;
 
             if (group === 'time') {
                 isSelected = this.selections.time === tag;
             } else if (group === 'context') {
                 const directlySelected = this.selections.context.has(tag);
+                isExcluded = this.selections.excluded.has(tag);
                 isSelected = directlySelected;
                 // Also check if a parent group path covers this tag
                 if (!directlySelected && !this.isComputedContextTag(tag)) {
@@ -480,6 +587,7 @@ const SelectionManager = {
 
             option.classList.toggle('selected', isSelected);
             option.classList.toggle('group-match', isGroupMatch);
+            option.classList.toggle('excluded', isExcluded);
         });
     },
 
