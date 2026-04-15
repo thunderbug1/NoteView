@@ -499,6 +499,73 @@
     opacity: 0.6;
 }
 
+/* Collapse / Expand Button */
+.collapse-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
+}
+
+.document-view .block:hover .collapse-btn,
+.document-view .block:focus-within .collapse-btn {
+    opacity: 0.5;
+}
+
+.collapse-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+.collapse-btn.collapsed {
+    opacity: 1 !important;
+    color: var(--text-muted);
+}
+
+/* Collapsed block styling */
+.document-view .block.block-collapsed {
+    cursor: pointer;
+}
+
+.document-view .block.block-collapsed:hover {
+    background: var(--bg-secondary);
+}
+
+.block-collapsed-title {
+    padding: 0.5rem 1rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: none;
+}
+
+.document-view .block.block-collapsed .block-collapsed-title {
+    display: block;
+}
+
+/* Always show metadata on collapsed blocks */
+.document-view .block.block-collapsed .block-metadata {
+    opacity: 1;
+    height: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
 /* Microphone / Speech-to-Text Button */
 .mic-btn {
     background: transparent;

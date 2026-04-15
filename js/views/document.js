@@ -13,6 +13,8 @@ const DocumentView = {
     pendingNewTags: null,
     saveTimeouts: new Map(), // blockId -> timeoutId
     originalContents: new Map(), // blockId -> original content for change detection
+    // Track which blocks are collapsed by block ID
+    collapsedBlocks: new Map(),
     fencedBlockThresholds: {
         lines: 12,
         chars: 800,
@@ -115,7 +117,17 @@ const DocumentView = {
         this._micHandler = this.handleMicClick.bind(this);
         container.addEventListener('click', this._micHandler);
 
+        // Add event delegation for collapse button click
+        if (this._collapseHandler) {
+            container.removeEventListener('click', this._collapseHandler);
+        }
+        this._collapseHandler = this.handleCollapseClick.bind(this);
+        container.addEventListener('click', this._collapseHandler);
+
         this.attachEventListeners();
+
+        // Restore collapsed state after DOM rebuild
+        this.restoreCollapsedState(sorted);
 
         // On mobile, disable scrolling when content fits to prevent elastic bouncing
         requestAnimationFrame(() => this.adjustScrollability());
@@ -226,6 +238,14 @@ const DocumentView = {
             </button>
         `);
 
+        // Collapse/expand button
+        const isCollapsed = this.collapsedBlocks.has(block.id);
+        parts.push(`
+            <button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${block.id}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isCollapsed ? '15 18 9 12 15 6' : '6 9 12 15 18 9'}"/></svg>
+            </button>
+        `);
+
         // Microphone / Speech-to-Text button
         if (this.isSpeechRecognitionSupported()) {
             parts.push(`
@@ -325,6 +345,112 @@ const DocumentView = {
             this.stopSpeechRecognition();
         } else {
             this.startSpeechRecognition(blockId, micBtn);
+        }
+    },
+
+    handleCollapseClick(e) {
+        // Check for collapse button click
+        const collapseBtn = e.target.closest('.collapse-btn');
+        if (collapseBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const blockId = collapseBtn.dataset.id;
+            if (blockId && blockId !== 'new') {
+                if (this.collapsedBlocks.has(blockId)) {
+                    this.expandBlock(blockId);
+                } else {
+                    this.collapseBlock(blockId);
+                }
+            }
+            return;
+        }
+        // Check for click on collapsed block title to expand
+        const collapsedTitle = e.target.closest('.block-collapsed-title');
+        if (collapsedTitle) {
+            const blockEl = collapsedTitle.closest('.block');
+            if (blockEl) {
+                const blockId = blockEl.dataset.id;
+                if (blockId && blockId !== 'new') {
+                    this.expandBlock(blockId);
+                }
+            }
+        }
+    },
+
+    collapseBlock(blockId) {
+        this.collapsedBlocks.set(blockId, true);
+        const blockEl = document.querySelector(`.block[data-id="${blockId}"]`);
+        if (!blockEl) return;
+
+        const editorDiv = blockEl.querySelector('.block-editor');
+        if (editorDiv) editorDiv.style.display = 'none';
+
+        // Create or show collapsed title with first non-empty line
+        let collapsedTitle = blockEl.querySelector('.block-collapsed-title');
+        if (!collapsedTitle) {
+            collapsedTitle = document.createElement('div');
+            collapsedTitle.className = 'block-collapsed-title';
+            blockEl.appendChild(collapsedTitle);
+        }
+        const view = this.editors.get(blockId);
+        const content = view ? view.state.doc.toString() : '';
+        const firstLine = content.split('\n').find(l => l.trim()) || 'Empty note';
+        collapsedTitle.textContent = firstLine.replace(/^#+\s*/, '');
+        collapsedTitle.style.display = 'block';
+
+        // Update button visual
+        const collapseBtn = blockEl.querySelector('.collapse-btn');
+        if (collapseBtn) {
+            collapseBtn.classList.add('collapsed');
+            collapseBtn.title = 'Expand note';
+            const svg = collapseBtn.querySelector('polyline');
+            if (svg) svg.setAttribute('points', '15 18 9 12 15 6');
+        }
+
+        blockEl.classList.add('block-collapsed');
+    },
+
+    expandBlock(blockId) {
+        this.collapsedBlocks.delete(blockId);
+        const blockEl = document.querySelector(`.block[data-id="${blockId}"]`);
+        if (!blockEl) return;
+
+        const editorDiv = blockEl.querySelector('.block-editor');
+        if (editorDiv) editorDiv.style.display = '';
+
+        const collapsedTitle = blockEl.querySelector('.block-collapsed-title');
+        if (collapsedTitle) collapsedTitle.style.display = 'none';
+
+        // Update button visual
+        const collapseBtn = blockEl.querySelector('.collapse-btn');
+        if (collapseBtn) {
+            collapseBtn.classList.remove('collapsed');
+            collapseBtn.title = 'Collapse note';
+            const svg = collapseBtn.querySelector('polyline');
+            if (svg) svg.setAttribute('points', '6 9 12 15 18 9');
+        }
+
+        blockEl.classList.remove('block-collapsed');
+    },
+
+    restoreCollapsedState(blocks) {
+        for (const block of blocks) {
+            if (this.collapsedBlocks.has(block.id)) {
+                const blockEl = document.querySelector(`.block[data-id="${block.id}"]`);
+                if (!blockEl) continue;
+                const editorDiv = blockEl.querySelector('.block-editor');
+                if (editorDiv) editorDiv.style.display = 'none';
+                let collapsedTitle = blockEl.querySelector('.block-collapsed-title');
+                if (!collapsedTitle) {
+                    collapsedTitle = document.createElement('div');
+                    collapsedTitle.className = 'block-collapsed-title';
+                    blockEl.appendChild(collapsedTitle);
+                }
+                const firstLine = (block.content || '').split('\n').find(l => l.trim()) || 'Empty note';
+                collapsedTitle.textContent = firstLine.replace(/^#+\s*/, '');
+                collapsedTitle.style.display = 'block';
+                blockEl.classList.add('block-collapsed');
+            }
         }
     },
 
@@ -1387,7 +1513,7 @@ const DocumentView = {
             return;
         }
 
-        const { EditorView, EditorState, basicSetup, markdown, languages, keymap, indentWithTab, placeholder } = window.CodeMirror;
+        const { EditorView, EditorState, basicSetup, markdown, languages, keymap, indentWithTab, placeholder, foldService } = window.CodeMirror;
 
         const self = this;
         const handleContentChange = (content) => self.handleContentChange(container.dataset.id, content);
@@ -1403,6 +1529,7 @@ const DocumentView = {
                 EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }]),
                 EditorView.lineWrapping,
                 this.createLivePreviewPlugin(),
+                this.createIndentFolding(),
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),
                 this.getEditorTheme(),
                 this.createUpdateListener(container, blockId, handleContentChange),
@@ -1415,6 +1542,34 @@ const DocumentView = {
 
         this.editors.set(blockId, view);
         this.originalContents.set(blockId, initialContent);
+    },
+
+    /**
+     * Create a foldService extension that makes indented list regions foldable.
+     * Supplements the built-in heading/blockquote folding from the markdown language.
+     */
+    createIndentFolding() {
+        const { foldService } = window.CodeMirror;
+        return foldService.of((state, lineStart, lineEnd) => {
+            const line = state.doc.lineAt(lineStart);
+            const text = line.text;
+            // Match indented list items (tabs or 2+ spaces followed by list marker)
+            const indentMatch = text.match(/^(\t| {2,})[-*+] /) || text.match(/^(\t| {2,})\d+\. /);
+            if (!indentMatch) return null;
+            const baseIndent = indentMatch[1].length;
+            // Fold from end of current line to end of the indented block
+            let endLine = line.number;
+            while (endLine < state.doc.lines) {
+                const nextLine = state.doc.line(endLine + 1);
+                const nextText = nextLine.text;
+                if (nextText.trim() === '') { endLine++; continue; }
+                const nextIndent = nextText.match(/^(\s*)/)[1].length;
+                if (nextIndent < baseIndent) break;
+                endLine++;
+            }
+            if (endLine === line.number) return null;
+            return { from: line.to, to: state.doc.line(endLine).to };
+        });
     },
 
     /**

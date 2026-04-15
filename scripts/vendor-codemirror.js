@@ -5,6 +5,7 @@ const src = `
 import {EditorView, basicSetup} from "codemirror";
 import {markdown} from "@codemirror/lang-markdown";
 import {languages} from "@codemirror/language-data";
+import {foldService} from "@codemirror/language";
 import {ViewPlugin, Decoration, WidgetType, keymap, placeholder} from "@codemirror/view";
 import {EditorState, StateField, Prec} from "@codemirror/state";
 import {unifiedMergeView} from "@codemirror/merge";
@@ -28,7 +29,8 @@ window.CodeMirror = {
     EditorState,
     autocompletion,
     completionKeymap,
-    closeBracketsKeymap
+    closeBracketsKeymap,
+    foldService
 };
 
 window.CodeMirrorReady = true;
