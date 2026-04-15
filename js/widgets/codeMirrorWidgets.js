@@ -119,6 +119,7 @@ function createCodeMirrorWidgets(documentView) {
             if (icon) wrap.innerHTML = icon;
 
             wrap.onmousedown = (e) => {
+                if (e.button !== 0) return;
                 e.preventDefault();
                 e.stopPropagation();
                 const newState = (this.state === 'x' || this.state === 'X') ? ' ' : 'x';
