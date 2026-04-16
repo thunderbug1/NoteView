@@ -400,6 +400,18 @@ const App = {
                 }
             }
 
+            // Context history navigation
+            if (Store.shortcuts && currentCombo === Store.shortcuts.contextBack) {
+                e.preventDefault();
+                SelectionManager.historyBack();
+                return;
+            }
+            if (Store.shortcuts && currentCombo === Store.shortcuts.contextForward) {
+                e.preventDefault();
+                SelectionManager.historyForward();
+                return;
+            }
+
             if (Store.shortcuts && currentCombo === Store.shortcuts.newNote) {
                 e.preventDefault();
                 this.handleNewNote();

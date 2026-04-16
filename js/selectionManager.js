@@ -16,6 +16,14 @@ const SelectionManager = {
 
     LONG_PRESS_MS: 400,
 
+    // Context navigation history
+    _historyStack: [],
+    _historyIndex: -1,
+    _historyDebounceTimer: null,
+    _isHistoryNavigating: false,
+    HISTORY_DEBOUNCE_MS: 500,
+    HISTORY_MAX_ENTRIES: 50,
+
     computedContextTags: ['Todo.all', 'Todo.open', 'Todo.blocked', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
 
     /**
@@ -28,6 +36,7 @@ const SelectionManager = {
         this.loadSelectionState();
         this.normalizeContextSelection();
         this.updateSelectionUI();
+        this.initHistory();
         console.log('[SelectionManager] init:complete', {
             restoredContext: Array.from(this.selections.context)
         });
@@ -82,6 +91,7 @@ const SelectionManager = {
         } catch (error) {
             console.warn('Could not save selection state:', error);
         }
+        this.scheduleHistoryPush();
     },
 
     normalizeContextSelection() {
@@ -109,6 +119,7 @@ const SelectionManager = {
     setTimeSelection(timeSelection) {
         this.selections.time = timeSelection;
         this.updateSelectionUI();
+        this.scheduleHistoryPush();
     },
 
     /**
@@ -126,6 +137,7 @@ const SelectionManager = {
     setContactSelection(contact) {
         this.selections.contact = contact;
         this.updateSelectionUI();
+        this.scheduleHistoryPush();
     },
 
     /**
@@ -256,6 +268,137 @@ const SelectionManager = {
         this.updateSelectionUI();
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.value = '';
+    },
+
+    /**
+     * Capture current selections as a serializable snapshot
+     * @returns {Object} Snapshot with context, excluded, time, contact
+     */
+    _snapshotSelections() {
+        return {
+            context: Array.from(this.selections.context).sort(),
+            excluded: Array.from(this.selections.excluded).sort(),
+            time: this.selections.time || '',
+            contact: this.selections.contact || ''
+        };
+    },
+
+    /**
+     * Deep-compare two snapshots
+     * @param {Object} a
+     * @param {Object} b
+     * @returns {boolean}
+     */
+    _snapshotsEqual(a, b) {
+        return JSON.stringify(a) === JSON.stringify(b);
+    },
+
+    /**
+     * Initialize the context navigation history stack
+     */
+    initHistory() {
+        this._historyStack = [];
+        this._historyIndex = -1;
+        this._historyDebounceTimer = null;
+        this._isHistoryNavigating = false;
+        const snapshot = this._snapshotSelections();
+        this._historyStack.push(snapshot);
+        this._historyIndex = 0;
+    },
+
+    /**
+     * Schedule a debounced history push. Resets timer on each call.
+     * No-ops during navigation restore.
+     */
+    scheduleHistoryPush() {
+        if (this._isHistoryNavigating) return;
+        if (this._historyDebounceTimer) {
+            clearTimeout(this._historyDebounceTimer);
+        }
+        this._historyDebounceTimer = setTimeout(() => {
+            this._pushHistory();
+        }, this.HISTORY_DEBOUNCE_MS);
+    },
+
+    /**
+     * Push current selections onto the history stack (called after debounce)
+     */
+    _pushHistory() {
+        this._historyDebounceTimer = null;
+        const snapshot = this._snapshotSelections();
+
+        // Skip if identical to current entry
+        if (this._historyIndex >= 0 &&
+            this._snapshotsEqual(snapshot, this._historyStack[this._historyIndex])) {
+            return;
+        }
+
+        // Truncate forward history
+        this._historyStack = this._historyStack.slice(0, this._historyIndex + 1);
+
+        // Push new entry
+        this._historyStack.push(snapshot);
+
+        // Trim to max size
+        if (this._historyStack.length > this.HISTORY_MAX_ENTRIES) {
+            this._historyStack.shift();
+        }
+
+        this._historyIndex = this._historyStack.length - 1;
+    },
+
+    /**
+     * Navigate to the previous context selection
+     */
+    historyBack() {
+        if (this._historyIndex <= 0) return;
+        this._historyIndex--;
+        this._restoreHistoryEntry(this._historyStack[this._historyIndex]);
+    },
+
+    /**
+     * Navigate to the next context selection
+     */
+    historyForward() {
+        if (this._historyIndex >= this._historyStack.length - 1) return;
+        this._historyIndex++;
+        this._restoreHistoryEntry(this._historyStack[this._historyIndex]);
+    },
+
+    /**
+     * Restore a snapshot to the live selections and re-render
+     * @param {Object} entry - Snapshot to restore
+     */
+    _restoreHistoryEntry(entry) {
+        this._isHistoryNavigating = true;
+        try {
+            this.selections.context = new Set(entry.context);
+            this.selections.excluded = new Set(entry.excluded);
+            this.selections.time = entry.time;
+            this.selections.contact = entry.contact;
+            this.saveSelectionState();
+            this.updateSelectionUI();
+            this.renderContextSidebar();
+            App.render();
+        } finally {
+            this._isHistoryNavigating = false;
+        }
+    },
+
+    /**
+     * Whether the history stack can navigate back
+     * @returns {boolean}
+     */
+    canGoBack() {
+        return this._historyIndex > 0;
+    },
+
+    /**
+     * Whether the history stack can navigate forward
+     * @returns {boolean}
+     */
+    canGoForward() {
+        return this._historyIndex < this._historyStack.length - 1;
     },
 
     /**
@@ -741,11 +884,10 @@ const SelectionManager = {
                 const wasSelected = option.classList.contains('selected');
 
                 if (wasSelected) {
-                    this.selections.contact = '';
+                    this.setContactSelection('');
                 } else {
-                    this.selections.contact = tag;
+                    this.setContactSelection(tag);
                 }
-                this.updateSelectionUI();
                 App.render();
             });
         });

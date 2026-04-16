@@ -29,7 +29,7 @@ const Store = {
     },
     directoryHandle: null,
     contacts: new Map(), // Map of username -> Set of tags
-    shortcuts: { newNote: 'Ctrl+Alt+N', aiAssistant: 'Ctrl+Shift+A' },
+    shortcuts: { newNote: 'Ctrl+Alt+N', aiAssistant: 'Ctrl+Shift+A', contextBack: 'Alt+ArrowLeft', contextForward: 'Alt+ArrowRight' },
 
     // Cache for filtered blocks
     _filteredBlocksCache: CacheManager.createCache(() => {

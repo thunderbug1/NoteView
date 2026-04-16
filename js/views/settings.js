@@ -4,6 +4,16 @@
 
 const SettingsView = {
 
+    /**
+     * Shortcut definitions for the settings UI
+     */
+    _shortcutDefs: [
+        { key: 'newNote', label: 'New Note', hint: 'Quickly add a new note from anywhere.' },
+        { key: 'aiAssistant', label: 'AI Assistant', hint: 'Open AI assistant for the focused note.' },
+        { key: 'contextBack', label: 'Context Back', hint: 'Navigate to the previous filter selection.' },
+        { key: 'contextForward', label: 'Context Forward', hint: 'Navigate to the next filter selection.' }
+    ],
+
     _renderProfiles() {
         if (AIAssistant.profiles.length === 0) {
             return '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0">No model profiles configured yet.</div>';
@@ -73,14 +83,15 @@ const SettingsView = {
                 </div>
 
                 <div class="settings-section">
-                    <h3>Editor Shortcuts</h3>
+                    <h3>Keyboard Shortcuts</h3>
+                    ${this._shortcutDefs.map(def => `
                     <div class="settings-item">
                         <div class="settings-item-info">
-                            <label>New Note</label>
-                            <p class="settings-item-hint">Quickly add a new note from anywhere.</p>
+                            <label>${escapeHtml(def.label)}</label>
+                            <p class="settings-item-hint">${escapeHtml(def.hint)}</p>
                         </div>
-                        <div id="newNoteShortcut" class="shortcut-key" title="Click to remap">${escapeHtml(Store.shortcuts.newNote)}</div>
-                    </div>
+                        <div id="shortcut-${def.key}" class="shortcut-key" data-shortcut-key="${def.key}" title="Click to remap">${escapeHtml(Store.shortcuts[def.key] || '')}</div>
+                    </div>`).join('')}
                 </div>
 
                 <div class="settings-section">
@@ -104,14 +115,6 @@ const SettingsView = {
                             </div>
                             <button class="ai-add-profile-btn" id="aiAddProfileBtn">+ Add Model Profile</button>
                             <div id="aiProfileFormContainer"></div>
-                        </div>
-
-                        <div class="settings-item">
-                            <div class="settings-item-info">
-                                <label>AI Shortcut</label>
-                                <p class="settings-item-hint">Open AI assistant for the focused note.</p>
-                            </div>
-                            <div id="aiShortcut" class="shortcut-key" title="Click to remap">${escapeHtml(Store.shortcuts.aiAssistant || 'Ctrl+Shift+A')}</div>
                         </div>
 
                         <div class="settings-item">
@@ -152,14 +155,15 @@ const SettingsView = {
             manageTagsBtn.addEventListener('click', () => this.openTagModal());
         }
 
-        // Shortcut remapping
-        const newNoteShortcutBtn = document.getElementById('newNoteShortcut');
-        if (newNoteShortcutBtn) {
-            newNoteShortcutBtn.addEventListener('click', () => {
-                if (newNoteShortcutBtn.classList.contains('recording')) return;
+        // Shortcut remapping (unified for all shortcuts)
+        document.querySelectorAll('.shortcut-key[data-shortcut-key]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.classList.contains('recording')) return;
 
-                newNoteShortcutBtn.classList.add('recording');
-                newNoteShortcutBtn.textContent = 'Press keys...';
+                btn.classList.add('recording');
+                btn.textContent = 'Press keys...';
+
+                const shortcutKey = btn.dataset.shortcutKey;
 
                 const handleKeydown = async (e) => {
                     e.preventDefault();
@@ -173,27 +177,29 @@ const SettingsView = {
 
                     const key = e.key === ' ' ? 'Space' : (e.key.length === 1 ? e.key.toUpperCase() : e.key);
 
-                    // Simple validation: must have at least one modifier and a final key
+                    // Must have at least one modifier and a final key
                     if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
 
                     keys.push(key);
                     const newShortcut = keys.join('+');
 
                     window.removeEventListener('keydown', handleKeydown, true);
-                    newNoteShortcutBtn.classList.remove('recording');
-                    newNoteShortcutBtn.textContent = newShortcut;
+                    btn.classList.remove('recording');
+                    btn.textContent = newShortcut;
 
-                    const shortcuts = { ...Store.shortcuts, newNote: newShortcut };
+                    const shortcuts = { ...Store.shortcuts, [shortcutKey]: newShortcut };
                     await Store.saveShortcuts(shortcuts);
 
-                    // Update FAB title if visible
-                    const fab = document.getElementById('fabNewNote');
-                    if (fab) fab.title = `New Note (${newShortcut})`;
+                    // Update FAB title if this is the newNote shortcut
+                    if (shortcutKey === 'newNote') {
+                        const fab = document.getElementById('fabNewNote');
+                        if (fab) fab.title = `New Note (${newShortcut})`;
+                    }
                 };
 
                 window.addEventListener('keydown', handleKeydown, true);
             });
-        }
+        });
 
         // AI toggle
         const aiToggle = document.getElementById('aiToggleSwitch');
@@ -203,36 +209,6 @@ const SettingsView = {
                 await AIAssistant.toggleEnabled(newState);
                 aiToggle.classList.toggle('active', newState);
                 document.getElementById('aiSettingsDetails').classList.toggle('visible', newState);
-            });
-        }
-
-        // AI shortcut remapping
-        const aiShortcutBtn = document.getElementById('aiShortcut');
-        if (aiShortcutBtn) {
-            aiShortcutBtn.addEventListener('click', () => {
-                if (aiShortcutBtn.classList.contains('recording')) return;
-                aiShortcutBtn.classList.add('recording');
-                aiShortcutBtn.textContent = 'Press keys...';
-
-                const handleKeydown = async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const keys = [];
-                    if (e.ctrlKey) keys.push('Ctrl');
-                    if (e.altKey) keys.push('Alt');
-                    if (e.shiftKey) keys.push('Shift');
-                    if (e.metaKey) keys.push('Meta');
-                    const key = e.key === ' ' ? 'Space' : (e.key.length === 1 ? e.key.toUpperCase() : e.key);
-                    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
-                    keys.push(key);
-                    const newShortcut = keys.join('+');
-                    window.removeEventListener('keydown', handleKeydown, true);
-                    aiShortcutBtn.classList.remove('recording');
-                    aiShortcutBtn.textContent = newShortcut;
-                    const shortcuts = { ...Store.shortcuts, aiAssistant: newShortcut };
-                    await Store.saveShortcuts(shortcuts);
-                };
-                window.addEventListener('keydown', handleKeydown, true);
             });
         }
 
