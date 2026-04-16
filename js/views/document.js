@@ -1536,24 +1536,25 @@ const DocumentView = {
                             const blockRectTop = blockEl.getBoundingClientRect().top;
 
                             const relativeTopStart = contentTop - blockRectTop + startBlock.top - scroller.scrollTop;
-                            const iconTopStart = relativeTopStart + startBlock.height - 9;
 
                             marker.style.display = 'flex';
-                            marker.style.top = `${iconTopStart}px`;
 
                             const scissorSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>';
 
                             if (isExtract) {
                                 const relativeTopEnd = contentTop - blockRectTop + endBlock.top - scroller.scrollTop;
-                                const iconTopEnd = relativeTopEnd + endBlock.height - 9;
-                                const h = Math.max(18, iconTopEnd - iconTopStart + 18);
+                                const bottomEdge = relativeTopEnd + endBlock.height;
+                                const h = Math.max(18, bottomEdge - relativeTopStart + 18);
 
+                                marker.style.top = `${relativeTopStart - 9}px`;
                                 marker.style.height = `${h}px`;
                                 marker.style.flexDirection = 'column';
                                 marker.style.justifyContent = 'space-between';
                                 marker.innerHTML = scissorSvg + scissorSvg;
                                 marker.title = "Extract block";
                             } else {
+                                const iconTopStart = relativeTopStart + startBlock.height - 9;
+                                marker.style.top = `${iconTopStart}px`;
                                 marker.style.height = '18px';
                                 marker.style.flexDirection = 'row';
                                 marker.style.justifyContent = 'center';
