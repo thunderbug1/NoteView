@@ -1230,7 +1230,7 @@ const DocumentView = {
     },
 
     /**
-     * Check whether a task line matches any of the active task filters.
+     * Check whether a task line matches all of the active task filters.
      * Non-task lines (no checkbox) always return true (stay visible).
      */
     taskLineMatchesFilter(lineText, activeFilters) {
@@ -1243,12 +1243,12 @@ const DocumentView = {
         const hasAssignee = lineText.includes('[assignee::');
 
         for (const filter of activeFilters) {
-            if (filter === 'Todo.open' && isOpen) return true;
-            if (filter === 'Todo.blocked' && isBlockedState) return true;
-            if (filter === 'Todo.unblocked' && isOpen) return true;
-            if (filter === 'Status.unassigned' && !hasAssignee) return true;
+            if (filter === 'Todo.open' && !isOpen) return false;
+            if (filter === 'Todo.blocked' && !isBlockedState) return false;
+            if (filter === 'Todo.unblocked' && !isOpen) return false;
+            if (filter === 'Status.unassigned' && hasAssignee) return false;
         }
-        return false;
+        return true;
     },
 
     /**

@@ -32,6 +32,7 @@ const AssigneeModal = {
         const content = `
             <input type="text" id="assigneeModalInput" placeholder="Search or enter name..." autofocus>
             <div class="tag-modal-list">
+                <div class="assignee-clear" data-action="clear">✕ Clear assignee</div>
                 ${suggestedContacts.map(contact => {
                     const contactTags = Store.contacts.get(contact);
                     const hasMatch = referenceContext.size === 0 || Array.from(referenceContext).some(t => contactTags.has(t));
@@ -59,9 +60,13 @@ const AssigneeModal = {
                 // Strip @ if user typed it
                 if (contact.startsWith('@')) contact = contact.substring(1);
                 onSelect(contact);
+            } else {
+                onSelect(null);
             }
             modal.close();
         };
+
+        modal.querySelector('.assignee-clear').addEventListener('click', () => selectContact(null));
 
         modal.querySelectorAll('.tag-modal-item').forEach(item => {
             item.addEventListener('click', () => selectContact(item.dataset.contact));
@@ -96,7 +101,7 @@ const AssigneeModal = {
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 const val = input.value.trim().replace(/^@/, '');
-                const visibleItems = Array.from(modal.querySelectorAll('.tag-modal-item'))
+                const visibleItems = Array.from(modal.querySelectorAll('.tag-modal-item:not(.clear-assignee)'))
                     .filter(i => i.style.display !== 'none');
 
                 if (visibleItems.length === 1 && val && visibleItems[0].dataset.contact !== val.toLowerCase()) {

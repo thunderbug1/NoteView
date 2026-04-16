@@ -897,34 +897,29 @@ const Store = {
                     }
                 }
 
-                let tasks = null;
-                const getTasks = () => {
-                    if (!tasks) {
-                        tasks = TaskParser.parseTasksFromBlock(block);
-                    }
-                    return tasks;
-                };
-
-                if (contextSelection.has('Todo.all')) {
-                    if (!block.content?.match(/\[[ xX\/bB\-]\]/)) return false;
-                }
-                if (contextSelection.has('Todo.open')) {
-                    if (!block.content?.match(/\[[ \/]\]/)) return false;
-                }
-                if (contextSelection.has('Todo.blocked')) {
-                    const hasBlocked = getTasks().some(t => TaskParser.isBlockedTask(t));
-                    if (!hasBlocked) return false;
-                }
-                if (contextSelection.has('Todo.unblocked')) {
-                    const hasUnblocked = getTasks().some(t => TaskParser.isUnblockedTask(t));
-                    if (!hasUnblocked) return false;
-                }
+                // Block-level computed: untagged
                 if (contextSelection.has('Status.untagged')) {
                     if (block.tags && block.tags.length > 0) return false;
                 }
-                if (contextSelection.has('Status.unassigned')) {
-                    const hasUnassigned = TaskParser.hasUnassignedTasks(getTasks());
-                    if (!hasUnassigned) return false;
+
+                // Task-level computed: find at least one task satisfying ALL selected conditions
+                const TASK_COMPUTED_TAGS = ['Todo.all', 'Todo.open', 'Todo.blocked', 'Todo.unblocked', 'Status.unassigned'];
+                const activeTaskComputed = [...contextSelection].filter(t => TASK_COMPUTED_TAGS.includes(t));
+
+                if (activeTaskComputed.length > 0) {
+                    const tasks = TaskParser.parseTasksFromBlock(block);
+                    const hasMatchingTask = tasks.some(task =>
+                        activeTaskComputed.every(tag => {
+                            switch (tag) {
+                                case 'Todo.all':          return true;
+                                case 'Todo.open':         return TaskParser.isOpenTask(task);
+                                case 'Todo.blocked':      return TaskParser.isBlockedTask(task);
+                                case 'Todo.unblocked':    return TaskParser.isUnblockedTask(task);
+                                case 'Status.unassigned': return TaskParser.isUnassignedTask(task);
+                            }
+                        })
+                    );
+                    if (!hasMatchingTask) return false;
                 }
             }
 

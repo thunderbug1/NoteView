@@ -192,9 +192,18 @@ function createCodeMirrorWidgets(documentView) {
                     const block = Store.blocks.find(b => b.id === blockId);
                     const tags = block ? block.tags : [];
                     App.showAssigneeModal((user) => {
-                        view.dispatch({
-                            changes: { from: this.from, to: this.to, insert: `[assignee:: ${user}]` }
-                        });
+                        if (user === null) {
+                            // Remove the badge and preceding space
+                            let delFrom = this.from;
+                            if (delFrom > 0 && view.state.doc.sliceString(delFrom - 1, delFrom) === ' ') {
+                                delFrom -= 1;
+                            }
+                            view.dispatch({ changes: { from: delFrom, to: this.to, insert: '' } });
+                        } else {
+                            view.dispatch({
+                                changes: { from: this.from, to: this.to, insert: `[assignee:: ${user}]` }
+                            });
+                        }
                     }, tags);
                     return;
                 }
@@ -385,7 +394,9 @@ function createCodeMirrorWidgets(documentView) {
                 const block = Store.blocks.find(b => b.id === blockId);
                 const tags = block ? block.tags : [];
                 App.showAssigneeModal((user) => {
-                    documentView.appendInlineField(view, this.from, this.to, 'assignee', user);
+                    if (user) {
+                        documentView.appendInlineField(view, this.from, this.to, 'assignee', user);
+                    }
                 }, tags);
             };
             return wrap;
