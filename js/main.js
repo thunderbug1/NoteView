@@ -846,30 +846,89 @@ const App = {
     showNewNoteModal() {
         const modalBlockId = 'new-modal';
         let modalTags = SelectionManager.getActiveTags();
+        let createdBlockId = null;
+        let isCreating = false;
 
         const renderModalTags = () => {
             const tagsDiv = modal.querySelector('.block-tags');
             if (!tagsDiv) return;
+            const id = createdBlockId || modalBlockId;
             const badgesHtml = modalTags.map(tag => TagModal._renderBadge(tag)).join('');
-            tagsDiv.innerHTML = `${badgesHtml}<button class="add-tag-btn" data-id="${modalBlockId}">+ Tag</button>`;
+            tagsDiv.innerHTML = `${badgesHtml}<button class="add-tag-btn" data-id="${id}">+ Tag</button>`;
             // Re-attach tag listeners
             modal.querySelectorAll('.add-tag-btn').forEach(btn => {
                 btn.addEventListener('click', () => openTagModal());
             });
         };
 
-        const openTagModal = () => {
-            // Inject a temporary block so TagModal reads the correct initial tags
-            const tempId = 'new';
-            const existingIdx = Store.blocks.findIndex(b => b.id === tempId);
-            const tempBlock = { id: tempId, tags: [...modalTags], content: '' };
-            if (existingIdx === -1) {
-                Store.blocks.push(tempBlock);
-            } else {
-                Store.blocks[existingIdx] = tempBlock;
+        const promoteModalBlock = async (initialContent) => {
+            if (isCreating || createdBlockId) return;
+            isCreating = true;
+
+            try {
+                const extraMeta = {};
+                if (modalTags.length > 0) {
+                    extraMeta.tags = modalTags;
+                }
+                const newBlock = await Store.createBlock(initialContent, extraMeta);
+                createdBlockId = newBlock.id;
+
+                // Remap the editor from 'new-modal' to the real block ID
+                const editor = DocumentView.editors.get(modalBlockId);
+                if (editor) {
+                    DocumentView.editors.delete(modalBlockId);
+                    DocumentView.editors.set(createdBlockId, editor);
+                }
+
+                // Update the container's data-id so handleContentChange routes correctly
+                const cmContainer = modal.querySelector('.codemirror-container');
+                if (cmContainer) {
+                    cmContainer.dataset.id = createdBlockId;
+                }
+
+                // Update mic button data-id
+                const micBtn = modal.querySelector('.mic-btn');
+                if (micBtn) {
+                    micBtn.dataset.id = createdBlockId;
+                }
+
+                // Update tag button data-id
+                modal.querySelectorAll('.add-tag-btn').forEach(btn => {
+                    btn.dataset.id = createdBlockId;
+                });
+
+                // Check if more content was typed while we were awaiting createBlock
+                if (editor) {
+                    const currentContent = editor.state.doc.toString();
+                    if (currentContent !== initialContent) {
+                        DocumentView.scheduleSave(createdBlockId, currentContent);
+                    }
+                }
+
+                DocumentView.pendingNewTags = null;
+                App.render();
+            } finally {
+                isCreating = false;
             }
-            DocumentView.pendingNewTags = [...modalTags];
-            TagModal.show(tempId);
+        };
+
+        const openTagModal = () => {
+            if (createdBlockId) {
+                // Block exists — open tag modal for real block
+                TagModal.show(createdBlockId);
+            } else {
+                // Block not yet created — use temp block approach
+                const tempId = 'new';
+                const existingIdx = Store.blocks.findIndex(b => b.id === tempId);
+                const tempBlock = { id: tempId, tags: [...modalTags], content: '' };
+                if (existingIdx === -1) {
+                    Store.blocks.push(tempBlock);
+                } else {
+                    Store.blocks[existingIdx] = tempBlock;
+                }
+                DocumentView.pendingNewTags = [...modalTags];
+                TagModal.show(tempId);
+            }
         };
 
         const content = `
@@ -885,10 +944,6 @@ const App = {
             </div>
             <div class="block-editor">
                 <div class="codemirror-container" data-id="${modalBlockId}"></div>
-                <div style="display: flex; justify-content: flex-end; margin-top: 15px; gap: 10px;">
-                    <button id="cancelNewNoteBtn" class="settings-btn secondary">Cancel</button>
-                    <button id="saveNewNoteBtn" class="settings-btn primary">Save Note</button>
-                </div>
             </div>
         `;
 
@@ -898,6 +953,10 @@ const App = {
             modalClass: 'tag-modal content-modal active-recording-preventer',
             onClose: () => {
                 DocumentView.stopSpeechRecognition();
+                // Clean up editor reference if still mapped to modalBlockId
+                if (!createdBlockId) {
+                    DocumentView.editors.delete(modalBlockId);
+                }
             }
         });
 
@@ -906,9 +965,11 @@ const App = {
             btn.addEventListener('click', () => openTagModal());
         });
 
-        // Watch for pending tag changes from TagModal
-        const checkPendingTags = setInterval(() => {
-            if (DocumentView.pendingNewTags && DocumentView.pendingNewTags.length >= 0) {
+        // Auto-save: combined tag sync + content auto-create
+        let lastContent = '';
+        const autoSaveInterval = setInterval(() => {
+            // --- Tag sync ---
+            if (!createdBlockId && DocumentView.pendingNewTags && DocumentView.pendingNewTags.length >= 0) {
                 const pending = DocumentView.pendingNewTags;
                 if (JSON.stringify(pending) !== JSON.stringify(modalTags)) {
                     modalTags = [...pending];
@@ -916,15 +977,29 @@ const App = {
                 }
             }
             // Clean up temp block once tag modal is gone
-            Store.blocks = Store.blocks.filter(b => b.id !== 'new');
+            Store.blocks = Store.blocks.filter(b => b.id === 'new');
+
+            // --- Content auto-create ---
+            if (!createdBlockId) {
+                const editor = DocumentView.editors.get(modalBlockId);
+                if (editor) {
+                    const content = editor.state.doc.toString();
+                    if (content.trim() && content !== lastContent) {
+                        lastContent = content;
+                        promoteModalBlock(content);
+                    }
+                }
+            }
         }, 300);
+
         // Clean up interval when modal overlay is removed
         const origClose = modal.close.bind(modal);
         modal.close = () => {
-            clearInterval(checkPendingTags);
+            clearInterval(autoSaveInterval);
             // Clean up any temp block
             Store.blocks = Store.blocks.filter(b => b.id !== 'new');
             origClose();
+            App.render();
         };
 
         // Mic button
@@ -948,26 +1023,16 @@ const App = {
             }, 100);
         });
 
-        const saveNote = async () => {
-            const editor = DocumentView.editors.get(modalBlockId);
-            if (editor) {
-                const content = editor.state.doc.toString();
-                if (content.trim()) {
-                    await Store.createBlock(content, { tags: modalTags });
-                    modal.close();
-                    this.render();
-                }
-            }
-        };
-
-        modal.querySelector('#saveNewNoteBtn').addEventListener('click', saveNote);
-        modal.querySelector('#cancelNewNoteBtn').addEventListener('click', () => modal.close());
-
-        // Handle Ctrl+Enter to save
+        // Ctrl+Enter closes the modal (block is already auto-saved)
         cmContainer.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
-                saveNote();
+                modal.close();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                modal.close();
             }
         });
     }

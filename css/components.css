@@ -547,84 +547,81 @@
     max-height: 250px;
     overflow-y: auto;
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: flex-start;
+    align-content: flex-start;
 }
 
 .tag-modal-item {
-    padding: 0.5rem;
-    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 0.85rem;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.tag-modal-item .tag-badge {
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-block;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.tag-modal-item.selected .tag-badge {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.tag-modal-item:hover .tag-badge {
+    opacity: 0.8;
+}
+
+/* Tag modal framed groups */
+.tag-modal-group {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    padding: 0.25rem 0.4rem;
+    width: 100%;
+}
+
+.tag-modal-group-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.2rem 0;
+    transition: background 0.15s, color 0.15s;
+    border-radius: var(--radius-sm);
+}
+
+.tag-modal-group-header:hover {
     color: var(--text-primary);
 }
 
-.tag-modal-item:hover {
-    background: var(--bg-hover);
-}
-
-.tag-modal-item.selected {
-    background: var(--accent-light);
+.tag-modal-group.group-selected > .tag-modal-group-header {
     color: var(--accent);
-    font-weight: 600;
 }
 
-.tag-modal-item .tag-checkbox {
-    display: inline-block;
-    width: 1.2em;
-    margin-right: 0.5rem;
-    font-weight: bold;
-}
-
-/* Tag modal selected bar */
-.tag-modal-selected {
+.tag-modal-group-items {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
-    padding: 0.5rem 0;
-    margin-bottom: 0.5rem;
-    min-height: 2rem;
-    border-bottom: 1px solid var(--border);
-    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0;
 }
 
-.tag-modal-selected-empty {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    font-style: italic;
+.tag-modal-group .tag-modal-item {
+    padding-left: 0;
 }
 
-.tag-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.tag-pill .badge {
-    pointer-events: none;
-}
-
-.tag-pill-remove {
-    cursor: pointer;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    padding: 0 0.15rem;
-    line-height: 1;
-    border-radius: 50%;
-    transition: color 0.15s;
-}
-
-.tag-pill-remove:hover {
-    color: var(--text-primary);
-}
-
-/* Inline rename input on selected pill */
-.tag-pill .badge {
-    cursor: pointer;
-    pointer-events: auto;
-}
-
-.pill-rename-input {
+/* Rename input in tag modal */
+.tag-rename-input {
     padding: 0.15rem 0.4rem;
     border: 1px solid var(--accent);
     border-radius: var(--radius-full);
@@ -632,99 +629,14 @@
     font-weight: 600;
     background: var(--bg-primary);
     color: var(--text-primary);
-    outline: none;
     width: auto;
     min-width: 80px;
-}
-
-/* Tag modal framed groups */
-.tag-modal-group {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-}
-
-.tag-modal-group-header {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-}
-
-.tag-modal-group-header:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.tag-modal-group.group-selected > .tag-modal-group-header {
-    background: var(--accent);
-    color: white;
-}
-
-.tag-modal-group-items {
-    padding: 0.25rem 0;
-}
-
-.tag-modal-group .tag-modal-item {
-    padding-left: 1rem;
-}
-
-/* Edit hint icon on tag items */
-.tag-modal-item .tag-edit-hint {
-    display: none;
-    float: right;
-    opacity: 0.35;
-    font-size: 0.75rem;
-    margin-left: 0.5rem;
-}
-
-.tag-modal-item:hover .tag-edit-hint {
-    display: inline;
-}
-
-/* Rename input in tag modal */
-.tag-rename-input {
-    padding: 0.2rem 0.4rem;
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    width: 100%;
     box-sizing: border-box;
 }
 
 .tag-rename-input:focus {
     outline: none;
     border-color: var(--accent);
-}
-
-.tag-modal-footer {
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: flex-end;
-}
-
-.tag-modal-save-btn {
-    padding: 0.5rem 1.25rem;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.tag-modal-save-btn:hover {
-    background: var(--accent-hover);
 }
 
 .tag-modal-item.non-matching-context {

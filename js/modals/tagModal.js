@@ -1,7 +1,7 @@
 /**
  * Tag Modal - Tag management for notes
  * Supports single-level tag grouping with grouped browse, smart autocomplete,
- * quick-remove selected bar, inline tag renaming, and guided tag creation.
+ * inline tag renaming, and guided tag creation.
  */
 
 const TagModal = {
@@ -15,9 +15,6 @@ const TagModal = {
         const treeData = Common.buildTagTree(allTags);
 
         const content = `
-            <div id="tagModalSelectedBar" class="tag-modal-selected">
-                ${this._renderSelectedBar(selectedTags)}
-            </div>
             <div class="tag-modal-input-row" style="position:relative;">
                 <input type="text" id="tagModalInput" placeholder="Search or create tag..." autocomplete="off" autofocus>
                 <div id="tagAutocomplete" class="tag-autocomplete" style="display:none;"></div>
@@ -28,19 +25,26 @@ const TagModal = {
             <div id="tagModalCreatePrompt" style="display: none;" class="tag-modal-create">
                 <span class="create-text"></span>
             </div>
-            <div class="tag-modal-footer">
-                <button id="tagModalSaveBtn" class="tag-modal-save-btn">Save</button>
-            </div>
         `;
+
+        // Save on close: single commit for existing blocks
+        const saveOnClose = () => {
+            if (blockId && blockId !== 'new') {
+                const newTags = Array.from(selectedTags).sort();
+                if (JSON.stringify(newTags) !== JSON.stringify([...initialTags].sort())) {
+                    App.updateBlockProperty(blockId, 'tags', newTags);
+                }
+            }
+        };
 
         const modal = Modal.create({
             title: 'Manage Tags',
-            content
+            content,
+            onClose: saveOnClose
         });
 
         const input = document.getElementById('tagModalInput');
         const promptBtn = document.getElementById('tagModalCreatePrompt');
-        const selectedBar = document.getElementById('tagModalSelectedBar');
         const autocomplete = document.getElementById('tagAutocomplete');
         let acSelectedIndex = -1;
         let acItems = [];
@@ -49,94 +53,10 @@ const TagModal = {
 
         // --- Helpers ---
 
-        const updateSelectedBar = () => {
-            selectedBar.innerHTML = this._renderSelectedBar(selectedTags);
-
-            // Remove buttons
-            selectedBar.querySelectorAll('.tag-pill-remove').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const pill = btn.closest('.tag-pill');
-                    const tag = pill.dataset.tag;
-                    selectedTags.delete(tag);
-                    updateSelectedBar();
-                    updateItemVisuals();
-                    input.focus();
-                });
-            });
-
-            // Click badge in pill → inline rename
-            selectedBar.querySelectorAll('.tag-pill .badge').forEach(badge => {
-                badge.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const pill = badge.closest('.tag-pill');
-                    const oldTag = pill.dataset.tag;
-                    if (!oldTag || pill.querySelector('.pill-rename-input')) return;
-
-                    const originalHtml = pill.innerHTML;
-                    pill.innerHTML = `<input class="pill-rename-input" type="text" value="${oldTag}">`;
-                    const renameInput = pill.querySelector('.pill-rename-input');
-                    renameInput.focus();
-                    renameInput.select();
-
-                    const doSave = async () => {
-                        const newTag = renameInput.value.trim().toLowerCase();
-                        if (!newTag || newTag === oldTag) {
-                            updateSelectedBar();
-                            return;
-                        }
-
-                        const existing = SelectionManager.getAllContextTags();
-                        if (existing.includes(newTag)) {
-                            updateSelectedBar();
-                            return;
-                        }
-
-                        await Store.renameTag(oldTag, newTag);
-
-                        // Update local state
-                        if (selectedTags.has(oldTag)) {
-                            selectedTags.delete(oldTag);
-                            selectedTags.add(newTag);
-                        }
-                        const idx = allTags.indexOf(oldTag);
-                        if (idx !== -1) allTags[idx] = newTag;
-
-                        updateSelectedBar();
-                        updateItemVisuals();
-                        input.focus();
-                    };
-
-                    const doCancel = () => {
-                        updateSelectedBar();
-                    };
-
-                    renameInput.addEventListener('keydown', (ev) => {
-                        if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); doSave(); }
-                        if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); doCancel(); }
-                    });
-
-                    renameInput.addEventListener('blur', () => {
-                        setTimeout(() => {
-                            if (pill.querySelector('.pill-rename-input')) doCancel();
-                        }, 100);
-                    });
-                });
-            });
-        };
-
         const updateItemVisuals = () => {
             modal.querySelectorAll('.tag-modal-item').forEach(item => {
                 const tag = item.dataset.tag;
-                const isSelected = selectedTags.has(tag);
-                const checkbox = item.querySelector('.tag-checkbox');
-                if (isSelected) {
-                    item.classList.add('selected');
-                    if (checkbox) checkbox.textContent = '✓';
-                } else {
-                    item.classList.remove('selected');
-                    if (checkbox) checkbox.textContent = '';
-                }
+                item.classList.toggle('selected', selectedTags.has(tag));
             });
         };
 
@@ -146,16 +66,14 @@ const TagModal = {
             } else {
                 selectedTags.add(tag);
             }
-            updateSelectedBar();
             updateItemVisuals();
+            updatePendingTags();
         };
 
-        // --- Save ---
-
-        const saveChanges = async () => {
-            const newTags = Array.from(selectedTags).sort();
-
+        // For 'new' blocks: update pending tags immediately (no commit)
+        const updatePendingTags = () => {
             if (blockId === 'new') {
+                const newTags = Array.from(selectedTags).sort();
                 DocumentView.pendingNewTags = newTags;
 
                 for (const tag of newTags) {
@@ -178,22 +96,13 @@ const TagModal = {
                         }
                     }
                 }
-            } else if (blockId) {
-                if (JSON.stringify(newTags) !== JSON.stringify([...initialTags].sort())) {
-                    await App.updateBlockProperty(blockId, 'tags', newTags);
-                }
             }
-            modal.close();
         };
-
-        // Attach handlers to initially rendered selected pills
-        updateSelectedBar();
 
         // --- Item click + double-click rename ---
 
         modal.querySelectorAll('.tag-modal-item').forEach(item => {
             item.addEventListener('click', (e) => {
-                // Don't toggle if clicking inside rename input
                 if (e.target.closest('.tag-rename-input')) return;
                 e.stopPropagation();
                 toggleTag(item.dataset.tag);
@@ -203,7 +112,7 @@ const TagModal = {
             // Double-click to rename
             item.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
-                this._startRename(item, modal, allTags, selectedTags, updateSelectedBar, updateItemVisuals, input, treeData);
+                this._startRename(item, modal, allTags, selectedTags, updateItemVisuals, input, treeData);
             });
         });
 
@@ -213,18 +122,18 @@ const TagModal = {
             header.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const group = header.closest('.tag-modal-group');
-                const allTags = Array.from(group.querySelectorAll(':scope > .tag-modal-group-items > .tag-modal-item'))
+                const groupTags = Array.from(group.querySelectorAll(':scope > .tag-modal-group-items > .tag-modal-item'))
                     .map(item => item.dataset.tag);
-                const allSelected = allTags.every(t => selectedTags.has(t));
+                const allSelected = groupTags.every(t => selectedTags.has(t));
 
                 if (allSelected) {
-                    allTags.forEach(t => selectedTags.delete(t));
+                    groupTags.forEach(t => selectedTags.delete(t));
                 } else {
-                    allTags.forEach(t => selectedTags.add(t));
+                    groupTags.forEach(t => selectedTags.add(t));
                 }
 
-                updateSelectedBar();
                 updateItemVisuals();
+                updatePendingTags();
                 input.focus();
             });
         });
@@ -245,17 +154,16 @@ const TagModal = {
 
                 if (!allTags.includes(tag)) {
                     allTags.push(tag);
-                    this._insertTagIntoList(modal, tag, toggleTag, input);
+                    this._insertTagIntoList(modal, tag, toggleTag, input, selectedTags, updateItemVisuals, updatePendingTags);
                 }
             }
 
-            updateSelectedBar();
             updateItemVisuals();
             input.value = '';
             promptBtn.style.display = 'none';
+            updatePendingTags();
         };
 
-        modal.querySelector('#tagModalSaveBtn').addEventListener('click', saveChanges);
         promptBtn.addEventListener('click', () => {
             createTag(input.value.trim().toLowerCase());
         });
@@ -379,7 +287,7 @@ const TagModal = {
             const lastDot = val.lastIndexOf('.');
             let exactMatch = false;
 
-            // Filter the main list (existing behavior)
+            // Filter the main list
             if (lastDot !== -1) {
                 const groupName = val.substring(0, lastDot).toLowerCase();
                 const leafSearch = val.substring(lastDot + 1).toLowerCase();
@@ -388,7 +296,7 @@ const TagModal = {
                     const tag = item.dataset.tag;
                     const { segments, leaf } = Common.parseHierarchicalTag(tag);
                     if (segments.length > 0 && segments[0].toLowerCase() === groupName) {
-                        item.style.display = (leaf.toLowerCase().includes(leafSearch) || leafSearch === '') ? 'block' : 'none';
+                        item.style.display = (leaf.toLowerCase().includes(leafSearch) || leafSearch === '') ? '' : 'none';
                     } else {
                         item.style.display = 'none';
                     }
@@ -400,7 +308,7 @@ const TagModal = {
                 modal.querySelectorAll('.tag-modal-item').forEach(item => {
                     const tag = item.dataset.tag;
                     const displayName = Common.formatTagDisplay(tag).toLowerCase();
-                    item.style.display = (tag.includes(val) || displayName.includes(val) || val === '') ? 'block' : 'none';
+                    item.style.display = (tag.includes(val) || displayName.includes(val) || val === '') ? '' : 'none';
                     if (tag === val) exactMatch = true;
                 });
                 modal.querySelectorAll('.tag-modal-group').forEach(group => this._updateGroupVisibility(group));
@@ -439,7 +347,6 @@ const TagModal = {
             } else if (e.key === 'Tab') {
                 e.preventDefault();
                 if (isAcOpen && acSelectedIndex >= 0) {
-                    // Accept the highlighted suggestion
                     const item = acItems[acSelectedIndex];
                     if (item.isGroup) {
                         input.value = item.completed.toLowerCase();
@@ -450,18 +357,15 @@ const TagModal = {
                         input.dispatchEvent(new Event('input'));
                     }
                 } else if (isAcOpen && acItems.length > 0) {
-                    // No selection — accept first suggestion
                     const item = acItems[0];
                     if (item.isGroup) {
                         input.value = item.completed.toLowerCase();
                         input.dispatchEvent(new Event('input'));
                     } else {
-                        // Complete to common prefix or full tag
                         input.value = item.completed.toLowerCase();
                         input.dispatchEvent(new Event('input'));
                     }
                 } else {
-                    // No dropdown — do Tab completion (one segment)
                     const val = input.value.trim().toLowerCase();
                     if (!val) return;
                     computeSuggestions(val);
@@ -491,7 +395,7 @@ const TagModal = {
                         input.value = '';
                         input.dispatchEvent(new Event('input'));
                     } else {
-                        saveChanges();
+                        modal.close();
                     }
                 }
             } else if (e.key === 'Escape') {
@@ -514,25 +418,7 @@ const TagModal = {
     // --- Rendering helpers ---
 
     /**
-     * Render the selected tags bar with removable pills
-     */
-    _renderSelectedBar(selectedTags) {
-        const tags = Array.from(selectedTags);
-        if (tags.length === 0) {
-            return '<span class="tag-modal-selected-empty">No tags selected</span>';
-        }
-
-        return tags.sort().map(tag => {
-            const badgeHtml = this._renderBadge(tag);
-            return `<span class="tag-pill" data-tag="${tag}">
-                ${badgeHtml}
-                <span class="tag-pill-remove">&times;</span>
-            </span>`;
-        }).join('');
-    },
-
-    /**
-     * Render the full tag tree (groups + flat tags) for the modal
+     * Render the full tag tree (groups + flat tags) as badge pills
      */
     _renderTree({ groups, flat }, selectedTags) {
         let html = '';
@@ -548,10 +434,9 @@ const TagModal = {
 
             groupTags.forEach(tag => {
                 const { leaf } = Common.parseHierarchicalTag(tag);
-                html += `<div class="tag-modal-item ${selectedTags.has(tag) ? 'selected' : ''}" data-tag="${tag}">`;
-                html += `<span class="tag-checkbox">${selectedTags.has(tag) ? '✓' : ''}</span>`;
-                html += `${Common.capitalizeFirst(leaf)}`;
-                html += `<span class="tag-edit-hint">&#9998;</span>`;
+                const selClass = selectedTags.has(tag) ? ' selected' : '';
+                html += `<div class="tag-modal-item${selClass}" data-tag="${tag}">`;
+                html += `<span class="tag-badge">${Common.capitalizeFirst(leaf)}</span>`;
                 html += `</div>`;
             });
 
@@ -560,10 +445,9 @@ const TagModal = {
 
         // Render flat tags
         flat.forEach(tag => {
-            html += `<div class="tag-modal-item tag-modal-flat-item ${selectedTags.has(tag) ? 'selected' : ''}" data-tag="${tag}">`;
-            html += `<span class="tag-checkbox">${selectedTags.has(tag) ? '✓' : ''}</span>`;
-            html += `${SelectionManager.getTagDisplayName(tag)}`;
-            html += `<span class="tag-edit-hint">&#9998;</span>`;
+            const selClass = selectedTags.has(tag) ? ' selected' : '';
+            html += `<div class="tag-modal-item tag-modal-flat-item${selClass}" data-tag="${tag}">`;
+            html += `<span class="tag-badge">${SelectionManager.getTagDisplayName(tag)}</span>`;
             html += `</div>`;
         });
 
@@ -587,7 +471,7 @@ const TagModal = {
     /**
      * Insert a newly created tag into the list at the correct position.
      */
-    _insertTagIntoList(modal, tag, toggleFn, inputEl) {
+    _insertTagIntoList(modal, tag, toggleFn, inputEl, selectedTags, updateItemVisuals, updatePendingTags) {
         const list = modal.querySelector('#tagModalList');
         const { segments, leaf } = Common.parseHierarchicalTag(tag);
 
@@ -600,7 +484,6 @@ const TagModal = {
             let group = list.querySelector(`:scope > .tag-modal-group[data-group-path="${groupName}"]`);
 
             if (!group) {
-                // Create the group
                 group = document.createElement('div');
                 group.className = 'tag-modal-group';
                 group.dataset.groupPath = groupName;
@@ -608,7 +491,6 @@ const TagModal = {
                     <div class="tag-modal-group-header">${Common.capitalizeFirst(groupName)}</div>
                     <div class="tag-modal-group-items"></div>
                 `;
-                // Insert before flat tags or in sorted order among groups
                 const firstFlat = list.querySelector(':scope > .tag-modal-flat-item');
                 if (firstFlat) {
                     list.insertBefore(group, firstFlat);
@@ -624,12 +506,29 @@ const TagModal = {
                     }
                     if (!inserted) list.appendChild(group);
                 }
+
+                // Attach group header handler
+                const header = group.querySelector('.tag-modal-group-header');
+                header.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const grp = header.closest('.tag-modal-group');
+                    const grpTags = Array.from(grp.querySelectorAll(':scope > .tag-modal-group-items > .tag-modal-item'))
+                        .map(item => item.dataset.tag);
+                    const allSel = grpTags.every(t => selectedTags.has(t));
+                    if (allSel) {
+                        grpTags.forEach(t => selectedTags.delete(t));
+                    } else {
+                        grpTags.forEach(t => selectedTags.add(t));
+                    }
+                    updateItemVisuals();
+                    updatePendingTags();
+                    inputEl.focus();
+                });
             }
 
             const parentContainer = group.querySelector('.tag-modal-group-items');
-            newItem.innerHTML = `<span class="tag-checkbox">✓</span> ${Common.capitalizeFirst(leaf)}<span class="tag-edit-hint">&#9998;</span>`;
+            newItem.innerHTML = `<span class="tag-badge">${Common.capitalizeFirst(leaf)}</span>`;
 
-            // Insert in sorted order
             const existingItems = Array.from(parentContainer.querySelectorAll(':scope > .tag-modal-item'));
             let inserted = false;
             for (const existing of existingItems) {
@@ -643,7 +542,7 @@ const TagModal = {
                 parentContainer.appendChild(newItem);
             }
         } else {
-            newItem.innerHTML = `<span class="tag-checkbox">✓</span> ${SelectionManager.getTagDisplayName(tag)}`;
+            newItem.innerHTML = `<span class="tag-badge">${SelectionManager.getTagDisplayName(tag)}</span>`;
             newItem.classList.add('tag-modal-flat-item');
             const flatItems = Array.from(list.querySelectorAll(':scope > .tag-modal-flat-item'));
             let inserted = false;
@@ -668,42 +567,35 @@ const TagModal = {
 
         newItem.addEventListener('dblclick', (e) => {
             e.stopPropagation();
-            this._startRename(newItem, modal, null, null, null, null, inputEl, null);
+            this._startRename(newItem, modal, null, null, null, inputEl, null);
         });
     },
 
     /**
      * Start inline rename on a tag item
      */
-    _startRename(item, modal, allTags, selectedTags, updateSelectedBar, updateItemVisuals, inputEl, treeData) {
+    _startRename(item, modal, allTags, selectedTags, updateItemVisuals, inputEl, treeData) {
         const oldTag = item.dataset.tag;
         if (!oldTag) return;
 
-        // Prevent double-triggering
         if (item.querySelector('.tag-rename-input')) return;
 
-        const checkboxEl = item.querySelector('.tag-checkbox');
-        const hintEl = item.querySelector('.tag-edit-hint');
         const originalHtml = item.innerHTML;
 
-        // Replace content with input
         item.innerHTML = `<input class="tag-rename-input" type="text" value="${oldTag}">`;
         const renameInput = item.querySelector('.tag-rename-input');
         renameInput.focus();
         renameInput.select();
 
-        // Temporarily disable click toggle
         item.style.pointerEvents = 'auto';
 
         const doSave = async () => {
             const newTag = renameInput.value.trim().toLowerCase();
             if (!newTag || newTag === oldTag) {
-                // Cancel — restore
                 item.innerHTML = originalHtml;
                 return;
             }
 
-            // Check for duplicate
             const existingTags = SelectionManager.getAllContextTags();
             if (existingTags.includes(newTag) && newTag !== oldTag) {
                 alert(`Tag "${newTag}" already exists.`);
@@ -711,28 +603,22 @@ const TagModal = {
                 return;
             }
 
-            // Rename via Store
             await Store.renameTag(oldTag, newTag);
 
-            // Update selectedTags if provided
             if (selectedTags && selectedTags.has(oldTag)) {
                 selectedTags.delete(oldTag);
                 selectedTags.add(newTag);
             }
 
-            // Update allTags if provided
             if (allTags) {
                 const idx = allTags.indexOf(oldTag);
                 if (idx !== -1) allTags[idx] = newTag;
             }
 
-            // Update the DOM item
             item.dataset.tag = newTag;
             const { leaf } = Common.parseHierarchicalTag(newTag);
-            item.innerHTML = `<span class="tag-checkbox">✓</span> ${Common.capitalizeFirst(leaf)}<span class="tag-edit-hint">&#9998;</span>`;
+            item.innerHTML = `<span class="tag-badge">${Common.capitalizeFirst(leaf)}</span>`;
 
-            // Update selected bar
-            if (updateSelectedBar) updateSelectedBar();
             if (updateItemVisuals) updateItemVisuals();
 
             inputEl.focus();
@@ -755,7 +641,6 @@ const TagModal = {
         });
 
         renameInput.addEventListener('blur', () => {
-            // Small delay to allow Enter to fire first
             setTimeout(() => {
                 if (item.querySelector('.tag-rename-input')) {
                     doCancel();
