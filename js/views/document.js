@@ -1359,24 +1359,18 @@ const DocumentView = {
             }
         }
 
+        // Hidden task lines are handled by a separate StateField extension (see
+        // createHiddenLineExtension) which CAN use cross-line Decoration.replace() —
+        // something ViewPlugin decorations cannot do.  Here we only skip already-hidden
+        // lines and detect orphaned tasks.
         for (let i = 1; i <= state.doc.lines; i++) {
-            if (fencedBlockLines.has(i)) {
-                continue;
-            }
+            if (fencedBlockLines.has(i)) continue;
 
             const line = state.doc.line(i);
 
-            // Per-line task filtering (skip lines with cursor)
-            if (hiddenLines.has(i - 1) && !cursorLines.has(i)) {
-                // Hide line content without crossing line breaks (CM6 plugin restriction).
-                // Replace only the text, then collapse the line via a line decoration.
-                const contentEnd = line.from + line.text.length;
-                if (contentEnd > line.from) {
-                    builder.push(Decoration.replace({}).range(line.from, contentEnd));
-                }
-                builder.push(Decoration.line({ attributes: { class: 'cm-hidden-task-line' } }).range(line.from));
-                continue;
-            }
+            // Skip lines hidden by the StateField, but NOT cursor lines — the
+            // StateField preserves those so they still need syntax decorations.
+            if (hiddenLines.has(i - 1) && !cursorLines.has(i)) continue;
 
             // Mark orphaned tasks whose parent was filtered out
             if (orphanedLines.has(i - 1)) {
@@ -1389,6 +1383,84 @@ const DocumentView = {
 
         // Delegate sorting entirely to CodeMirror which understands how to resolve overlaps securely
         return Decoration.set(builder, true);
+    },
+
+    /**
+     * Build cross-line Decoration.replace() ranges for hidden task lines.
+     * Called from a StateField (NOT a ViewPlugin) so it CAN span line breaks,
+     * which properly removes hidden regions from CM's height map and keeps the
+     * gutter in sync.
+     */
+    buildHiddenLineDecorations(state) {
+        const { Decoration } = window.CodeMirror;
+        const activeTaskFilters = this.getActiveTaskFilter();
+        if (!activeTaskFilters || activeTaskFilters.size === 0) {
+            return Decoration.none;
+        }
+
+        const allLineTexts = [];
+        for (let i = 1; i <= state.doc.lines; i++) allLineTexts.push(state.doc.line(i).text);
+        const hiddenLines = this.getHiddenTaskLineIndices(allLineTexts, activeTaskFilters);
+
+        if (hiddenLines.size === 0) return Decoration.none;
+
+        // Lines with the cursor are never hidden (user needs to see/edit them).
+        // Unlike the ViewPlugin version, we don't check hasFocus — always
+        // preserve the cursor line.  Better UX when switching focus to sidebar.
+        const cursorLines = new Set();
+        for (const range of state.selection.ranges) {
+            cursorLines.add(state.doc.lineAt(range.head).number);
+        }
+
+        // Group consecutive hidden (non-cursor) lines into replace spans
+        const builder = [];
+        let spanStart = null;
+
+        for (let i = 1; i <= state.doc.lines; i++) {
+            const isHidden = hiddenLines.has(i - 1);
+            const hasCursor = cursorLines.has(i);
+
+            if (isHidden && !hasCursor) {
+                if (spanStart === null) {
+                    spanStart = state.doc.line(i).from;
+                }
+            } else {
+                if (spanStart !== null) {
+                    const endPos = state.doc.line(i).from;
+                    builder.push(Decoration.replace({}).range(spanStart, endPos));
+                    spanStart = null;
+                }
+            }
+        }
+        // Flush trailing span (last lines of document)
+        if (spanStart !== null) {
+            builder.push(Decoration.replace({}).range(spanStart, state.doc.line(state.doc.lines).to));
+        }
+
+        return builder.length > 0 ? Decoration.set(builder, true) : Decoration.none;
+    },
+
+    /**
+     * Create a StateField extension for hidden task line decorations.
+     * StateField-based decorations CAN span line breaks (unlike ViewPlugin
+     * decorations), so hidden line regions are properly removed from CM's
+     * height map and the gutter syncs correctly.
+     */
+    createHiddenLineExtension() {
+        const { StateField, EditorView } = window.CodeMirror;
+        const self = this;
+        return StateField.define({
+            create(state) {
+                return self.buildHiddenLineDecorations(state);
+            },
+            update(deco, tr) {
+                if (tr.docChanged || tr.selection) {
+                    return self.buildHiddenLineDecorations(tr.state);
+                }
+                return deco.map(tr.changes);
+            },
+            provide: f => EditorView.decorations.from(f)
+        });
     },
 
     /**
@@ -1588,6 +1660,7 @@ const DocumentView = {
                 keymap.of([indentWithTab]),
                 EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }]),
                 EditorView.lineWrapping,
+                this.createHiddenLineExtension(),
                 this.createLivePreviewPlugin(),
                 this.createIndentFolding(),
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),
