@@ -244,6 +244,21 @@ const SelectionManager = {
     },
 
     /**
+     * Clear all active filters (context, excluded, time, contact, search)
+     */
+    clearAllFilters() {
+        this.selections.context.clear();
+        this.selections.excluded.clear();
+        this.selections.time = '';
+        this.selections.contact = '';
+        Store.searchQuery = '';
+        this.saveSelectionState();
+        this.updateSelectionUI();
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+    },
+
+    /**
      * Get computed context tags
      * @returns {Array} Computed context tag ids
      */

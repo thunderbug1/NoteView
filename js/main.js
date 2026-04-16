@@ -923,6 +923,19 @@ const App = {
 
                 DocumentView.pendingNewTags = null;
                 App.render();
+
+                // Show hint if the new note is hidden by active filters
+                const reasons = Store.getBlockingFilters(newBlock);
+                if (reasons.length > 0) {
+                    const labels = reasons.map(r => r.label).join(', ');
+                    Common.showToast('Note created but hidden by filter: ' + labels, {
+                        actionLabel: 'Show all',
+                        action: () => {
+                            SelectionManager.clearAllFilters();
+                            App.render();
+                        }
+                    });
+                }
             } finally {
                 isCreating = false;
             }

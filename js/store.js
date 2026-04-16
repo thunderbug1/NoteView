@@ -984,6 +984,156 @@ const Store = {
         return result;
     },
 
+    /**
+     * Determine which active filters would exclude a given block.
+     * Returns an array of { type, label } objects. Empty if the block passes all filters.
+     */
+    getBlockingFilters(block) {
+        const reasons = [];
+        if (block.pinned) return reasons;
+
+        const timeSelection = SelectionManager.selections.time || '';
+        const contextSelection = SelectionManager.selections.context;
+        const excludedSelection = SelectionManager.selections.excluded;
+        const contactSelection = SelectionManager.selections.contact;
+        const searchQuery = this.searchQuery;
+
+        // Time filter
+        if (timeSelection) {
+            const property = this.timeProperty || 'lastUpdated';
+            const dateVal = block[property];
+            if (!dateVal || !TimeFilter.checkTimeFilter(dateVal, timeSelection)) {
+                const labels = { today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month' };
+                reasons.push({ type: 'time', label: labels[timeSelection] || timeSelection });
+            }
+        }
+
+        // Context tags (AND logic)
+        if (contextSelection.size > 0) {
+            const blockTags = block.tags || [];
+
+            for (const item of contextSelection) {
+                if (SelectionManager.isComputedContextTag(item)) continue;
+
+                if (item.startsWith('path:')) {
+                    const group = item.slice(5);
+                    const hasMatch = blockTags.some(tag => {
+                        const { segments } = Common.parseHierarchicalTag(tag);
+                        return segments.length > 0 && segments[0] === group;
+                    });
+                    if (!hasMatch) {
+                        reasons.push({ type: 'context', label: group });
+                    }
+                } else {
+                    if (!blockTags.includes(item)) {
+                        reasons.push({ type: 'context', label: item });
+                    }
+                }
+            }
+
+            // Computed context tags
+            if (contextSelection.has('Todo.all')) {
+                if (!block.content?.match(/\[[ xX\/bB\-]\]/)) {
+                    reasons.push({ type: 'context', label: 'Todo.all' });
+                }
+            }
+            if (contextSelection.has('Todo.open')) {
+                if (!block.content?.match(/\[[ \/]\]/)) {
+                    reasons.push({ type: 'context', label: 'Todo.open' });
+                }
+            }
+            if (contextSelection.has('Todo.blocked')) {
+                const tasks = TaskParser.parseTasksFromBlock(block);
+                if (!tasks.some(t => TaskParser.isBlockedTask(t))) {
+                    reasons.push({ type: 'context', label: 'Todo.blocked' });
+                }
+            }
+            if (contextSelection.has('Todo.unblocked')) {
+                const tasks = TaskParser.parseTasksFromBlock(block);
+                if (!tasks.some(t => TaskParser.isUnblockedTask(t))) {
+                    reasons.push({ type: 'context', label: 'Todo.unblocked' });
+                }
+            }
+            if (contextSelection.has('Status.untagged')) {
+                if (block.tags && block.tags.length > 0) {
+                    reasons.push({ type: 'context', label: 'Status.untagged' });
+                }
+            }
+            if (contextSelection.has('Status.unassigned')) {
+                const tasks = TaskParser.parseTasksFromBlock(block);
+                if (!TaskParser.hasUnassignedTasks(tasks)) {
+                    reasons.push({ type: 'context', label: 'Status.unassigned' });
+                }
+            }
+        }
+
+        // Excluded tags
+        if (excludedSelection.size > 0) {
+            const blockTags = block.tags || [];
+
+            for (const item of excludedSelection) {
+                if (SelectionManager.isComputedContextTag(item)) {
+                    if (item === 'Todo.all') {
+                        if (block.content?.match(/\[[ xX\/bB\-]\]/)) {
+                            reasons.push({ type: 'excluded', label: 'Todo.all' });
+                        }
+                    } else if (item === 'Todo.open') {
+                        if (block.content?.match(/\[[ \/]\]/)) {
+                            reasons.push({ type: 'excluded', label: 'Todo.open' });
+                        }
+                    } else if (item === 'Todo.blocked') {
+                        if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isBlockedTask(t))) {
+                            reasons.push({ type: 'excluded', label: 'Todo.blocked' });
+                        }
+                    } else if (item === 'Todo.unblocked') {
+                        if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isUnblockedTask(t))) {
+                            reasons.push({ type: 'excluded', label: 'Todo.unblocked' });
+                        }
+                    } else if (item === 'Status.untagged') {
+                        if (!block.tags || block.tags.length === 0) {
+                            reasons.push({ type: 'excluded', label: 'Status.untagged' });
+                        }
+                    } else if (item === 'Status.unassigned') {
+                        if (TaskParser.hasUnassignedTasks(TaskParser.parseTasksFromBlock(block))) {
+                            reasons.push({ type: 'excluded', label: 'Status.unassigned' });
+                        }
+                    }
+                } else if (item.startsWith('path:')) {
+                    const group = item.slice(5);
+                    if (blockTags.some(tag => {
+                        const { segments } = Common.parseHierarchicalTag(tag);
+                        return segments.length > 0 && segments[0] === group;
+                    })) {
+                        reasons.push({ type: 'excluded', label: item });
+                    }
+                } else {
+                    if (blockTags.includes(item)) {
+                        reasons.push({ type: 'excluded', label: item });
+                    }
+                }
+            }
+        }
+
+        // Contact filter
+        if (contactSelection) {
+            if (!ContactHelper.hasContact(block.content || '', contactSelection)) {
+                reasons.push({ type: 'contact', label: '@' + contactSelection });
+            }
+        }
+
+        // Search filter
+        if (searchQuery) {
+            const searchLower = searchQuery.toLowerCase();
+            const contentMatch = block.content?.toLowerCase().includes(searchLower);
+            const tagMatch = block.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+            if (!contentMatch && !tagMatch) {
+                reasons.push({ type: 'search', label: '"' + searchQuery + '"' });
+            }
+        }
+
+        return reasons;
+    },
+
     // Override saveBlock to invalidate cache
     // Save block to disk and optionally commit to git
     async saveBlock(block, options = {}) {

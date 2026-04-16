@@ -164,6 +164,51 @@ function debounce(func, wait) {
     };
 }
 
+/**
+ * Show a temporary toast notification at the bottom of the screen
+ * @param {string} message - Toast message text
+ * @param {Object} [opts] - Options
+ * @param {Function} [opts.action] - Click handler for action button
+ * @param {string} [opts.actionLabel] - Label for action button
+ * @param {number} [opts.duration=4000] - Duration in milliseconds
+ */
+function showToast(message, { action, actionLabel, duration } = {}) {
+    document.querySelectorAll('.nv-toast').forEach(t => t.remove());
+
+    const toast = document.createElement('div');
+    toast.className = 'nv-toast';
+    toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);' +
+        'padding:0.75rem 1.5rem;background:var(--bg-secondary);border:1px solid var(--border);' +
+        'border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;' +
+        'z-index:10001;box-shadow:var(--shadow-lg);transition:opacity 0.3s;opacity:1;' +
+        'display:flex;align-items:center;gap:0.75rem;white-space:nowrap;';
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = message;
+    toast.appendChild(textSpan);
+
+    if (action && actionLabel) {
+        const btn = document.createElement('button');
+        btn.textContent = actionLabel;
+        btn.style.cssText = 'background:none;border:1px solid var(--accent);color:var(--accent);' +
+            'padding:0.25rem 0.75rem;border-radius:var(--radius-sm);cursor:pointer;' +
+            'font-size:0.8rem;white-space:nowrap;';
+        btn.addEventListener('click', () => {
+            action();
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        });
+        toast.appendChild(btn);
+    }
+
+    document.body.appendChild(toast);
+    const timeout = duration || 4000;
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, timeout);
+}
+
 // Export for use in other modules
 window.Common = {
     escapeHtml,
@@ -175,5 +220,6 @@ window.Common = {
     debounce,
     parseHierarchicalTag,
     formatTagDisplay,
-    buildTagTree
+    buildTagTree,
+    showToast
 };
