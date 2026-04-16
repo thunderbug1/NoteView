@@ -1,0 +1,642 @@
+/* ============================================
+   NoteView - AI Assistant
+   ============================================ */
+
+/* AI Button in Block Metadata Bar */
+.ai-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.document-view .block:hover .ai-btn,
+.document-view .block:focus-within .ai-btn {
+    opacity: 0.5;
+}
+
+.ai-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+/* AI button — disabled state (AI features off) */
+.ai-btn-disabled {
+    opacity: 0.3 !important;
+    cursor: default;
+}
+
+.ai-btn-disabled:hover {
+    opacity: 0.5 !important;
+    color: var(--text-muted);
+    background: transparent;
+    transform: none;
+}
+
+/* Content modal AI button is always visible */
+.content-modal .ai-btn {
+    opacity: 0.6;
+}
+
+/* AI Modal Overlay */
+.ai-modal {
+    width: 680px;
+    max-width: 92vw;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.ai-modal .tag-modal-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Model Profile Selector */
+.ai-model-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ai-model-select {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.ai-model-select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Scope Toggle */
+.ai-scope-toggle {
+    display: flex;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.ai-scope-option {
+    flex: 1;
+    padding: 0.45rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+    font-family: inherit;
+}
+
+.ai-scope-option:hover {
+    background: var(--bg-tertiary);
+}
+
+.ai-scope-option.active {
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+}
+
+/* Preset Chips */
+.ai-preset-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.ai-preset-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.65rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.ai-preset-chip:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.ai-preset-chip.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* Instruction Input */
+.ai-instruction-input {
+    width: 100%;
+    min-height: 80px;
+    max-height: 200px;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    resize: vertical;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+}
+
+.ai-instruction-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.ai-instruction-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Action Row */
+.ai-action-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.ai-send-btn {
+    padding: 0.55rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    background: var(--accent);
+    color: white;
+    font-family: inherit;
+}
+
+.ai-send-btn:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.ai-send-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.ai-stop-btn {
+    padding: 0.55rem 1rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-family: inherit;
+    display: none;
+}
+
+.ai-stop-btn.visible {
+    display: inline-flex;
+}
+
+.ai-stop-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--danger, #ef4444);
+}
+
+/* Streaming Response Area */
+.ai-response-area {
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ai-response-area.visible {
+    display: flex;
+}
+
+.ai-response-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem;
+    font-family: 'Menlo', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    max-height: 250px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.ai-streaming-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.ai-streaming-indicator::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: ai-dot-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ai-dot-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+/* Error Display */
+.ai-error {
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: var(--radius-sm);
+    color: var(--danger, #ef4444);
+    font-size: 0.85rem;
+}
+
+.ai-error .ai-retry-btn {
+    margin-top: 0.5rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger, #ef4444);
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.ai-error .ai-retry-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Diff View */
+.ai-diff-container {
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ai-diff-container.visible {
+    display: flex;
+}
+
+.ai-diff-editor {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    min-height: 200px;
+    max-height: 400px;
+}
+
+.ai-diff-editor .cm-editor {
+    height: 100%;
+}
+
+.ai-diff-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.ai-accept-btn {
+    padding: 0.55rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    background: var(--success, #22c55e);
+    color: white;
+    font-family: inherit;
+}
+
+.ai-accept-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.ai-reject-btn {
+    padding: 0.55rem 1.25rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-family: inherit;
+}
+
+.ai-reject-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.ai-no-changes {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+/* Settings - AI Section */
+.ai-settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ai-toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.ai-toggle-switch.active {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.ai-toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.ai-toggle-switch.active::after {
+    transform: translateX(20px);
+}
+
+.ai-settings-details {
+    display: none;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.ai-settings-details.visible {
+    display: flex;
+}
+
+/* Profile List in Settings */
+.ai-profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ai-profile-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    transition: border-color 0.2s;
+}
+
+.ai-profile-item:hover {
+    border-color: var(--accent-light);
+}
+
+.ai-profile-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-profile-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.ai-profile-details {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-profile-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.ai-profile-actions button {
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
+}
+
+.ai-profile-actions button:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.ai-profile-actions .delete-profile-btn:hover {
+    border-color: var(--danger, #ef4444);
+    color: var(--danger, #ef4444);
+}
+
+.ai-add-profile-btn {
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
+    width: 100%;
+    text-align: center;
+}
+
+.ai-add-profile-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.05));
+}
+
+/* Profile Edit Form */
+.ai-profile-form {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ai-profile-form .ai-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.ai-profile-form label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.ai-profile-form input {
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+}
+
+.ai-profile-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.ai-form-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.25rem;
+}
+
+.ai-form-actions button {
+    padding: 0.4rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
+}
+
+.ai-form-save {
+    background: var(--accent);
+    color: white;
+    border: none;
+}
+
+.ai-form-save:hover {
+    opacity: 0.9;
+}
+
+.ai-form-cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.ai-form-cancel:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .ai-model-select,
+[data-theme="dark"] .ai-instruction-input,
+[data-theme="dark"] .ai-profile-form input {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .ai-response-content {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .ai-modal {
+        width: 95vw;
+        max-height: 90vh;
+    }
+
+    .ai-model-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ai-profile-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ai-diff-actions {
+        flex-direction: column;
+    }
+
+    .ai-diff-actions button {
+        width: 100%;
+        text-align: center;
+    }
+}

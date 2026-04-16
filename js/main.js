@@ -153,6 +153,7 @@ const App = {
         this.setupEventListeners();
         SelectionManager.init();
         SelectionManager.updateTagCounts();
+        await AIAssistant.init();
         this.updateVaultSwitcherName();
         this.render();
         console.log('[App] completeInitialization:done', {
@@ -372,7 +373,7 @@ const App = {
             if (e.shiftKey) combo.push('Shift');
             if (e.metaKey) combo.push('Meta');
 
-            const key = e.key === ' ' ? 'Space' : (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+            const key = !e.key ? '' : e.key === ' ' ? 'Space' : (e.key.length === 1 ? e.key.toUpperCase() : e.key);
             if (!['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
                 combo.push(key);
             }
@@ -402,6 +403,21 @@ const App = {
             if (Store.shortcuts && currentCombo === Store.shortcuts.newNote) {
                 e.preventDefault();
                 this.handleNewNote();
+            }
+
+            // AI Assistant shortcut
+            if (Store.shortcuts && currentCombo === Store.shortcuts.aiAssistant) {
+                e.preventDefault();
+                if (!AIAssistant.enabled) {
+                    AIAssistant._showToast('Enable AI Features in Settings first');
+                } else {
+                    const activeEditor = document.activeElement?.closest('.cm-editor');
+                    const cmContainer = activeEditor?.closest('.codemirror-container');
+                    const blockId = cmContainer?.dataset.id;
+                    if (blockId && blockId !== 'new') {
+                        AIAssistant.openOverlay(blockId);
+                    }
+                }
             }
         });
     },

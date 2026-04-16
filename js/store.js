@@ -29,7 +29,7 @@ const Store = {
     },
     directoryHandle: null,
     contacts: new Map(), // Map of username -> Set of tags
-    shortcuts: { newNote: 'Ctrl+Alt+N' },
+    shortcuts: { newNote: 'Ctrl+Alt+N', aiAssistant: 'Ctrl+Shift+A' },
 
     // Cache for filtered blocks
     _filteredBlocksCache: CacheManager.createCache(() => {
@@ -476,6 +476,7 @@ const Store = {
 
     async openDirectory(handle) {
         this.directoryHandle = handle;
+        if (window.AppSettings) AppSettings.invalidate();
         await this.saveDirectoryHandle(handle);
         await this.saveVault(handle);
         await GitStore.init(handle);

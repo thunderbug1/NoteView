@@ -3,6 +3,25 @@
  */
 
 const SettingsView = {
+
+    _renderProfiles() {
+        if (AIAssistant.profiles.length === 0) {
+            return '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0">No model profiles configured yet.</div>';
+        }
+        return AIAssistant.profiles.map(p => `
+            <div class="ai-profile-item" data-profile-id="${escapeHtml(p.id)}">
+                <div class="ai-profile-info">
+                    <div class="ai-profile-name">${escapeHtml(p.name)}</div>
+                    <div class="ai-profile-details">${escapeHtml(p.model)} &middot; ${escapeHtml(p.endpointUrl)}</div>
+                </div>
+                <div class="ai-profile-actions">
+                    <button class="edit-profile-btn" data-profile-id="${escapeHtml(p.id)}">Edit</button>
+                    <button class="delete-profile-btn" data-profile-id="${escapeHtml(p.id)}">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    },
+
     async render(blocks) {
         const container = document.getElementById('viewContainer');
         if (!container) return;
@@ -61,6 +80,47 @@ const SettingsView = {
                             <p class="settings-item-hint">Quickly add a new note from anywhere.</p>
                         </div>
                         <div id="newNoteShortcut" class="shortcut-key" title="Click to remap">${escapeHtml(Store.shortcuts.newNote)}</div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>AI Configuration</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Enable AI Features</label>
+                            <p class="settings-item-hint">Show AI assistant button in note metadata bar. Configure model profiles and presets below.</p>
+                        </div>
+                        <div class="ai-toggle-switch ${AIAssistant.enabled ? 'active' : ''}" id="aiToggleSwitch" title="Toggle AI features"></div>
+                    </div>
+
+                    <div class="ai-settings-details ${AIAssistant.enabled ? 'visible' : ''}" id="aiSettingsDetails">
+                        <div class="settings-item" style="flex-direction:column;align-items:stretch">
+                            <div class="settings-item-info" style="margin-bottom:0.75rem">
+                                <label>Model Profiles</label>
+                                <p class="settings-item-hint">Add one or more OpenAI-compatible endpoints. Select which to use per query in the AI overlay.</p>
+                            </div>
+                            <div class="ai-profile-list" id="aiProfileList">
+                                ${this._renderProfiles()}
+                            </div>
+                            <button class="ai-add-profile-btn" id="aiAddProfileBtn">+ Add Model Profile</button>
+                            <div id="aiProfileFormContainer"></div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <label>AI Shortcut</label>
+                                <p class="settings-item-hint">Open AI assistant for the focused note.</p>
+                            </div>
+                            <div id="aiShortcut" class="shortcut-key" title="Click to remap">${escapeHtml(Store.shortcuts.aiAssistant || 'Ctrl+Shift+A')}</div>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <label>Manage Presets</label>
+                                <p class="settings-item-hint">Create, edit, or delete reusable prompt presets shown in the AI overlay.</p>
+                            </div>
+                            <button id="managePresetsBtn" class="settings-btn secondary">Manage Presets...</button>
+                        </div>
                     </div>
                 </div>
 
@@ -133,6 +193,79 @@ const SettingsView = {
 
                 window.addEventListener('keydown', handleKeydown, true);
             });
+        }
+
+        // AI toggle
+        const aiToggle = document.getElementById('aiToggleSwitch');
+        if (aiToggle) {
+            aiToggle.addEventListener('click', async () => {
+                const newState = !AIAssistant.enabled;
+                await AIAssistant.toggleEnabled(newState);
+                aiToggle.classList.toggle('active', newState);
+                document.getElementById('aiSettingsDetails').classList.toggle('visible', newState);
+            });
+        }
+
+        // AI shortcut remapping
+        const aiShortcutBtn = document.getElementById('aiShortcut');
+        if (aiShortcutBtn) {
+            aiShortcutBtn.addEventListener('click', () => {
+                if (aiShortcutBtn.classList.contains('recording')) return;
+                aiShortcutBtn.classList.add('recording');
+                aiShortcutBtn.textContent = 'Press keys...';
+
+                const handleKeydown = async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const keys = [];
+                    if (e.ctrlKey) keys.push('Ctrl');
+                    if (e.altKey) keys.push('Alt');
+                    if (e.shiftKey) keys.push('Shift');
+                    if (e.metaKey) keys.push('Meta');
+                    const key = e.key === ' ' ? 'Space' : (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+                    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+                    keys.push(key);
+                    const newShortcut = keys.join('+');
+                    window.removeEventListener('keydown', handleKeydown, true);
+                    aiShortcutBtn.classList.remove('recording');
+                    aiShortcutBtn.textContent = newShortcut;
+                    const shortcuts = { ...Store.shortcuts, aiAssistant: newShortcut };
+                    await Store.saveShortcuts(shortcuts);
+                };
+                window.addEventListener('keydown', handleKeydown, true);
+            });
+        }
+
+        // Add profile button
+        const addProfileBtn = document.getElementById('aiAddProfileBtn');
+        if (addProfileBtn) {
+            addProfileBtn.addEventListener('click', () => this._showProfileForm());
+        }
+
+        // Profile list delegation (edit/delete)
+        const profileList = document.getElementById('aiProfileList');
+        if (profileList) {
+            profileList.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-profile-btn');
+                const deleteBtn = e.target.closest('.delete-profile-btn');
+                if (editBtn) {
+                    const profile = AIAssistant.profiles.find(p => p.id === editBtn.dataset.profileId);
+                    if (profile) this._showProfileForm(profile);
+                } else if (deleteBtn) {
+                    const id = deleteBtn.dataset.profileId;
+                    if (confirm('Delete this model profile?')) {
+                        AIAssistant.deleteProfile(id).then(() => {
+                            profileList.innerHTML = this._renderProfiles();
+                        });
+                    }
+                }
+            });
+        }
+
+        // Manage presets button
+        const managePresetsBtn = document.getElementById('managePresetsBtn');
+        if (managePresetsBtn) {
+            managePresetsBtn.addEventListener('click', () => this._openPresetModal());
         }
     },
 
@@ -242,6 +375,166 @@ const SettingsView = {
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') doSave();
             if (e.key === 'Escape') doCancel();
+        });
+    },
+
+    // --- AI Profile Form ---
+
+    _showProfileForm(existingProfile = null) {
+        const container = document.getElementById('aiProfileFormContainer');
+        if (!container) return;
+
+        const isEdit = !!existingProfile;
+        const p = existingProfile || { name: '', endpointUrl: '', model: 'gpt-4o' };
+        const currentKey = isEdit ? (AIAssistant._apiKeys[existingProfile.id] || '') : '';
+
+        container.innerHTML = `
+            <div class="ai-profile-form">
+                <div class="ai-form-row">
+                    <label>Name</label>
+                    <input type="text" id="aiProfileName" value="${escapeHtml(p.name)}" placeholder="e.g. GPT-4o, Local Llama">
+                </div>
+                <div class="ai-form-row">
+                    <label>Endpoint URL</label>
+                    <input type="url" id="aiProfileEndpoint" value="${escapeHtml(p.endpointUrl)}" placeholder="https://api.openai.com/v1">
+                </div>
+                <div class="ai-form-row">
+                    <label>API Key <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(stored separately, excluded from git)</span></label>
+                    <input type="password" id="aiProfileApiKey" value="${escapeHtml(currentKey)}" placeholder="${isEdit ? 'Leave blank to keep current key' : 'sk-...'}" autocomplete="off">
+                </div>
+                <div class="ai-form-row">
+                    <label>Model</label>
+                    <input type="text" id="aiProfileModel" value="${escapeHtml(p.model)}" placeholder="gpt-4o">
+                </div>
+                <div class="ai-form-actions">
+                    <button class="ai-form-cancel" id="aiProfileCancel">Cancel</button>
+                    <button class="ai-form-save" id="aiProfileSave">${isEdit ? 'Update' : 'Add Profile'}</button>
+                </div>
+            </div>
+        `;
+
+        container.querySelector('#aiProfileCancel').addEventListener('click', () => {
+            container.innerHTML = '';
+        });
+
+        container.querySelector('#aiProfileSave').addEventListener('click', async () => {
+            const name = container.querySelector('#aiProfileName').value.trim();
+            const endpointUrl = container.querySelector('#aiProfileEndpoint').value.trim();
+            const apiKey = container.querySelector('#aiProfileApiKey').value;
+            const model = container.querySelector('#aiProfileModel').value.trim() || 'gpt-4o';
+
+            if (!name || !endpointUrl) {
+                alert('Name and Endpoint URL are required.');
+                return;
+            }
+
+            if (isEdit) {
+                const updates = { name, endpointUrl, model };
+                if (apiKey) updates.apiKey = apiKey;  // only update key if provided
+                await AIAssistant.updateProfile(existingProfile.id, updates);
+            } else {
+                await AIAssistant.createProfile({ name, endpointUrl, apiKey, model });
+            }
+
+            container.innerHTML = '';
+            document.getElementById('aiProfileList').innerHTML = this._renderProfiles();
+        });
+    },
+
+    // --- Preset Management Modal ---
+
+    _openPresetModal() {
+        const presetsHtml = AIAssistant.presets.length === 0
+            ? '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0">No presets configured. Add one below.</div>'
+            : `<div class="tag-editor-list">${AIAssistant.presets.map(p => `
+                <div class="tag-editor-row" data-preset-id="${escapeHtml(p.id)}">
+                    <span class="tag-name">${escapeHtml(p.title)}</span>
+                    <span class="tag-count" style="font-size:0.75rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(p.instruction)}</span>
+                    <div class="tag-actions">
+                        <button class="tag-action-btn rename" data-preset-id="${escapeHtml(p.id)}">Edit</button>
+                        <button class="tag-action-btn delete" data-preset-id="${escapeHtml(p.id)}">Delete</button>
+                    </div>
+                </div>`).join('')}</div>`;
+
+        const modal = Modal.create({
+            title: 'Manage AI Presets',
+            content: `
+                ${presetsHtml}
+                <button class="ai-add-profile-btn" id="addPresetBtn" style="margin-top:0.75rem">+ Add Preset</button>
+                <div id="presetFormContainer"></div>
+            `,
+            width: '520px'
+        });
+
+        // Add preset button
+        modal.querySelector('#addPresetBtn').addEventListener('click', () => {
+            this._showPresetForm(modal, null);
+        });
+
+        // Preset list delegation
+        const list = modal.querySelector('.tag-editor-list');
+        if (list) {
+            list.addEventListener('click', (e) => {
+                const btn = e.target.closest('.tag-action-btn');
+                if (!btn) return;
+                const presetId = btn.dataset.presetId;
+                const preset = AIAssistant.presets.find(p => p.id === presetId);
+                if (!preset) return;
+
+                if (btn.classList.contains('rename')) {
+                    this._showPresetForm(modal, preset);
+                } else if (btn.classList.contains('delete')) {
+                    AIAssistant.deletePreset(presetId).then(() => {
+                        modal.close();
+                        this._openPresetModal();
+                    });
+                }
+            });
+        }
+    },
+
+    _showPresetForm(modal, existingPreset = null) {
+        const container = modal.querySelector('#presetFormContainer');
+        if (!container) return;
+
+        const isEdit = !!existingPreset;
+        const p = existingPreset || { title: '', instruction: '' };
+
+        container.innerHTML = `
+            <div class="ai-profile-form" style="margin-top:0.5rem">
+                <div class="ai-form-row">
+                    <label>Title</label>
+                    <input type="text" id="presetTitle" value="${escapeHtml(p.title)}" placeholder="e.g. Summarize">
+                </div>
+                <div class="ai-form-row">
+                    <label>Instruction</label>
+                    <input type="text" id="presetInstruction" value="${escapeHtml(p.instruction)}" placeholder="The prompt text sent to the AI...">
+                </div>
+                <div class="ai-form-actions">
+                    <button class="ai-form-cancel" id="presetCancel">Cancel</button>
+                    <button class="ai-form-save" id="presetSave">${isEdit ? 'Update' : 'Add Preset'}</button>
+                </div>
+            </div>
+        `;
+
+        container.querySelector('#presetCancel').addEventListener('click', () => {
+            container.innerHTML = '';
+        });
+
+        container.querySelector('#presetSave').addEventListener('click', async () => {
+            const title = container.querySelector('#presetTitle').value.trim();
+            const instruction = container.querySelector('#presetInstruction').value.trim();
+            if (!title || !instruction) {
+                alert('Title and instruction are required.');
+                return;
+            }
+            if (isEdit) {
+                await AIAssistant.updatePreset(existingPreset.id, title, instruction);
+            } else {
+                await AIAssistant.createPreset(title, instruction);
+            }
+            modal.close();
+            this._openPresetModal();
         });
     }
 };
