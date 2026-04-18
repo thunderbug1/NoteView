@@ -208,6 +208,11 @@ function createCodeMirrorWidgets(documentView) {
                     return;
                 }
 
+                if (this.type === 'priority') {
+                    documentView.showPriorityMenu(e.pageX, e.pageY, view, this.from, this.to);
+                    return;
+                }
+
                 view.dispatch({ selection: { anchor: this.from, head: this.to } });
                 view.focus();
             };
