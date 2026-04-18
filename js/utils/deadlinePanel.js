@@ -13,19 +13,33 @@ const DeadlinePanel = {
         if (!this._clickHandler) {
             this._clickHandler = (e) => {
                 const item = e.target.closest('.deadline-item');
-                if (item) {
-                    const blockId = item.dataset.blockId;
-                    const matchIndex = item.dataset.matchIndex ? parseInt(item.dataset.matchIndex, 10) : null;
-                    if (blockId && typeof App !== 'undefined') {
-                        const editor = DocumentView.editors.get(blockId);
-                        if (editor) {
-                            DocumentView.highlightAndScrollTo(blockId, editor, matchIndex);
-                            editor.focus();
-                        } else {
-                            App.showBlockContentModal(blockId, { matchIndex });
-                        }
+                if (!item) return;
+
+                const blockId = item.dataset.blockId;
+                const taskId = item.dataset.taskId;
+                const matchIndex = item.dataset.matchIndex ? parseInt(item.dataset.matchIndex, 10) : null;
+                if (!blockId || typeof App === 'undefined') return;
+
+                if (Store.currentView === 'kanban') {
+                    const card = document.querySelector(
+                        `.kanban-card[data-id="${taskId}"][data-block-id="${blockId}"]`
+                    );
+                    if (card) {
+                        KanbanView.highlightAndScrollToCard(card);
+                        return;
                     }
                 }
+
+                if (Store.currentView === 'document') {
+                    const editor = DocumentView.editors.get(blockId);
+                    if (editor) {
+                        DocumentView.highlightAndScrollTo(blockId, editor, matchIndex);
+                        editor.focus();
+                        return;
+                    }
+                }
+
+                App.showBlockContentModal(blockId, { matchIndex });
             };
             container.addEventListener('click', this._clickHandler);
         }

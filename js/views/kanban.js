@@ -465,6 +465,14 @@ const KanbanView = {
         KanbanView.setupColumnDropTargets(columns);
     },
 
+    highlightAndScrollToCard(card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.remove('kanban-card-highlight');
+        void card.offsetWidth;
+        card.classList.add('kanban-card-highlight');
+        setTimeout(() => card.classList.remove('kanban-card-highlight'), 1500);
+    },
+
     showMoveModal(data) {
         const currentColumn = this.getColumnById(data.columnId);
         const columns = this.columns.filter(col => col.id !== data.columnId);

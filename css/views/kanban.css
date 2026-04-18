@@ -218,6 +218,26 @@
     background: var(--bg-hover, #f1f5f9);
 }
 
+@keyframes kanban-card-flash {
+    0% {
+        box-shadow: 0 0 0 0 var(--accent), var(--shadow-md);
+    }
+    30% {
+        box-shadow: 0 0 0 4px var(--accent-light), 0 0 12px rgba(59, 130, 246, 0.25);
+        background-color: var(--accent-light);
+    }
+    100% {
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        background-color: transparent;
+    }
+}
+
+.kanban-card.kanban-card-highlight {
+    animation: kanban-card-flash 1.5s ease-out forwards;
+    z-index: 1;
+    position: relative;
+}
+
 @media (max-width: 768px) {
     .kanban-column {
         flex: 0 0 250px;
