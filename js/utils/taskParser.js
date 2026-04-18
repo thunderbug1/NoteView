@@ -236,12 +236,39 @@ function isOpenTask(task) {
 }
 
 /**
+ * Check whether a task is done
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task is done
+ */
+function isDoneTask(task) {
+    return task.state === 'x';
+}
+
+/**
+ * Check whether a task is in progress
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task is in progress
+ */
+function isInProgressTask(task) {
+    return task.state === '/';
+}
+
+/**
  * Check whether a task is blocked
  * @param {Object} task - Parsed task object
  * @returns {boolean} True when task is in blocked state
  */
 function isBlockedTask(task) {
     return task.state === 'b';
+}
+
+/**
+ * Check whether a task is canceled
+ * @param {Object} task - Parsed task object
+ * @returns {boolean} True when task is canceled
+ */
+function isCanceledTask(task) {
+    return task.state === '-';
 }
 
 /**
@@ -476,7 +503,10 @@ window.TaskParser = {
     hasMention,
     getAssignmentContacts,
     isOpenTask,
+    isDoneTask,
+    isInProgressTask,
     isBlockedTask,
+    isCanceledTask,
     isUnblockedTask,
     isUnassignedTask,
     hasUnassignedTasks,

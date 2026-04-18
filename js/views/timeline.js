@@ -1,8 +1,12 @@
 /**
- * Timeline View - Shows task status changes from git history as a vertical timeline
+ * Timeline View - Shows all changes from git history as a vertical timeline
+ * Includes note-level events (created, edited, deleted) and task status changes.
+ * Use Todo.* sidebar filters to show only task changes.
  */
 
 const TimelineView = {
+    collapsedDays: new Map(),
+
     stateLabels: {
         ' ': 'Todo',
         '/': 'In Progress',
@@ -91,6 +95,19 @@ const TimelineView = {
     },
 
     /**
+     * Extract a lightweight file set from all files at a commit.
+     * Returns Map of filename -> { tags } for ALL markdown files.
+     */
+    extractFileSet(filesContent) {
+        const result = new Map();
+        for (const [filename, content] of Object.entries(filesContent)) {
+            const parsed = parseFrontMatter(content);
+            result.set(filename, { tags: parsed.tags || [] });
+        }
+        return result;
+    },
+
+    /**
      * Diff tasks between two commits and return status change events.
      */
     diffTasks(prevAllTasks, currAllTasks, commit) {
@@ -108,6 +125,7 @@ const TimelineView = {
                 if (!prevTask) {
                     // New task created
                     events.push({
+                        category: 'task',
                         type: 'created',
                         taskText: currTask.text,
                         badges: currTask.badges || [],
@@ -124,6 +142,7 @@ const TimelineView = {
                 } else if (prevTask.state !== currTask.state) {
                     // State changed
                     events.push({
+                        category: 'task',
                         type: 'changed',
                         taskText: currTask.text,
                         badges: currTask.badges || [],
@@ -144,6 +163,7 @@ const TimelineView = {
             for (const [key, prevTask] of prevTasks) {
                 if (!currTasks.has(key)) {
                     events.push({
+                        category: 'task',
                         type: 'removed',
                         taskText: prevTask.text,
                         badges: prevTask.badges || [],
@@ -166,6 +186,7 @@ const TimelineView = {
             if (!currAllTasks.has(filename)) {
                 for (const [key, prevTask] of prevTasks) {
                     events.push({
+                        category: 'task',
                         type: 'removed',
                         taskText: prevTask.text,
                         badges: prevTask.badges || [],
@@ -189,16 +210,19 @@ const TimelineView = {
      * Process a single commit: determine changed files, extract tasks, diff.
      * Uses diff-based approach for commits after the first one.
      */
-    async _processCommit(commit, prevAllTasks, parentCommit) {
+    async _processCommit(commit, prevAllTasks, prevFileSet, parentCommit) {
         let currAllTasks;
+        let currFileSet;
+        let changedFiles = null;
 
         if (!parentCommit) {
             // First commit: must read all files
             const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
             currAllTasks = this.extractAllTasks(filesContent);
+            currFileSet = this.extractFileSet(filesContent);
         } else {
             // Diff-based: only read files that changed between parent and this commit
-            const changedFiles = await GitStore.getChangedFilesBetween(
+            changedFiles = await GitStore.getChangedFilesBetween(
                 parentCommit.oid, commit.oid
             );
 
@@ -206,16 +230,19 @@ const TimelineView = {
                 // walk() failed, fallback to reading all files
                 const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
                 currAllTasks = this.extractAllTasks(filesContent);
+                currFileSet = this.extractFileSet(filesContent);
             } else if (Object.keys(changedFiles).length === 0) {
-                // No file changes (e.g. merge commit) — carry forward previous tasks
+                // No file changes (e.g. merge commit) — carry forward previous state
                 currAllTasks = prevAllTasks;
+                currFileSet = prevFileSet;
             } else {
                 // Start from previous snapshot, update only changed files
                 currAllTasks = new Map(prevAllTasks);
+                currFileSet = new Map(prevFileSet);
                 for (const [filename, content] of Object.entries(changedFiles)) {
                     if (content === null || content === undefined) {
-                        // File was deleted or content unavailable
                         currAllTasks.delete(filename);
+                        currFileSet.delete(filename);
                     } else if (typeof content === 'string') {
                         const parsed = parseFrontMatter(content);
                         const tasks = this.extractTasksFromContent(parsed.content);
@@ -224,13 +251,96 @@ const TimelineView = {
                         } else {
                             currAllTasks.delete(filename);
                         }
+                        currFileSet.set(filename, { tags: parsed.tags || [] });
                     }
                 }
             }
         }
 
-        const events = this.diffTasks(prevAllTasks, currAllTasks, commit);
-        return { tasks: currAllTasks, events };
+        const taskEvents = this.diffTasks(prevAllTasks, currAllTasks, commit);
+
+        // Generate note events for files that changed but had no task events
+        const taskEventFiles = new Set(taskEvents.map(e => e.filename));
+        const noteEvents = this.generateNoteEvents(
+            changedFiles, prevFileSet, currFileSet, commit, parentCommit === null, taskEventFiles
+        );
+
+        return { tasks: currAllTasks, fileSet: currFileSet, events: [...taskEvents, ...noteEvents] };
+    },
+
+    /**
+     * Generate note-level events for file changes that don't have task events.
+     * Deduplicates against files already covered by task events.
+     */
+    generateNoteEvents(changedFiles, prevFileSet, currFileSet, commit, isFirstCommit, taskEventFiles) {
+        const events = [];
+
+        if (isFirstCommit || changedFiles === null) {
+            // First commit or fallback: all current files are "created"
+            for (const [filename, data] of currFileSet) {
+                if (taskEventFiles.has(filename)) continue;
+                events.push({
+                    category: 'note',
+                    type: 'note-created',
+                    blockId: filename.replace('.md', ''),
+                    filename,
+                    tags: data.tags || [],
+                    timestamp: commit.timestamp,
+                    commitMessage: commit.message,
+                    oid: commit.oid,
+                    parents: commit.parents
+                });
+            }
+        } else {
+            for (const [filename, content] of Object.entries(changedFiles)) {
+                if (taskEventFiles.has(filename)) continue;
+                if (content === null || content === undefined) {
+                    // File deleted
+                    const prevData = prevFileSet.get(filename);
+                    events.push({
+                        category: 'note',
+                        type: 'note-deleted',
+                        blockId: filename.replace('.md', ''),
+                        filename,
+                        tags: prevData ? prevData.tags : [],
+                        timestamp: commit.timestamp,
+                        commitMessage: commit.message,
+                        oid: commit.oid,
+                        parents: commit.parents
+                    });
+                } else if (prevFileSet.has(filename)) {
+                    // File modified (existed before)
+                    const parsed = parseFrontMatter(content);
+                    events.push({
+                        category: 'note',
+                        type: 'note-modified',
+                        blockId: filename.replace('.md', ''),
+                        filename,
+                        tags: parsed.tags || [],
+                        timestamp: commit.timestamp,
+                        commitMessage: commit.message,
+                        oid: commit.oid,
+                        parents: commit.parents
+                    });
+                } else {
+                    // File created (new)
+                    const parsed = parseFrontMatter(content);
+                    events.push({
+                        category: 'note',
+                        type: 'note-created',
+                        blockId: filename.replace('.md', ''),
+                        filename,
+                        tags: parsed.tags || [],
+                        timestamp: commit.timestamp,
+                        commitMessage: commit.message,
+                        oid: commit.oid,
+                        parents: commit.parents
+                    });
+                }
+            }
+        }
+
+        return events;
     },
 
     /**
@@ -257,35 +367,40 @@ const TimelineView = {
         let allEvents = [];
         let commitSnapshots;
         let prevAllTasks;
+        let prevFileSet;
 
         if (canIncrement) {
             // Incremental: reuse existing snapshots, process only new commits
             commitSnapshots = [...rawCache.commitSnapshots];
             prevAllTasks = commitSnapshots[commitSnapshots.length - 1].tasks;
+            prevFileSet = commitSnapshots[commitSnapshots.length - 1].fileSet || new Map();
 
             for (let i = rawCache.commitCount; i < chronological.length; i++) {
                 const commit = chronological[i];
-                const { tasks, events } = await this._processCommit(
-                    commit, prevAllTasks, chronological[i - 1]
+                const { tasks, fileSet, events } = await this._processCommit(
+                    commit, prevAllTasks, prevFileSet, chronological[i - 1]
                 );
-                commitSnapshots.push({ oid: commit.oid, tasks });
+                commitSnapshots.push({ oid: commit.oid, tasks, fileSet });
                 allEvents.push(...events);
                 prevAllTasks = tasks;
+                prevFileSet = fileSet;
             }
         } else {
             // Full rebuild with diff-based optimization
             commitSnapshots = [];
             prevAllTasks = new Map();
+            prevFileSet = new Map();
 
             for (let i = 0; i < chronological.length; i++) {
                 const commit = chronological[i];
                 const parentCommit = i > 0 ? chronological[i - 1] : null;
-                const { tasks, events } = await this._processCommit(
-                    commit, prevAllTasks, parentCommit
+                const { tasks, fileSet, events } = await this._processCommit(
+                    commit, prevAllTasks, prevFileSet, parentCommit
                 );
-                commitSnapshots.push({ oid: commit.oid, tasks });
+                commitSnapshots.push({ oid: commit.oid, tasks, fileSet });
                 allEvents.push(...events);
                 prevAllTasks = tasks;
+                prevFileSet = fileSet;
             }
         }
 
@@ -324,45 +439,72 @@ const TimelineView = {
             // Context tag filter
             if (contextSelection.size > 0) {
                 const requiredTags = Array.from(contextSelection).filter(t => !SelectionManager.isComputedContextTag(t));
-                
+
                 if (requiredTags.length > 0) {
                     const hasAllTags = requiredTags.every(tag => event.tags?.includes(tag));
                     if (!hasAllTags) return false;
                 }
-                
+
                 if (contextSelection.has('Status.untagged')) {
                     if (event.tags && event.tags.length > 0) return false;
                 }
-                if (contextSelection.has('Todo.all')) {
-                        // Timeline events are always task events.
-                }
-                if (contextSelection.has('Todo.open')) {
+
+                // Todo filters only apply to task events
+                const activeTodoFilter = contextSelection.has('Todo.all')
+                    || contextSelection.has('Todo.open')
+                    || contextSelection.has('Todo.inProgress')
+                    || contextSelection.has('Todo.done')
+                    || contextSelection.has('Todo.blocked')
+                    || contextSelection.has('Todo.canceled')
+                    || contextSelection.has('Todo.unblocked');
+
+                if (activeTodoFilter) {
+                    if (event.category !== 'task') return false;
+
+                    if (contextSelection.has('Todo.open')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                         if (!TaskParser.isOpenTask(eventTask)) return false;
-                }
-                if (contextSelection.has('Todo.blocked')) {
+                    }
+                    if (contextSelection.has('Todo.inProgress')) {
+                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                        if (!TaskParser.isInProgressTask(eventTask)) return false;
+                    }
+                    if (contextSelection.has('Todo.done')) {
+                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                        if (!TaskParser.isDoneTask(eventTask)) return false;
+                    }
+                    if (contextSelection.has('Todo.blocked')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                         if (!TaskParser.isBlockedTask(eventTask)) return false;
-                }
-                if (contextSelection.has('Todo.unblocked')) {
+                    }
+                    if (contextSelection.has('Todo.canceled')) {
+                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                        if (!TaskParser.isCanceledTask(eventTask)) return false;
+                    }
+                    if (contextSelection.has('Todo.unblocked')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                         if (!TaskParser.isUnblockedTask(eventTask)) return false;
+                    }
                 }
                 if (contextSelection.has('Status.unassigned')) {
-                        const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
+                    if (event.category !== 'task') return false;
+                    const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                     if (!TaskParser.isUnassignedTask(eventTask)) return false;
                 }
             }
-            
+
             // Contact filter
             if (contactSelection) {
-                if (!ContactHelper.hasEventContact(event, contactSelection)) return false;
+                if (event.category === 'task' && !ContactHelper.hasEventContact(event, contactSelection)) return false;
             }
-            
+
             // Search filter
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                if (!event.taskText.toLowerCase().includes(q) && 
+                const textMatch = event.category === 'task'
+                    ? event.taskText?.toLowerCase().includes(q)
+                    : false;
+                if (!textMatch &&
                     !event.blockId.toLowerCase().includes(q) &&
                     !event.commitMessage.toLowerCase().includes(q)) return false;
             }
@@ -394,6 +536,10 @@ const TimelineView = {
     },
 
     renderEvent(event) {
+        if (event.category === 'note') {
+            return this.renderNoteEvent(event);
+        }
+
         const stateClass = `state-${event.newState === null ? 'removed' : event.newState.trim() || 'todo'}`;
         
         let transitionHtml = '';
@@ -435,6 +581,84 @@ const TimelineView = {
         `;
     },
 
+    renderNoteEvent(event) {
+        const typeConfig = {
+            'note-created':  { label: 'Note created', cls: 'tl-note-created' },
+            'note-modified': { label: 'Note edited',  cls: 'tl-note-modified' },
+            'note-deleted':  { label: 'Note deleted', cls: 'tl-note-deleted' }
+        };
+        const { label, cls } = typeConfig[event.type] || { label: 'Note changed', cls: '' };
+
+        return `
+            <div class="tl-event" data-block-id="${event.blockId}" data-oid="${event.oid}" data-filename="${event.filename}" data-parents="${(event.parents || []).join(',')}">
+                <div class="tl-dot-wrapper">
+                    <div class="tl-dot tl-dot-note ${cls}"></div>
+                </div>
+                <div class="tl-card tl-card-note">
+                    <div class="tl-card-header">
+                        <span class="tl-note-label ${cls}">${label}</span>
+                        <span class="tl-time">${this.formatTime(event.timestamp)}</span>
+                    </div>
+                    <div class="tl-card-footer">
+                        <span class="tl-note-name" title="Open note">${escapeHtml(event.blockId)}</span>
+                        ${event.commitMessage ? `<span class="tl-commit-msg">${escapeHtml(event.commitMessage)}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    handleCollapseClick(e) {
+        const collapseBtn = e.target.closest('.tl-collapse-btn');
+        if (!collapseBtn) return;
+        e.preventDefault();
+        const dateStr = collapseBtn.dataset.date;
+        if (!dateStr) return;
+        if (this.collapsedDays.has(dateStr)) {
+            this.expandDay(dateStr);
+        } else {
+            this.collapseDay(dateStr);
+        }
+    },
+
+    collapseDay(dateStr) {
+        this.collapsedDays.set(dateStr, true);
+        const group = document.querySelector(`.tl-date-group .tl-collapse-btn[data-date="${CSS.escape(dateStr)}"]`)?.closest('.tl-date-group');
+        if (!group) return;
+
+        const events = group.querySelector('.tl-date-events');
+        if (events) events.style.display = 'none';
+
+        const btn = group.querySelector('.tl-collapse-btn');
+        if (btn) {
+            btn.classList.add('collapsed');
+            btn.title = 'Expand';
+            const svg = btn.querySelector('polyline');
+            if (svg) svg.setAttribute('points', '15 18 9 12 15 6');
+        }
+
+        group.classList.add('tl-date-collapsed');
+    },
+
+    expandDay(dateStr) {
+        this.collapsedDays.delete(dateStr);
+        const group = document.querySelector(`.tl-date-group .tl-collapse-btn[data-date="${CSS.escape(dateStr)}"]`)?.closest('.tl-date-group');
+        if (!group) return;
+
+        const events = group.querySelector('.tl-date-events');
+        if (events) events.style.display = '';
+
+        const btn = group.querySelector('.tl-collapse-btn');
+        if (btn) {
+            btn.classList.remove('collapsed');
+            btn.title = 'Collapse';
+            const svg = btn.querySelector('polyline');
+            if (svg) svg.setAttribute('points', '6 9 12 15 18 9');
+        }
+
+        group.classList.remove('tl-date-collapsed');
+    },
+
     async render(blocks) {
         const container = document.getElementById('viewContainer');
         container.className = 'timeline-view';
@@ -457,8 +681,8 @@ const TimelineView = {
         if (filtered.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <p>No task status changes found in git history.</p>
-                    <p style="font-size:0.8rem; margin-top:0.5rem; opacity:0.7;">Make some changes to your tasks and they'll appear here.</p>
+                    <p>No changes found in git history.</p>
+                    <p style="font-size:0.8rem; margin-top:0.5rem; opacity:0.7;">Make changes to your notes and they will appear here.</p>
                 </div>
             `;
             return;
@@ -467,10 +691,18 @@ const TimelineView = {
         let html = '<div class="tl-container"><div class="tl-line"></div>';
 
         for (const [dateStr, events] of grouped) {
-            html += `<div class="tl-date-group">`;
-            html += `<div class="tl-date-header"><span>${dateStr}</span></div>`;
+            const isCollapsed = this.collapsedDays.has(dateStr);
+            html += `<div class="tl-date-group ${isCollapsed ? 'tl-date-collapsed' : ''}">`;
+            html += `<div class="tl-date-header">
+                <button class="tl-collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-date="${escapeHtml(dateStr)}" title="${isCollapsed ? 'Expand' : 'Collapse'}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isCollapsed ? '15 18 9 12 15 6' : '6 9 12 15 18 9'}"/></svg>
+                </button>
+                <span>${dateStr}</span>
+                <span class="tl-date-count">${events.length}</span>
+            </div>`;
+            html += `<div class="tl-date-events" ${isCollapsed ? 'style="display:none"' : ''}>`;
             html += events.map(e => this.renderEvent(e)).join('');
-            html += `</div>`;
+            html += `</div></div>`;
         }
 
         html += '</div>';
@@ -482,7 +714,14 @@ const TimelineView = {
         </button>`;
 
         container.innerHTML = html;
-        
+
+        // Attach collapse handler via delegation
+        if (this._collapseHandler) {
+            container.removeEventListener('click', this._collapseHandler);
+        }
+        this._collapseHandler = this.handleCollapseClick.bind(this);
+        container.addEventListener('click', this._collapseHandler);
+
         // Attach event listeners
         container.querySelectorAll('.tl-note-name').forEach(el => {
             el.addEventListener('click', () => {
@@ -558,7 +797,12 @@ const TimelineView = {
             }
 
             try {
-                const currContentRaw = await GitStore.getFileAtCommit(filename, oid);
+                let currContentRaw = null;
+                try {
+                    currContentRaw = await GitStore.getFileAtCommit(filename, oid);
+                } catch (e) {
+                    // File doesn't exist at this commit (e.g. deleted file)
+                }
                 const currParsed = parseFrontMatter(currContentRaw || '');
 
                 const { EditorView, EditorState, basicSetup, unifiedMergeView, markdown, languages } = window.CodeMirror;
@@ -568,8 +812,12 @@ const TimelineView = {
                 if (viewType === 'diff') {
                     let prevContent = '';
                     if (parentOid) {
-                        const prevContentRaw = await GitStore.getFileAtCommit(filename, parentOid);
-                        prevContent = parseFrontMatter(prevContentRaw || '').content;
+                        try {
+                            const prevContentRaw = await GitStore.getFileAtCommit(filename, parentOid);
+                            prevContent = parseFrontMatter(prevContentRaw || '').content;
+                        } catch (e) {
+                            // File didn't exist at parent commit either
+                        }
                     }
 
                     container.innerHTML = '';

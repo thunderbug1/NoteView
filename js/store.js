@@ -760,6 +760,7 @@ const Store = {
         await this.loadBlocks();
         await UndoRedoManager.clear();
         TimelineView.invalidateRawDataCache();
+        TimelineView.invalidateCache();
     },
 
     extractContacts() {
@@ -921,7 +922,7 @@ const Store = {
                 }
 
                 // Task-level computed: find at least one task satisfying ALL selected conditions
-                const TASK_COMPUTED_TAGS = ['Todo.all', 'Todo.open', 'Todo.blocked', 'Todo.unblocked', 'Status.unassigned'];
+                const TASK_COMPUTED_TAGS = ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.unassigned'];
                 const activeTaskComputed = [...contextSelection].filter(t => TASK_COMPUTED_TAGS.includes(t));
 
                 if (activeTaskComputed.length > 0) {
@@ -931,7 +932,10 @@ const Store = {
                             switch (tag) {
                                 case 'Todo.all':          return true;
                                 case 'Todo.open':         return TaskParser.isOpenTask(task);
+                                case 'Todo.inProgress':   return TaskParser.isInProgressTask(task);
+                                case 'Todo.done':         return TaskParser.isDoneTask(task);
                                 case 'Todo.blocked':      return TaskParser.isBlockedTask(task);
+                                case 'Todo.canceled':     return TaskParser.isCanceledTask(task);
                                 case 'Todo.unblocked':    return TaskParser.isUnblockedTask(task);
                                 case 'Status.unassigned': return TaskParser.isUnassignedTask(task);
                             }
@@ -952,8 +956,14 @@ const Store = {
                             if (block.content?.match(/\[[ xX\/bB\-]\]/)) return false;
                         } else if (item === 'Todo.open') {
                             if (block.content?.match(/\[[ \/]\]/)) return false;
+                        } else if (item === 'Todo.inProgress') {
+                            if (block.content?.match(/\[[\/]\]/)) return false;
+                        } else if (item === 'Todo.done') {
+                            if (block.content?.match(/\[[xX]\]/)) return false;
                         } else if (item === 'Todo.blocked') {
                             if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isBlockedTask(t))) return false;
+                        } else if (item === 'Todo.canceled') {
+                            if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isCanceledTask(t))) return false;
                         } else if (item === 'Todo.unblocked') {
                             if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isUnblockedTask(t))) return false;
                         } else if (item === 'Status.untagged') {
@@ -1055,10 +1065,26 @@ const Store = {
                     reasons.push({ type: 'context', label: 'Todo.open' });
                 }
             }
+            if (contextSelection.has('Todo.inProgress')) {
+                if (!block.content?.match(/\[[\/]\]/)) {
+                    reasons.push({ type: 'context', label: 'Todo.inProgress' });
+                }
+            }
+            if (contextSelection.has('Todo.done')) {
+                if (!block.content?.match(/\[[xX]\]/)) {
+                    reasons.push({ type: 'context', label: 'Todo.done' });
+                }
+            }
             if (contextSelection.has('Todo.blocked')) {
                 const tasks = TaskParser.parseTasksFromBlock(block);
                 if (!tasks.some(t => TaskParser.isBlockedTask(t))) {
                     reasons.push({ type: 'context', label: 'Todo.blocked' });
+                }
+            }
+            if (contextSelection.has('Todo.canceled')) {
+                const tasks = TaskParser.parseTasksFromBlock(block);
+                if (!tasks.some(t => TaskParser.isCanceledTask(t))) {
+                    reasons.push({ type: 'context', label: 'Todo.canceled' });
                 }
             }
             if (contextSelection.has('Todo.unblocked')) {
@@ -1094,9 +1120,21 @@ const Store = {
                         if (block.content?.match(/\[[ \/]\]/)) {
                             reasons.push({ type: 'excluded', label: 'Todo.open' });
                         }
+                    } else if (item === 'Todo.inProgress') {
+                        if (block.content?.match(/\[[\/]\]/)) {
+                            reasons.push({ type: 'excluded', label: 'Todo.inProgress' });
+                        }
+                    } else if (item === 'Todo.done') {
+                        if (block.content?.match(/\[[xX]\]/)) {
+                            reasons.push({ type: 'excluded', label: 'Todo.done' });
+                        }
                     } else if (item === 'Todo.blocked') {
                         if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isBlockedTask(t))) {
                             reasons.push({ type: 'excluded', label: 'Todo.blocked' });
+                        }
+                    } else if (item === 'Todo.canceled') {
+                        if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isCanceledTask(t))) {
+                            reasons.push({ type: 'excluded', label: 'Todo.canceled' });
                         }
                     } else if (item === 'Todo.unblocked') {
                         if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isUnblockedTask(t))) {

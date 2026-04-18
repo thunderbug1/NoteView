@@ -1470,7 +1470,7 @@ const DocumentView = {
     getActiveTaskFilter() {
         const context = SelectionManager.selections?.context;
         if (!context || context.size === 0) return new Set();
-        const taskFilters = ['Todo.open', 'Todo.blocked', 'Todo.unblocked', 'Status.unassigned'];
+        const taskFilters = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.unassigned'];
         const active = new Set();
         for (const f of taskFilters) {
             if (context.has(f)) active.add(f);
@@ -1488,12 +1488,18 @@ const DocumentView = {
 
         const state = checkboxMatch[1];
         const isOpen = state === ' ' || state === '/';
+        const isInProgress = state === '/';
+        const isDone = state === 'x' || state === 'X';
         const isBlockedState = state === 'b' || state === 'B';
+        const isCanceled = state === '-';
         const hasAssignee = lineText.includes('[assignee::');
 
         for (const filter of activeFilters) {
             if (filter === 'Todo.open' && !isOpen) return false;
+            if (filter === 'Todo.inProgress' && !isInProgress) return false;
+            if (filter === 'Todo.done' && !isDone) return false;
             if (filter === 'Todo.blocked' && !isBlockedState) return false;
+            if (filter === 'Todo.canceled' && !isCanceled) return false;
             if (filter === 'Todo.unblocked' && !isOpen) return false;
             if (filter === 'Status.unassigned' && hasAssignee) return false;
         }

@@ -24,7 +24,7 @@ const SelectionManager = {
     HISTORY_DEBOUNCE_MS: 500,
     HISTORY_MAX_ENTRIES: 50,
 
-    computedContextTags: ['Todo.all', 'Todo.open', 'Todo.blocked', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
+    computedContextTags: ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
 
     /**
      * Initialize the selection manager
@@ -756,7 +756,10 @@ const SelectionManager = {
         const tagCounts = {};
         let hasAllTodos = false;
         let hasOpenTodos = false;
+        let hasInProgressTodos = false;
+        let hasDoneTodos = false;
         let hasBlockedTodos = false;
+        let hasCanceledTodos = false;
         let hasUnblockedTodos = false;
         let hasUntagged = false;
         let hasUnassigned = false;
@@ -784,10 +787,16 @@ const SelectionManager = {
             const hasBlocked = tasks.some(t => TaskParser.isBlockedTask(t));
             const hasUnblocked = tasks.some(t => TaskParser.isUnblockedTask(t));
             const hasUnassignedTasks = TaskParser.hasUnassignedTasks(tasks);
-            
+            const hasDone = tasks.some(t => TaskParser.isDoneTask(t));
+            const hasInProgress = tasks.some(t => TaskParser.isInProgressTask(t));
+            const hasCanceled = tasks.some(t => TaskParser.isCanceledTask(t));
+
             if (hasBlocked) hasBlockedTodos = true;
             if (hasUnblocked) hasUnblockedTodos = true;
             if (hasUnassignedTasks) hasUnassigned = true;
+            if (hasDone) hasDoneTodos = true;
+            if (hasInProgress) hasInProgressTodos = true;
+            if (hasCanceled) hasCanceledTodos = true;
             
             if (!block.tags || block.tags.length === 0) hasUntagged = true;
 
@@ -818,7 +827,10 @@ const SelectionManager = {
             } else {
                 if (tag === 'Todo.all') hasBlocks = hasAllTodos;
                 else if (tag === 'Todo.open') hasBlocks = hasOpenTodos;
+                else if (tag === 'Todo.inProgress') hasBlocks = hasInProgressTodos;
+                else if (tag === 'Todo.done') hasBlocks = hasDoneTodos;
                 else if (tag === 'Todo.blocked') hasBlocks = hasBlockedTodos;
+                else if (tag === 'Todo.canceled') hasBlocks = hasCanceledTodos;
                 else if (tag === 'Todo.unblocked') hasBlocks = hasUnblockedTodos;
                 else if (tag === 'Status.untagged') hasBlocks = hasUntagged;
                 else if (tag === 'Status.unassigned') hasBlocks = hasUnassigned;

@@ -58,6 +58,9 @@
     margin-bottom: 0.75rem;
     margin-left: -2.5rem;
     padding-left: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .tl-date-header span {
@@ -71,6 +74,55 @@
     letter-spacing: 0.06em;
     border-radius: var(--radius-sm);
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.tl-date-count {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-muted) !important;
+    font-size: 0.65rem !important;
+    padding: 0.15rem 0.5rem !important;
+    box-shadow: none !important;
+    border-radius: 999px !important;
+}
+
+.tl-collapse-btn {
+    background: transparent;
+    border: none;
+    padding: 0.2rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tl-date-header:hover .tl-collapse-btn {
+    opacity: 0.8;
+}
+
+.tl-collapse-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+.tl-collapse-btn.collapsed {
+    opacity: 1 !important;
+    color: var(--text-muted);
+}
+
+.tl-date-group.tl-date-collapsed {
+    margin-bottom: 0.25rem;
+}
+
+.tl-date-group.tl-date-collapsed .tl-date-header {
+    margin-bottom: 0.25rem;
+    opacity: 0.7;
 }
 
 .tl-event {
@@ -113,6 +165,11 @@
 .tl-dot.tl-state-b { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.15); background: #f59e0b; }
 .tl-dot.tl-state-\- { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.15); background: #ef4444; }
 .tl-dot.tl-state-removed { border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,0.15); background: #94a3b8; }
+
+/* Note-level event dot colors */
+.tl-dot.tl-dot-note.tl-note-created { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.15); background: #10b981; }
+.tl-dot.tl-dot-note.tl-note-modified { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); background: var(--bg-primary); }
+.tl-dot.tl-dot-note.tl-note-deleted { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.15); background: #ef4444; }
 
 .tl-card {
     flex: 1;
@@ -181,6 +238,32 @@
 .tl-state-badge.tl-state-b { background: rgba(245, 158, 11, 0.12); color: #d97706; }
 .tl-state-badge.tl-state-\- { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
 .tl-state-badge.tl-state-removed { background: rgba(148, 163, 184, 0.12); color: #94a3b8; text-decoration: line-through; }
+
+/* Note event label badges */
+.tl-note-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-sm);
+}
+.tl-note-label.tl-note-created { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.tl-note-label.tl-note-modified { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.tl-note-label.tl-note-deleted { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+
+/* Note event card */
+.tl-card-note {
+    border-left: 3px solid var(--border-light);
+}
+
+.tl-commit-msg {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 300px;
+}
 
 /* Card footer */
 .tl-card-footer {
