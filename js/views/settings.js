@@ -11,7 +11,8 @@ const SettingsView = {
         { key: 'newNote', label: 'New Note', hint: 'Quickly add a new note from anywhere.' },
         { key: 'aiAssistant', label: 'AI Assistant', hint: 'Open AI assistant for the focused note.' },
         { key: 'contextBack', label: 'Context Back', hint: 'Navigate to the previous filter selection.' },
-        { key: 'contextForward', label: 'Context Forward', hint: 'Navigate to the next filter selection.' }
+        { key: 'contextForward', label: 'Context Forward', hint: 'Navigate to the next filter selection.' },
+        { key: 'toggleTask', label: 'Toggle Task', hint: 'Convert current line to/from task checkbox.' }
     ],
 
     _renderProfiles() {

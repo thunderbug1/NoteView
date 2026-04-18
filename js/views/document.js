@@ -104,6 +104,13 @@ const DocumentView = {
         this._tagHandler = this.handleTagClick.bind(this);
         container.addEventListener('click', this._tagHandler);
 
+        // Add event delegation for task toggle button click
+        if (this._taskToggleHandler) {
+            container.removeEventListener('click', this._taskToggleHandler);
+        }
+        this._taskToggleHandler = this.handleTaskToggleClick.bind(this);
+        container.addEventListener('click', this._taskToggleHandler);
+
         // Add event delegation for pin button click
         if (this._pinHandler) {
             container.removeEventListener('click', this._pinHandler);
@@ -238,6 +245,13 @@ const DocumentView = {
                 </div>
             `);
         }
+
+        // Task toggle button
+        parts.push(`
+            <button class="task-toggle-btn" data-id="${block.id}" title="Toggle task on current line (Alt+T)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            </button>
+        `);
 
         // Pin button
         parts.push(`
@@ -380,6 +394,40 @@ const DocumentView = {
         }
     },
 
+    handleTaskToggleClick(e) {
+        const btn = e.target.closest('.task-toggle-btn');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const blockId = btn.dataset.id;
+        if (!blockId) return;
+        const view = this.editors.get(blockId);
+        if (view) {
+            this.toggleTaskOnCurrentLine(view);
+            view.focus();
+        }
+    },
+
+    toggleTaskOnCurrentLine(view) {
+        const state = view.state;
+        const pos = state.selection.main.head;
+        const line = state.doc.lineAt(pos);
+        const result = TaskParser.toggleTaskOnLine(line.text);
+        view.dispatch({
+            changes: { from: line.from, to: line.to, insert: result.newText },
+            selection: { anchor: line.from + result.newText.length }
+        });
+    },
+
+    shortcutToCM6(shortcut) {
+        return shortcut
+            .replace('Ctrl+', 'Mod-')
+            .replace('Meta+', 'Mod-')
+            .replace('Alt+', 'Alt-')
+            .replace('Shift+', 'Shift-')
+            .toLowerCase();
+    },
+
     handleMicClick(e) {
         const micBtn = e.target.closest('.mic-btn');
         if (!micBtn) return;
@@ -411,17 +459,6 @@ const DocumentView = {
             }
             return;
         }
-        // Check for click on collapsed block title to expand
-        const collapsedTitle = e.target.closest('.block-collapsed-title');
-        if (collapsedTitle) {
-            const blockEl = collapsedTitle.closest('.block');
-            if (blockEl) {
-                const blockId = blockEl.dataset.id;
-                if (blockId && blockId !== 'new') {
-                    this.expandBlock(blockId);
-                }
-            }
-        }
     },
 
     collapseBlock(blockId) {
@@ -431,19 +468,6 @@ const DocumentView = {
 
         const editorDiv = blockEl.querySelector('.block-editor');
         if (editorDiv) editorDiv.style.display = 'none';
-
-        // Create or show collapsed title with first non-empty line
-        let collapsedTitle = blockEl.querySelector('.block-collapsed-title');
-        if (!collapsedTitle) {
-            collapsedTitle = document.createElement('div');
-            collapsedTitle.className = 'block-collapsed-title';
-            blockEl.appendChild(collapsedTitle);
-        }
-        const view = this.editors.get(blockId);
-        const content = view ? view.state.doc.toString() : '';
-        const firstLine = content.split('\n').find(l => l.trim()) || 'Empty note';
-        collapsedTitle.textContent = firstLine.replace(/^#+\s*/, '');
-        collapsedTitle.style.display = 'block';
 
         // Update button visual
         const collapseBtn = blockEl.querySelector('.collapse-btn');
@@ -465,9 +489,6 @@ const DocumentView = {
         const editorDiv = blockEl.querySelector('.block-editor');
         if (editorDiv) editorDiv.style.display = '';
 
-        const collapsedTitle = blockEl.querySelector('.block-collapsed-title');
-        if (collapsedTitle) collapsedTitle.style.display = 'none';
-
         // Update button visual
         const collapseBtn = blockEl.querySelector('.collapse-btn');
         if (collapseBtn) {
@@ -487,15 +508,6 @@ const DocumentView = {
                 if (!blockEl) continue;
                 const editorDiv = blockEl.querySelector('.block-editor');
                 if (editorDiv) editorDiv.style.display = 'none';
-                let collapsedTitle = blockEl.querySelector('.block-collapsed-title');
-                if (!collapsedTitle) {
-                    collapsedTitle = document.createElement('div');
-                    collapsedTitle.className = 'block-collapsed-title';
-                    blockEl.appendChild(collapsedTitle);
-                }
-                const firstLine = (block.content || '').split('\n').find(l => l.trim()) || 'Empty note';
-                collapsedTitle.textContent = firstLine.replace(/^#+\s*/, '');
-                collapsedTitle.style.display = 'block';
                 blockEl.classList.add('block-collapsed');
             }
         }
@@ -1628,6 +1640,10 @@ const DocumentView = {
      */
     createNewBlockKeymap(container, createNewBlock) {
         const { keymap, Prec } = window.CodeMirror;
+        const self = this;
+        const toggleTaskKey = Store.shortcuts?.toggleTask
+            ? self.shortcutToCM6(Store.shortcuts.toggleTask)
+            : 'Mod-Shift-t';
         return Prec.high(keymap.of([
             {
                 key: 'Mod-Enter',
@@ -1657,6 +1673,13 @@ const DocumentView = {
                         }
                     }
                     return false;
+                }
+            },
+            {
+                key: toggleTaskKey,
+                run: (view) => {
+                    self.toggleTaskOnCurrentLine(view);
+                    return true;
                 }
             }
         ]));

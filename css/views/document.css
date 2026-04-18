@@ -431,6 +431,48 @@
     opacity: 0.6;
 }
 
+/* Task Toggle Button */
+.task-toggle-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
+}
+
+.document-view .block:hover .task-toggle-btn,
+.document-view .block:focus-within .task-toggle-btn {
+    opacity: 0.5;
+}
+
+.task-toggle-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+.content-modal .task-toggle-btn {
+    opacity: 0.6;
+}
+
+@media (max-width: 768px) {
+    .task-toggle-btn {
+        padding: 0.5rem;
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
 /* Pin Button */
 .pin-btn {
     background: transparent;
@@ -535,21 +577,6 @@
 
 .document-view .block.block-collapsed:hover {
     background: var(--bg-secondary);
-}
-
-.block-collapsed-title {
-    padding: 0.5rem 1rem;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    display: none;
-}
-
-.document-view .block.block-collapsed .block-collapsed-title {
-    display: block;
 }
 
 /* Always show metadata on collapsed blocks */

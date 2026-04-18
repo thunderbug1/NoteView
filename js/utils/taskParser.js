@@ -81,6 +81,29 @@ function getTaskIndent(prefix) {
     return leadingWhitespace.replace(/\t/g, '    ').length;
 }
 
+const BULLET_REGEX = /^(\s*)([-*+]\s+)(.*)$/;
+const TASK_LINE_REGEX = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/;
+
+function toggleTaskOnLine(lineText) {
+    const taskMatch = lineText.match(TASK_LINE_REGEX);
+    if (taskMatch) {
+        const indent = taskMatch[1].match(/^\s*/)[0];
+        const text = taskMatch[3].replace(/^ /, '');
+        return { newText: indent + text };
+    }
+
+    const bulletMatch = lineText.match(BULLET_REGEX);
+    if (bulletMatch) {
+        const indent = bulletMatch[1];
+        const text = bulletMatch[3];
+        return { newText: indent + '- [ ] ' + text };
+    }
+
+    const existingIndent = lineText.match(/^(\s*)/)[1];
+    const text = lineText.trimStart();
+    return { newText: existingIndent + '- [ ] ' + text };
+}
+
 function extractMentionContacts(text) {
     const contacts = new Set();
     if (!text) return contacts;
@@ -464,5 +487,6 @@ window.TaskParser = {
     UPCOMING_DAYS,
     KNOWN_BADGE_KEYS,
     CHECKBOX_REGEX,
-    BADGE_REGEX
+    BADGE_REGEX,
+    toggleTaskOnLine
 };
