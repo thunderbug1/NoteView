@@ -268,14 +268,15 @@ const DocumentView = {
         }
 
         // Task toggle button
-        parts.push(`
+        const actions = [];
+        actions.push(`
             <button class="task-toggle-btn" data-id="${block.id}" title="Toggle task on current line (Alt+T)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
             </button>
         `);
 
         // Pin button
-        parts.push(`
+        actions.push(`
             <button class="pin-btn ${block.pinned ? 'pinned' : ''}" data-id="${block.id}" title="${block.pinned ? 'Unpin note' : 'Pin note'}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="${block.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z"/></svg>
             </button>
@@ -284,7 +285,7 @@ const DocumentView = {
 
         // Microphone / Speech-to-Text button
         if (this.isSpeechRecognitionSupported()) {
-            parts.push(`
+            actions.push(`
                 <button class="mic-btn" data-id="${block.id}" title="Dictate text">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
                 </button>
@@ -294,7 +295,7 @@ const DocumentView = {
         // AI Assistant button (always shown, disabled when AI is off)
         if (window.AIAssistant) {
             const disabled = !AIAssistant.enabled;
-            parts.push(`
+            actions.push(`
                 <button class="ai-btn${disabled ? ' ai-btn-disabled' : ''}" data-id="${block.id}" title="${disabled ? 'Enable AI in Settings to use' : 'AI Assistant (Ctrl+Shift+A)'}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
                 </button>
@@ -302,7 +303,7 @@ const DocumentView = {
         }
 
         // Copy button
-        parts.push(`
+        actions.push(`
             <button class="copy-btn" data-id="${block.id}" title="Copy note text">
                 <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 <svg class="copied-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -310,11 +311,13 @@ const DocumentView = {
         `);
 
         // Delete button (always shown, far right)
-        parts.push(`
+        actions.push(`
             <button class="delete-btn" data-id="${block.id}" title="Delete note">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>
         `);
+
+        parts.push(`<div class="block-actions">${actions.join('')}</div>`);
 
         if (parts.length > 0) {
             return `<div class="block-metadata">${parts.join('')}</div>`;
