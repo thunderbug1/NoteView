@@ -42,6 +42,7 @@ const SelectionManager = {
         this.normalizeContextSelection();
         this.updateSelectionUI();
         this.initHistory();
+        this.initClearContextBtn();
         console.log('[SelectionManager] init:complete', {
             restoredContext: Array.from(this.selections.context)
         });
@@ -255,6 +256,20 @@ const SelectionManager = {
      */
     getContextTags() {
         return Array.from(this.selections.context);
+    },
+
+    /**
+     * Initialize the clear context button
+     */
+    initClearContextBtn() {
+        const btn = document.getElementById('clearContextBtn');
+        if (btn) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.clearContextTags();
+                App.render();
+            });
+        }
     },
 
     /**
@@ -758,6 +773,11 @@ const SelectionManager = {
             option.classList.toggle('group-match', isGroupMatch);
             option.classList.toggle('excluded', isExcluded);
         });
+
+        const clearBtn = document.getElementById('clearContextBtn');
+        if (clearBtn) {
+            clearBtn.disabled = this.selections.context.size === 0;
+        }
     },
 
     /**

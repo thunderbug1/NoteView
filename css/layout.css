@@ -195,6 +195,28 @@
     font-weight: 600;
 }
 
+.section-clear-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.section-clear-btn:hover:not(:disabled) {
+    opacity: 1;
+}
+
+.section-clear-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
 /* View Selector */
 .view-selector select {
     width: 100%;
