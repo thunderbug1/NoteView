@@ -67,8 +67,9 @@
     padding: 0 1rem;
     opacity: 0;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 1rem;
+    gap: 0.5rem;
     height: 0;
     overflow: hidden;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -80,6 +81,17 @@
     border: 1px solid var(--border);
     border-bottom: none;
     border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.block-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .document-view .block:hover .block-metadata,
@@ -706,4 +718,206 @@
         height: auto;
         max-height: 90vh;
     }
+}
+
+/* Mobile indentation toolbar (above virtual keyboard) */
+.mobile-toolbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--bg-secondary, #1e1e2e);
+    border-top: 1px solid var(--border, #313244);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.mobile-toolbar.hidden {
+    transform: translateY(100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.mobile-toolbar button {
+    background: transparent;
+    border: 1px solid var(--border, #313244);
+    color: var(--text, #cdd6f4);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    font-size: 1.1rem;
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-toolbar button:active {
+    background: var(--accent-light, rgba(59, 130, 246, 0.15));
+    color: var(--accent, #89b4fa);
+}
+
+/* Note modal (wikilink reference) */
+.content-modal.note-modal {
+    width: min(720px, calc(100vw - 2rem));
+    max-height: min(600px, calc(100vh - 2rem));
+}
+
+.note-modal .tag-modal-body {
+    padding: 1.25rem 1.5rem 1.5rem;
+    overflow-y: auto;
+}
+
+.note-modal-header-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.note-modal-tags .badge {
+    display: inline-block;
+    font-size: 0.8em;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.note-modal-content {
+    line-height: 1.7;
+}
+
+.note-modal-content h1,
+.note-modal-content h2,
+.note-modal-content h3 {
+    color: var(--text-primary);
+    margin: 1rem 0 0.5rem;
+}
+
+.note-modal-content p {
+    margin: 0.5rem 0;
+}
+
+.note-modal-content pre {
+    background: var(--bg-tertiary, var(--bg-secondary));
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    font-size: 0.9em;
+}
+
+.note-modal-content code {
+    background: var(--bg-tertiary, var(--bg-secondary));
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.note-modal-content ul,
+.note-modal-content ol {
+    padding-left: 1.5rem;
+}
+
+.note-modal-not-found {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted);
+}
+
+.note-modal-not-found strong {
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.note-modal-create-btn {
+    margin-top: 1rem;
+    padding: 0.5rem 1.25rem;
+    background: var(--accent, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.note-modal-create-btn:hover {
+    opacity: 0.9;
+}
+
+.note-modal-raw {
+    white-space: pre-wrap;
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+}
+
+/* Backlinks panel (right sidebar) */
+.backlinks-panel .backlinks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.backlink-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.backlink-item:hover {
+    background: var(--bg-hover);
+}
+
+.backlink-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.backlink-snippet {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Extract cut modal */
+.extract-cut-title-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 1rem 0;
+}
+
+.extract-cut-title-row label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.extract-cut-title-row input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
 }

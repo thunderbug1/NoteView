@@ -265,6 +265,39 @@ function createCodeMirrorWidgets(documentView) {
         ignoreEvent() { return true; }
     }
 
+    class WikilinkWidget extends WidgetType {
+        constructor(displayText, targetId, from, to, exists) {
+            super();
+            this.displayText = displayText;
+            this.targetId = targetId;
+            this.from = from;
+            this.to = to;
+            this.exists = exists;
+        }
+        eq(other) {
+            return other.displayText === this.displayText && other.targetId === this.targetId && other.from === this.from;
+        }
+        toDOM(view) {
+            const span = document.createElement("span");
+            span.className = this.exists ? "md-wikilink" : "md-wikilink md-wikilink-broken";
+            span.textContent = this.displayText;
+            span.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.shiftKey || !this.exists) {
+                    documentView.openNoteModal(this.targetId);
+                } else {
+                    documentView.navigateToBlock(this.targetId);
+                }
+            };
+            span.onmousedown = (e) => {
+                e.stopPropagation();
+            };
+            return span;
+        }
+        ignoreEvent() { return true; }
+    }
+
     class FencedBlockWidget extends WidgetType {
         constructor(block) {
             super();
@@ -434,6 +467,7 @@ function createCodeMirrorWidgets(documentView) {
         CheckboxWidget,
         BadgeWidget,
         LinkWidget,
+        WikilinkWidget,
         FencedBlockWidget,
         AddDeadlineWidget,
         AddAssigneeWidget,

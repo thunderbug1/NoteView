@@ -30,6 +30,9 @@ const DocumentView = {
     _recognition: null,
     _recordingBlockId: null,
     _isStopping: false,
+    // Mobile toolbar state
+    _mobileToolbar: null,
+    _focusedEditor: null,
 
     /**
      * Get or initialize task menus
@@ -52,6 +55,9 @@ const DocumentView = {
 
         // Wait for CodeMirror to be loaded
         await this.waitForCodeMirror();
+
+        // Initialize mobile toolbar (once, only on touch devices)
+        this.createMobileToolbar();
 
         const sorted = SortManager.sortItems('document', blocks);
 
@@ -155,12 +161,21 @@ const DocumentView = {
         if (!marker) return;
         e.preventDefault();
         e.stopPropagation();
-        
+
         const blockId = marker.dataset.id;
         const view = this.editors.get(blockId);
         if (!view) return;
 
-        const head = view.state.selection.main.head;
+        const selection = view.state.selection.main;
+        if (!selection.empty && selection.from !== selection.to) {
+            const selectedText = view.state.sliceDoc(selection.from, selection.to);
+            if (selectedText.trim()) {
+                this.handleExtractCut(view, selectedText, selection);
+                return;
+            }
+        }
+
+        const head = selection.head;
         const line = view.state.doc.lineAt(head);
         this.handleSplitNote(view, line.from, line.to);
     },
@@ -207,6 +222,12 @@ const DocumentView = {
     // Render metadata header above block (like Obsidian/Tana)
     renderBlockMetadata(block) {
         const parts = [];
+
+        // Title (from first heading)
+        const titleMatch = block.content?.match(/^#\s+(.+)$/m);
+        if (titleMatch) {
+            parts.push(`<span class="block-title">${Common.escapeHtml(titleMatch[1].trim())}</span>`);
+        }
 
         // Tags
         const tags = block.tags || [];
@@ -609,6 +630,70 @@ const DocumentView = {
         }
     },
 
+    createMobileToolbar() {
+        if (this._mobileToolbar) return;
+        if (!('ontouchstart' in window)) return;
+
+        const toolbar = document.createElement('div');
+        toolbar.className = 'mobile-toolbar hidden';
+        toolbar.innerHTML = `
+            <button class="mobile-indent-outdent" data-action="outdent" title="Outdent">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="mobile-indent-outdent" data-action="indent" title="Indent">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        `;
+        document.body.appendChild(toolbar);
+        this._mobileToolbar = toolbar;
+
+        toolbar.querySelectorAll('.mobile-indent-outdent').forEach(btn => {
+            btn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const action = btn.dataset.action;
+                const view = this._focusedEditor;
+                if (!view) return;
+
+                const { indentMore, indentLess } = window.CodeMirror;
+                if (action === 'indent') {
+                    indentMore(view);
+                } else if (action === 'outdent') {
+                    indentLess(view);
+                }
+            }, { passive: false });
+        });
+
+        if (window.visualViewport) {
+            const updatePosition = () => {
+                if (!this._mobileToolbar || this._mobileToolbar.classList.contains('hidden')) return;
+                const vv = window.visualViewport;
+                const offset = window.innerHeight - vv.height - vv.offsetTop;
+                toolbar.style.bottom = offset + 'px';
+            };
+            window.visualViewport.addEventListener('resize', updatePosition);
+            window.visualViewport.addEventListener('scroll', updatePosition);
+        }
+    },
+
+    showMobileToolbar() {
+        if (!this._mobileToolbar) return;
+        const vv = window.visualViewport;
+        if (!vv) return;
+        // Only show when virtual keyboard is open
+        if (vv.height >= window.innerHeight * 0.8) return;
+        this._mobileToolbar.classList.remove('hidden');
+        const offset = window.innerHeight - vv.height - vv.offsetTop;
+        this._mobileToolbar.style.bottom = offset + 'px';
+    },
+
+    hideMobileToolbar() {
+        if (!this._mobileToolbar) return;
+        this._mobileToolbar.classList.add('hidden');
+    },
+
     async handleSplitNote(view, from, to) {
         // Find the block ID of the current editor
         let editorContainer = view.dom.closest('.codemirror-container');
@@ -861,6 +946,88 @@ const DocumentView = {
         this.insertTextAtSelection(view, this.buildFencedPaste(view, text, action));
     },
 
+    async handleExtractCut(view, selectedText, selection) {
+        const result = await this.showExtractCutModal(selectedText);
+        if (!result) {
+            view.dispatch({ changes: { from: selection.from, to: selection.to, insert: '' } });
+            view.focus();
+            return;
+        }
+
+        const title = result.title || '';
+        const content = title ? `# ${title}\n\n${selectedText}` : selectedText;
+
+        await Store.createBlock(content);
+        SelectionManager.updateTagCounts();
+        TimelineView.invalidateCache();
+
+        const replacement = title ? `[[${title}]]` : '';
+        view.dispatch({
+            changes: { from: selection.from, to: selection.to, insert: replacement },
+            scrollIntoView: true
+        });
+        view.focus();
+    },
+
+    showExtractCutModal(text) {
+        const lines = text.split('\n').length;
+        const chars = text.length;
+
+        return new Promise((resolve) => {
+            let resolved = false;
+            const finish = (value) => {
+                if (resolved) return;
+                resolved = true;
+                resolve(value);
+            };
+
+            const modal = Modal.create({
+                title: 'Extract to New Note',
+                modalClass: 'tag-modal large-paste-modal extract-cut-modal',
+                content: `
+                    <div class="large-paste-summary">
+                        <p>You cut ${lines} lines (${chars} characters). Extract into a new note?</p>
+                    </div>
+                    <div class="extract-cut-title-row">
+                        <label for="extract-title-input">Title <span style="font-weight:normal;color:var(--text-muted)">(optional — needed to link back)</span></label>
+                        <input type="text" id="extract-title-input" class="modal-prompt-input" placeholder="Enter note title..." value="" />
+                    </div>
+                    <div class="large-paste-actions">
+                        <button class="settings-btn secondary" data-action="extract">Extract</button>
+                        <button class="settings-btn primary" data-action="extract-link">Extract & Link</button>
+                    </div>
+                `,
+                onClose: () => finish(null)
+            });
+
+            const input = modal.querySelector('#extract-title-input');
+            setTimeout(() => { input.focus(); input.select(); }, 10);
+
+            const submit = (withLink) => {
+                const title = input.value.trim();
+                if (withLink && !title) return;
+                finish(withLink ? { title } : { title: '' });
+                modal.close();
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const title = input.value.trim();
+                    finish(title ? { title } : { title: '' });
+                    modal.close();
+                }
+                if (e.key === 'Escape') {
+                    finish(null);
+                    modal.close();
+                }
+            });
+
+            modal.querySelector('[data-action="extract-link"]').addEventListener('click', () => submit(true));
+            modal.querySelector('[data-action="extract"]').addEventListener('click', () => submit(false));
+        });
+    },
+
     getFencedBlocks(text) {
         const fencedBlocks = [];
         const regex = /(^|\r?\n)```([^\r\n`]*)\r?\n([\s\S]*?)\r?\n```(?=\r?\n|$)/g;
@@ -998,6 +1165,38 @@ const DocumentView = {
         };
     },
 
+    createWikilinkCompletionSource(container) {
+        return (context) => {
+            const word = context.matchBefore(/\[\[[^\[\]|]*$/);
+            if (!word) return null;
+
+            if (word.from === word.to && !context.explicit) return null;
+
+            const typedQuery = word.text.slice(2).toLowerCase();
+            const suggestions = Store.blocks
+                .map(b => ({ block: b, title: Store.getBlockTitle(b) }))
+                .filter(({ title, block }) => title && title !== block.id || block.id.toLowerCase().includes(typedQuery))
+                .map(({ block, title }) => {
+                    const display = title || block.id;
+                    return {
+                        label: display,
+                        type: 'text',
+                        apply: `[[${display}]]`,
+                        detail: block.tags?.length ? block.tags.join(', ') : ''
+                    };
+                })
+                .filter(s => s.label.toLowerCase().includes(typedQuery));
+
+            if (suggestions.length === 0) return null;
+
+            return {
+                from: word.from,
+                options: suggestions,
+                validFor: /^\[\[[^\[\]|]*$/
+            };
+        };
+    },
+
     /**
      * Get the cached EditorView.theme() config object, creating it on first call.
      */
@@ -1082,6 +1281,35 @@ const DocumentView = {
             ".md-link-text": {
                 color: 'var(--accent)',
                 textDecoration: 'underline'
+            },
+            ".md-wikilink": {
+                color: 'var(--accent)',
+                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                whiteSpace: 'nowrap'
+            },
+            ".md-wikilink:hover": {
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                borderColor: 'var(--accent)'
+            },
+            ".md-wikilink-broken": {
+                color: 'var(--text-muted, #94a3b8)',
+                backgroundColor: 'rgba(148, 163, 184, 0.08)',
+                borderColor: 'rgba(148, 163, 184, 0.2)',
+                textDecoration: 'line-through',
+                textDecorationStyle: 'dotted'
+            },
+            ".md-wikilink-broken:hover": {
+                backgroundColor: 'rgba(148, 163, 184, 0.15)'
+            },
+            ".md-wikilink-source": {
+                color: 'var(--accent)',
+                backgroundColor: 'rgba(59, 130, 246, 0.06)',
+                borderRadius: '3px'
             },
             ".md-strikethrough": {
                 textDecoration: 'line-through'
@@ -1600,6 +1828,12 @@ const DocumentView = {
         const { EditorView } = window.CodeMirror;
         const self = this;
         return EditorView.domEventHandlers({
+            focus: (event, view) => {
+                const blockId = container.dataset.id;
+                if (blockId && blockId !== 'new') {
+                    self._focusedBlockId = blockId;
+                }
+            },
             paste: (event, view) => {
                 const pastedText = event.clipboardData?.getData('text/plain');
                 if (!self.shouldPromptForLargePaste(pastedText)) {
@@ -1608,6 +1842,20 @@ const DocumentView = {
 
                 event.preventDefault();
                 self.handleLargePaste(view, pastedText);
+                return true;
+            },
+            cut: (event, view) => {
+                const selection = view.state.selection.main;
+                if (selection.from === selection.to) return false;
+                const selectedText = view.state.sliceDoc(selection.from, selection.to);
+                if (!selectedText.trim()) return false;
+
+                const lines = selectedText.split('\n').length;
+                if (lines < 3 && selectedText.length < 200) return false;
+
+                event.preventDefault();
+                navigator.clipboard.writeText(selectedText);
+                self.handleExtractCut(view, selectedText, selection);
                 return true;
             },
             blur: (event, view) => {
@@ -1700,6 +1948,7 @@ const DocumentView = {
         const handleContentChange = (content) => self.handleContentChange(container.dataset.id, content);
         const createNewBlock = () => self.createNewBlock();
         const mentionCompletionSource = this.createMentionCompletionSource(container);
+        const wikilinkCompletionSource = this.createWikilinkCompletionSource(container);
 
         const view = new EditorView({
             doc: (blockId === 'new' && initialContent === '') ? '' : (initialContent.endsWith('\n') ? initialContent : initialContent + '\n'),
@@ -1707,7 +1956,7 @@ const DocumentView = {
                 basicSetup,
                 markdown({ codeLanguages: languages }),
                 keymap.of([indentWithTab]),
-                EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }]),
+                EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }, { autocomplete: wikilinkCompletionSource }]),
                 EditorView.lineWrapping,
                 this.createHiddenLineExtension(),
                 this.createLivePreviewPlugin(),
@@ -1717,7 +1966,23 @@ const DocumentView = {
                 this.createUpdateListener(container, blockId, handleContentChange),
                 this.createDomEventHandlers(container),
                 this.createNewBlockKeymap(container, createNewBlock),
-                this.createHighlightExtension(blockId)
+                this.createHighlightExtension(blockId),
+                EditorView.updateListener.of((update) => {
+                    if (update.focusChanged && update.view.hasFocus) {
+                        this._focusedEditor = update.view;
+                        this.showMobileToolbar();
+                    } else if (update.focusChanged && !update.view.hasFocus) {
+                        if (this._focusedEditor === update.view) {
+                            // Delay to allow toolbar button clicks to register
+                            setTimeout(() => {
+                                if (this._focusedEditor === update.view) {
+                                    this._focusedEditor = null;
+                                    this.hideMobileToolbar();
+                                }
+                            }, 150);
+                        }
+                    }
+                })
             ],
             parent: container
         });
@@ -1914,7 +2179,8 @@ const DocumentView = {
             this.decorateHeaders.bind(this),
             this.decorateInlineFormats.bind(this),
             this.decorateLinks.bind(this),
-            this.decorateBareUrls.bind(this)
+            this.decorateBareUrls.bind(this),
+            this.decorateWikilinks.bind(this)
         ];
     },
 
@@ -2269,6 +2535,11 @@ const DocumentView = {
         }
     },
 
+    // Get the ID of the currently focused block
+    getFocusedBlockId() {
+        return this._focusedBlockId || null;
+    },
+
     // Focus the "new note" block at the bottom
     focusNewBlock() {
         const tryFocus = (attempts = 0) => {
@@ -2283,5 +2554,100 @@ const DocumentView = {
             }
         };
         tryFocus();
+    },
+
+    // Navigate to a block by wikilink target — scroll into view in document, or open modal if filtered out
+    navigateToBlock(targetId) {
+        const block = Store.findBlockByWikilink(targetId);
+        if (!block) {
+            this.openNoteModal(targetId);
+            return;
+        }
+        const blockEl = document.querySelector(`.block[data-id="${CSS.escape(block.id)}"]`);
+        if (blockEl) {
+            blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const editor = this.editors.get(block.id);
+            if (editor) setTimeout(() => editor.focus(), 150);
+        } else {
+            this.openNoteModal(targetId);
+        }
+    },
+
+    // Open a modal showing the referenced note's content (or a "create" option)
+    openNoteModal(targetId) {
+        const block = Store.findBlockByWikilink(targetId);
+
+        if (!block) {
+            Modal.create({
+                title: 'Note Not Found',
+                modalClass: 'tag-modal content-modal note-modal',
+                content: `
+                    <div class="note-modal-not-found">
+                        <p>No note found with name: <strong>${Common.escapeHtml(targetId)}</strong></p>
+                        <button class="note-modal-create-btn" data-target="${Common.escapeHtml(targetId)}">Create this note</button>
+                    </div>
+                `
+            });
+            const btn = document.querySelector('.note-modal-create-btn');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    const closestModal = btn.closest('.tag-modal-overlay');
+                    if (closestModal) closestModal.remove();
+                    App.createNewBlockWithId(targetId);
+                });
+            }
+            return;
+        }
+
+        let renderedContent;
+        const rawContent = block.content || '';
+        if (window.marked && typeof window.marked.parse === 'function') {
+            renderedContent = marked.parse(rawContent);
+        } else {
+            renderedContent = `<pre class="note-modal-raw">${Common.escapeHtml(rawContent)}</pre>`;
+        }
+
+        const tags = (block.tags && block.tags.length > 0)
+            ? `<div class="note-modal-tags">${block.tags.map(t => `<span class="badge">${Common.escapeHtml(t)}</span>`).join(' ')}</div>`
+            : '';
+
+        Modal.create({
+            title: Common.escapeHtml(block.id),
+            modalClass: 'tag-modal content-modal note-modal',
+            content: `
+                <div class="note-modal-header-info">
+                    ${tags}
+                </div>
+                <div class="note-modal-content">
+                    ${renderedContent}
+                </div>
+            `
+        });
+    },
+
+    // Decorator: wikilinks [[target]] and [[target|display]]
+    decorateWikilinks(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
+        const wikilinkRegex = /\[\[([^\[\]|]+)(?:\|([^\[\]]+))?\]\]/g;
+        let match;
+        while ((match = wikilinkRegex.exec(text)) !== null) {
+            const matchFrom = from + match.index;
+            const matchTo = matchFrom + match[0].length;
+
+            let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
+            if (!overlaps) {
+                const targetId = match[1].trim();
+                const displayText = match[2] ? match[2].trim() : targetId;
+
+                if (hideSyntax) {
+                    const blockExists = !!Store.findBlockByWikilink(targetId);
+                    builder.push(Decoration.replace({
+                        widget: new widgets.WikilinkWidget(displayText, targetId, matchFrom, matchTo, blockExists)
+                    }).range(matchFrom, matchTo));
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-wikilink-source' }).range(matchFrom, matchTo));
+                }
+                usedRanges.push({ from: matchFrom, to: matchTo });
+            }
+        }
     }
 };

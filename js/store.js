@@ -811,9 +811,27 @@ const Store = {
         this._filteredBlocksCache.invalidate();
     },
 
+    // Get display title for a block (first heading, or empty string if none)
+    getBlockTitle(block) {
+        if (!block || !block.content) return '';
+        const match = block.content.match(/^#\s+(.+)$/m);
+        return match ? match[1].trim() : '';
+    },
+
+    // Resolve a wikilink target: filename first (Obsidian-compatible), then first heading
+    findBlockByWikilink(target) {
+        const lower = target.toLowerCase();
+        let block = this.blocks.find(b => b.id.toLowerCase() === lower);
+        if (block) return block;
+        return this.blocks.find(b => {
+            const title = this.getBlockTitle(b);
+            return title && title.toLowerCase() === lower;
+        });
+    },
+
     // Create new block
     async createBlock(content = '', extraMetadata = {}) {
-        const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}`;
+        const id = extraMetadata.id || `${new Date().toISOString().split('T')[0]}-${Date.now()}`;
         const block = {
             id,
             content,

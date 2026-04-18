@@ -629,6 +629,9 @@ const App = {
 
         // Update deadline panel in right sidebar (uses all blocks, not filtered)
         DeadlinePanel.render(Store.blocks);
+        // Update backlinks panel
+        const focusedBlockId = DocumentView.getFocusedBlockId();
+        BacklinksPanel.render(Store.blocks, focusedBlockId);
     },
 
     updateUndoRedoUI() {
@@ -672,6 +675,8 @@ const App = {
         SelectionManager.updateTagCounts();
         // Update deadline panel after content changes
         DeadlinePanel.render(Store.blocks);
+        // Update backlinks panel after content changes
+        BacklinksPanel.render(Store.blocks, DocumentView.getFocusedBlockId());
     },
 
     async deleteBlock(id) {
@@ -721,6 +726,13 @@ const App = {
         // Update tag counts to refresh contacts sidebar
         SelectionManager.updateTagCounts();
         this.render();
+    },
+
+    async createNewBlockWithId(targetId) {
+        await Store.createBlock(`# ${targetId}\n`, { id: targetId });
+        SelectionManager.updateTagCounts();
+        await this.render();
+        DocumentView.navigateToBlock(targetId);
     },
 
     async showBlockContentModal(blockId, options = {}) {
