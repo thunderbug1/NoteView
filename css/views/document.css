@@ -36,7 +36,7 @@
     content: '';
     position: absolute;
     left: -1rem;
-    top: 0;
+    top: 1.5rem;
     bottom: 0;
     width: 2px;
     background: transparent;
@@ -492,36 +492,38 @@
 }
 
 /* Collapse / Expand Button */
-.collapse-btn {
+.document-view .block > .collapse-btn {
     background: transparent;
     border: none;
     padding: 0.3rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    color: var(--text-muted);
-    opacity: 0;
+    color: var(--text-secondary);
+    opacity: 0.6;
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     pointer-events: auto;
-    position: relative;
-    z-index: 10;
+    position: absolute;
+    left: -1.75rem;
+    top: -0.25rem;
+    z-index: 15;
 }
 
-.document-view .block:hover .collapse-btn,
-.document-view .block:focus-within .collapse-btn {
-    opacity: 0.5;
+.document-view .block:hover > .collapse-btn,
+.document-view .block:focus-within > .collapse-btn {
+    opacity: 0.6;
 }
 
-.collapse-btn:hover {
+.document-view .block > .collapse-btn:hover {
     opacity: 1 !important;
     color: var(--accent);
     background: var(--accent-light, rgba(59, 130, 246, 0.1));
     transform: scale(1.1);
 }
 
-.collapse-btn.collapsed {
+.document-view .block > .collapse-btn.collapsed {
     opacity: 1 !important;
     color: var(--text-muted);
 }

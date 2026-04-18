@@ -58,6 +58,7 @@ const DocumentView = {
         // Build HTML for blocks - use div containers for CodeMirror
         container.innerHTML = sorted.map(block => `
             <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${block.id}">
+                ${this.renderCollapseButton(block)}
                 <div class="block-split-marker" data-id="${block.id}" title="Split note here">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
                 </div>
@@ -189,6 +190,13 @@ const DocumentView = {
         return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     },
 
+    renderCollapseButton(block) {
+        const isCollapsed = this.collapsedBlocks.has(block.id);
+        return `<button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${block.id}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isCollapsed ? '15 18 9 12 15 6' : '6 9 12 15 18 9'}"/></svg>
+        </button>`;
+    },
+
     // Render metadata header above block (like Obsidian/Tana)
     renderBlockMetadata(block) {
         const parts = [];
@@ -238,13 +246,6 @@ const DocumentView = {
             </button>
         `);
 
-        // Collapse/expand button
-        const isCollapsed = this.collapsedBlocks.has(block.id);
-        parts.push(`
-            <button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${block.id}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isCollapsed ? '15 18 9 12 15 6' : '6 9 12 15 18 9'}"/></svg>
-            </button>
-        `);
 
         // Microphone / Speech-to-Text button
         if (this.isSpeechRecognitionSupported()) {
