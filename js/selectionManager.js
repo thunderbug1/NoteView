@@ -26,6 +26,11 @@ const SelectionManager = {
 
     computedContextTags: ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
 
+    // Selecting a tag in an exclusion group removes all other tags in that group
+    computedExclusionGroups: [
+        ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked']
+    ],
+
     /**
      * Initialize the selection manager
      */
@@ -161,6 +166,13 @@ const SelectionManager = {
             this.selections.context.clear();
         } else {
             this.selections.context.delete('Status.untagged');
+            for (const group of this.computedExclusionGroups) {
+                if (group.includes(tag)) {
+                    for (const t of group) {
+                        if (t !== tag) this.selections.context.delete(t);
+                    }
+                }
+            }
         }
         this.selections.context.add(tag);
         this.selections.excluded.delete(tag);
@@ -648,13 +660,12 @@ const SelectionManager = {
                 const isExcluded = this.selections.excluded.has(tag);
 
                 if (isExcluded) {
-                    // Clicking an excluded tag → make it included
                     this.addContextTag(tag);
                 } else if (directlySelected) {
                     this.selections.context.delete(tag);
                     this.saveSelectionState();
                 } else {
-                    this.selections.context.add(tag);
+                    this.addContextTag(tag);
                     this.saveSelectionState();
                 }
 
