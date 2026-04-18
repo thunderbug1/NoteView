@@ -299,6 +299,10 @@
 .sidebar-edge { display: none; }
 
 @media (max-width: 768px) {
+    #app {
+        height: 100vh;
+        height: 100dvh;
+    }
     body.sidebar-open { overflow: hidden; }
     body { overscroll-behavior-x: none; }
 

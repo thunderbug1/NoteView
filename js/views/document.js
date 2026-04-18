@@ -50,6 +50,9 @@ const DocumentView = {
             this.stopSpeechRecognition();
         }
 
+        // Clean up mobile keyboard handler before DOM rebuild
+        this.cleanupMobileKeyboardHandler();
+
         const container = document.getElementById('viewContainer');
         container.className = 'document-view';
 
@@ -378,6 +381,8 @@ const DocumentView = {
             });
         });
 
+        // Setup mobile keyboard scroll handling
+        this.setupMobileKeyboardHandler();
     },
 
     // Event delegation for delete button
@@ -2543,6 +2548,64 @@ const DocumentView = {
         return this._focusedBlockId || null;
     },
 
+    // Mobile keyboard scroll handling
+    _mobileKeyboardHandler: null,
+
+    setupMobileKeyboardHandler() {
+        if (window.innerWidth > 768) return;
+        if (!window.visualViewport) return;
+        if (this._mobileKeyboardHandler) return;
+
+        const self = this;
+        const handleViewportResize = () => {
+            const vv = window.visualViewport;
+            const keyboardHeight = window.innerHeight - vv.height;
+
+            if (keyboardHeight > 50) {
+                // Ensure scrolling is enabled when keyboard is open
+                const container = document.getElementById('viewContainer');
+                container.style.overflowY = 'auto';
+
+                // Find the focused editor
+                const focusedEditor = document.querySelector('.cm-editor.cm-focused');
+                if (!focusedEditor) return;
+
+                const block = focusedEditor.closest('.block');
+                if (!block) return;
+
+                // Account for mobile toolbar height
+                const toolbarHeight = self._mobileToolbar ? self._mobileToolbar.offsetHeight : 0;
+                const containerRect = container.getBoundingClientRect();
+                const blockRect = block.getBoundingClientRect();
+
+                const visibleTop = containerRect.top;
+                const visibleBottom = containerRect.bottom - toolbarHeight;
+                const visibleHeight = visibleBottom - visibleTop;
+
+                const blockTop = blockRect.top - visibleTop;
+                const blockBottom = blockRect.bottom - visibleTop;
+
+                if (blockBottom > visibleHeight || blockTop < 0) {
+                    const offset = blockTop - (visibleHeight - blockRect.height) / 2;
+                    container.scrollTo({
+                        top: container.scrollTop + offset,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        };
+
+        window.visualViewport.addEventListener('resize', handleViewportResize);
+        this._mobileKeyboardHandler = handleViewportResize;
+    },
+
+    cleanupMobileKeyboardHandler() {
+        if (this._mobileKeyboardHandler && window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', this._mobileKeyboardHandler);
+            this._mobileKeyboardHandler = null;
+        }
+    },
+
     // Focus the "new note" block at the bottom
     focusNewBlock() {
         const tryFocus = (attempts = 0) => {
@@ -2550,8 +2613,17 @@ const DocumentView = {
             const editor = this.editors.get('new');
 
             if (newBlock && editor) {
-                newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setTimeout(() => editor.focus(), 150);
+                if (window.innerWidth <= 768) {
+                    // On mobile, focus first to trigger keyboard, then let
+                    // visualViewport handler + fallback scroll into position
+                    editor.focus();
+                    setTimeout(() => {
+                        newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
+                } else {
+                    newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(() => editor.focus(), 150);
+                }
             } else if (attempts < 15) {
                 setTimeout(() => tryFocus(attempts + 1), 50);
             }
