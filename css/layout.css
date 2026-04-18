@@ -304,6 +304,67 @@
     background: var(--bg-primary);
 }
 
+/* Content Toolbar */
+.content-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    flex: 0 0 auto;
+    min-height: 38px;
+}
+
+.content-toolbar-left,
+.content-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.content-toolbar .undo-redo-controls {
+    display: flex;
+    gap: 2px;
+}
+
+.content-toolbar .undo-redo-controls + .toolbar-btn {
+    margin-left: 0.35rem;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.toolbar-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.toolbar-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.toolbar-btn.active {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.toolbar-btn[hidden] {
+    display: none;
+}
+
 #viewContainer {
     flex: 1;
     overflow-y: auto;
@@ -402,7 +463,11 @@
     }
     #sidebarOverlay.active { display: block; }
 
-    #viewContainer { padding: 1rem; padding-top: 3.5rem; }
+    #viewContainer { padding: 1rem; }
+
+    .content-toolbar {
+        padding: 0.25rem 0.5rem;
+    }
 }
 
 /* PWA install banner */

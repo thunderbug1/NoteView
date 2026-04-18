@@ -114,33 +114,6 @@
 }
 
 
-.sort-sidebar-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-}
-
-.sort-toolbar-summary {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    line-height: 1.4;
-}
-
-.sort-toolbar-button {
-    align-self: flex-start;
-    padding: 0.45rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    cursor: pointer;
-}
-
-.sort-toolbar-button:hover {
-    border-color: var(--border-light);
-    background: var(--bg-hover);
-}
-
 .sort-config-actions {
     display: flex;
     gap: 0.5rem;

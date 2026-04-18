@@ -187,9 +187,9 @@ const SortManager = {
         return this.getFieldDefinitions(view).length > 0;
     },
 
-    initSidebar(onChange) {
+    initToolbar(onChange) {
         this.onChange = onChange;
-        const button = document.getElementById('openSortConfigBtn');
+        const button = document.getElementById('toolbarSortBtn');
         if (!button) return;
 
         if (button.dataset.sortBound === 'true') return;
@@ -202,17 +202,17 @@ const SortManager = {
         });
     },
 
-    updateSidebar() {
-        const section = document.getElementById('sortSidebarSection');
-        const button = document.getElementById('openSortConfigBtn');
-        if (!section || !button) return;
+    updateToolbar() {
+        const button = document.getElementById('toolbarSortBtn');
+        if (!button) return;
 
         const view = Store.currentView;
         const supported = this.supportsView(view);
-        section.style.display = supported ? '' : 'none';
+        button.hidden = !supported;
         if (!supported) return;
 
-        button.textContent = `${Common.capitalizeFirst(view)} Sort`;
+        const desc = this.getSummary(view);
+        button.title = desc ? `Sort: ${desc}` : 'Sort';
     },
 
     openSortModal(view, onApply) {
