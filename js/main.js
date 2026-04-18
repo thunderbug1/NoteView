@@ -138,6 +138,8 @@ const App = {
             blockCount: Store.blocks.length
         });
         if (this.isInitialized) {
+            AppSettings.invalidate();
+            await AIAssistant.init();
             SelectionManager.init();
             SelectionManager.updateTagCounts();
             this.updateVaultSwitcherName();
@@ -431,6 +433,16 @@ const App = {
                     }
                 }
             }
+
+            // Batch AI shortcut
+            if (currentCombo === 'Ctrl+Shift+B') {
+                e.preventDefault();
+                if (!AIAssistant.isConfigured()) {
+                    AIAssistant._showToast('Enable AI Features in Settings first');
+                } else {
+                    AIAssistant.openBatchOverlay();
+                }
+            }
         });
     },
 
@@ -451,8 +463,21 @@ const App = {
 
         this.setupSearch();
 
-        SortManager.initSidebar(() => this.render());
-        SortManager.updateSidebar();
+        SortManager.initToolbar(() => this.render());
+        SortManager.updateToolbar();
+
+        // Toolbar AI button
+        const toolbarAiBtn = document.getElementById('toolbarAiBtn');
+        if (toolbarAiBtn) {
+            toolbarAiBtn.addEventListener('click', () => {
+                if (!AIAssistant.isConfigured()) {
+                    AIAssistant._showToast('Enable AI Features in Settings first');
+                    return;
+                }
+                AIAssistant.openBatchOverlay();
+            });
+        }
+
         this.setupSidebarTagListeners();
 
         // Vault switcher
@@ -529,7 +554,7 @@ const App = {
         // across view changes.
 
         SelectionManager.updateSelectionUI();
-        SortManager.updateSidebar();
+        SortManager.updateToolbar();
         this.render();
         console.log('[App] setView:done', {
             currentView: Store.currentView
@@ -607,7 +632,15 @@ const App = {
         const blocks = Store.getFilteredBlocks();
         const view = Store.currentView;
 
-        SortManager.updateSidebar();
+        SortManager.updateToolbar();
+
+        // Update toolbar AI button state
+        const toolbarAiBtn = document.getElementById('toolbarAiBtn');
+        if (toolbarAiBtn) {
+            const aiReady = AIAssistant.isConfigured();
+            toolbarAiBtn.disabled = !aiReady || blocks.length === 0;
+            toolbarAiBtn.hidden = view === 'settings' || !aiReady;
+        }
 
         switch (view) {
             case 'document':

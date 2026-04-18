@@ -27,6 +27,7 @@ const SettingsView = {
                 </div>
                 <div class="ai-profile-actions">
                     <button class="edit-profile-btn" data-profile-id="${escapeHtml(p.id)}">Edit</button>
+                    <button class="clone-profile-btn" data-profile-id="${escapeHtml(p.id)}">Clone</button>
                     <button class="delete-profile-btn" data-profile-id="${escapeHtml(p.id)}">Delete</button>
                 </div>
             </div>
@@ -124,6 +125,14 @@ const SettingsView = {
                                 <p class="settings-item-hint">Create, edit, or delete reusable prompt presets shown in the AI overlay.</p>
                             </div>
                             <button id="managePresetsBtn" class="settings-btn secondary">Manage Presets...</button>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <label>Import from Vault</label>
+                                <p class="settings-item-hint">Copy AI configuration (profiles, presets, API keys) from another vault.</p>
+                            </div>
+                            <button id="importAISettingsBtn" class="settings-btn secondary">Import...</button>
                         </div>
                     </div>
                 </div>
@@ -233,12 +242,24 @@ const SettingsView = {
         // Profile list delegation (edit/delete)
         const profileList = document.getElementById('aiProfileList');
         if (profileList) {
-            profileList.addEventListener('click', (e) => {
+            profileList.addEventListener('click', async (e) => {
                 const editBtn = e.target.closest('.edit-profile-btn');
+                const cloneBtn = e.target.closest('.clone-profile-btn');
                 const deleteBtn = e.target.closest('.delete-profile-btn');
                 if (editBtn) {
                     const profile = AIAssistant.profiles.find(p => p.id === editBtn.dataset.profileId);
                     if (profile) this._showProfileForm(profile);
+                } else if (cloneBtn) {
+                    const profile = AIAssistant.profiles.find(p => p.id === cloneBtn.dataset.profileId);
+                    if (profile) {
+                        await AIAssistant.createProfile({
+                            name: profile.name + ' (copy)',
+                            endpointUrl: profile.endpointUrl,
+                            apiKey: AIAssistant._apiKeys[profile.id] || '',
+                            model: profile.model
+                        });
+                        profileList.innerHTML = this._renderProfiles();
+                    }
                 } else if (deleteBtn) {
                     const id = deleteBtn.dataset.profileId;
                     if (confirm('Delete this model profile?')) {
@@ -260,6 +281,12 @@ const SettingsView = {
         const manageTemplatesBtn = document.getElementById('manageTemplatesBtn');
         if (manageTemplatesBtn) {
             manageTemplatesBtn.addEventListener('click', () => this._openTemplateModal());
+        }
+
+        // Import AI settings button
+        const importAIBtn = document.getElementById('importAISettingsBtn');
+        if (importAIBtn) {
+            importAIBtn.addEventListener('click', () => this._openImportVaultPicker());
         }
     },
 
@@ -394,7 +421,12 @@ const SettingsView = {
                 </div>
                 <div class="ai-form-row">
                     <label>API Key <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(stored separately, excluded from git)</span></label>
-                    <input type="password" id="aiProfileApiKey" value="${escapeHtml(currentKey)}" placeholder="${isEdit ? 'Leave blank to keep current key' : 'sk-...'}" autocomplete="off">
+                    <div class="ai-api-key-field">
+                        <input type="password" id="aiProfileApiKey" value="${escapeHtml(currentKey)}" placeholder="${isEdit ? 'Leave blank to keep current key' : 'sk-...'}" autocomplete="off">
+                        <button type="button" class="ai-toggle-key-visibility" title="Show API key">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="ai-form-row">
                     <label>Model</label>
@@ -409,6 +441,20 @@ const SettingsView = {
 
         container.querySelector('#aiProfileCancel').addEventListener('click', () => {
             container.innerHTML = '';
+        });
+
+        container.querySelector('.ai-toggle-key-visibility').addEventListener('click', () => {
+            const input = container.querySelector('#aiProfileApiKey');
+            const btn = container.querySelector('.ai-toggle-key-visibility');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+                btn.title = 'Hide API key';
+            } else {
+                input.type = 'password';
+                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+                btn.title = 'Show API key';
+            }
         });
 
         container.querySelector('#aiProfileSave').addEventListener('click', async () => {
@@ -529,6 +575,93 @@ const SettingsView = {
             }
             modal.close();
             this._openPresetModal();
+        });
+    },
+
+    // --- AI Import from Vault ---
+
+    async _openImportVaultPicker() {
+        const vaultList = await Store.getVaultList();
+        const currentVaultName = Store.directoryHandle?.name;
+        const otherVaults = vaultList.filter(v => v.name !== currentVaultName);
+
+        if (otherVaults.length === 0) {
+            AIAssistant._showToast('No other vaults available');
+            return;
+        }
+
+        const vaultItems = otherVaults.map(v => `
+            <div class="tag-editor-row vault-import-row" data-vault-name="${escapeHtml(v.name)}" style="cursor:pointer">
+                <span class="tag-name">${escapeHtml(v.name)}</span>
+            </div>
+        `).join('');
+
+        const modal = Modal.create({
+            title: 'Import AI Settings from Vault',
+            content: `
+                <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem">Select a vault to copy its AI configuration from:</p>
+                <div class="tag-editor-list">${vaultItems}</div>
+            `,
+            width: '420px'
+        });
+
+        const list = modal.querySelector('.tag-editor-list');
+        if (list) {
+            list.addEventListener('click', async (e) => {
+                const row = e.target.closest('.vault-import-row');
+                if (!row) return;
+                const vaultName = row.dataset.vaultName;
+                modal.close();
+                await this._confirmImport(vaultName);
+            });
+        }
+    },
+
+    async _confirmImport(vaultName) {
+        const data = await AIAssistant.importFromVault(vaultName);
+        if (!data) {
+            AIAssistant._showToast('No AI settings found in that vault');
+            return;
+        }
+
+        const profileList = data.profiles.map(p =>
+            `<li>${escapeHtml(p.name)} (${escapeHtml(p.model)})</li>`
+        ).join('');
+
+        const presetList = data.presets.map(p =>
+            `<li>${escapeHtml(p.title)}</li>`
+        ).join('');
+
+        const hasKeys = Object.keys(data.keys).length > 0;
+
+        const content = `
+            <div style="font-size:0.9rem">
+                <p style="margin-bottom:0.75rem">Import from <strong>${escapeHtml(vaultName)}</strong>:</p>
+                <div style="margin-bottom:0.5rem"><strong>${data.profiles.length} profile${data.profiles.length !== 1 ? 's' : ''}:</strong></div>
+                <ul style="margin:0 0 0.75rem 1.25rem;padding:0;list-style:disc">${profileList || '<li style="color:var(--text-muted)">None</li>'}</ul>
+                <div style="margin-bottom:0.5rem"><strong>${data.presets.length} preset${data.presets.length !== 1 ? 's' : ''}:</strong></div>
+                <ul style="margin:0 0 0.75rem 1.25rem;padding:0;list-style:disc">${presetList || '<li style="color:var(--text-muted)">None</li>'}</ul>
+                ${hasKeys ? '<p style="color:var(--text-muted)">API keys will be copied.</p>' : ''}
+                <p style="color:var(--color-danger, #f44);margin-top:0.75rem;font-weight:500">This will replace your current AI settings.</p>
+            </div>
+            <div class="ai-form-actions" style="margin-top:1rem">
+                <button class="ai-form-cancel" id="importCancelBtn">Cancel</button>
+                <button class="ai-form-save" id="importConfirmBtn">Import</button>
+            </div>
+        `;
+
+        const modal = Modal.create({
+            title: 'Confirm Import',
+            content,
+            width: '440px'
+        });
+
+        modal.querySelector('#importCancelBtn').addEventListener('click', () => modal.close());
+        modal.querySelector('#importConfirmBtn').addEventListener('click', async () => {
+            await AIAssistant.applyImport(data);
+            modal.close();
+            this.render();
+            AIAssistant._showToast('AI settings imported successfully');
         });
     },
 
