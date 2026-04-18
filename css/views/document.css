@@ -722,6 +722,87 @@
     opacity: 0.6;
 }
 
+/* Creation Action Buttons */
+.block-creation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.creation-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.35rem 0.7rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+    transition: all 0.15s ease;
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.creation-btn:hover {
+    background: var(--bg-tertiary, var(--bg-primary));
+    color: var(--text);
+    border-color: var(--accent);
+}
+
+.creation-btn:active {
+    transform: scale(0.97);
+}
+
+/* Hide action row once block has content */
+.document-view .block:not(.empty) .block-creation-actions {
+    display: none;
+}
+
+/* Creation mic button recording state */
+.creation-btn.mic-action.recording {
+    color: var(--danger, #ef4444);
+    border-color: var(--danger, #ef4444);
+    animation: mic-pulse 1.5s ease-in-out infinite;
+}
+
+/* Template picker dropdown */
+.template-picker {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    z-index: 20;
+    min-width: 180px;
+    padding: 0.25rem;
+}
+
+.template-picker-item {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-family: inherit;
+    min-height: 44px;
+}
+
+.template-picker-item:hover {
+    background: var(--bg-secondary);
+}
+
 @media (max-width: 768px) {
     .tag-modal.content-modal {
         width: 95vw;

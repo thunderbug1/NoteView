@@ -79,9 +79,7 @@ const DocumentView = {
             </article>
         `).join('') + `
             <article class="block empty" data-id="new">
-                <div class="block-split-marker" data-id="new" title="Split note here">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
-                </div>
+                ${this.renderCreationActions('new')}
                 <div class="block-tags">
                     ${this.getSelectedContextBadge()}
                 </div>
@@ -133,6 +131,13 @@ const DocumentView = {
         }
         this._micHandler = this.handleMicClick.bind(this);
         container.addEventListener('click', this._micHandler);
+
+        // Add event delegation for creation action buttons
+        if (this._creationHandler) {
+            container.removeEventListener('click', this._creationHandler);
+        }
+        this._creationHandler = this.handleCreationAction.bind(this);
+        container.addEventListener('click', this._creationHandler);
 
         // Add event delegation for collapse button click
         if (this._collapseHandler) {
@@ -220,6 +225,18 @@ const DocumentView = {
         return `<button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${block.id}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isCollapsed ? '15 18 9 12 15 6' : '6 9 12 15 18 9'}"/></svg>
         </button>`;
+    },
+
+    renderCreationActions(blockId) {
+        const micBtn = this.isSpeechRecognitionSupported()
+            ? `<button class="creation-btn mic-action" data-action="dictate" data-id="${blockId}" title="Start dictation"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> Dictate</button>`
+            : '';
+        return `<div class="block-creation-actions">
+            <button class="creation-btn" data-action="type" data-id="${blockId}" title="Start typing"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Type</button>
+            ${micBtn}
+            <button class="creation-btn" data-action="task" data-id="${blockId}" title="Add a task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg> Task</button>
+            <button class="creation-btn" data-action="template" data-id="${blockId}" title="Create from template"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg> Template</button>
+        </div>`;
     },
 
     // Render metadata header above block (like Obsidian/Tana)
@@ -455,6 +472,92 @@ const DocumentView = {
             .replace('Alt+', 'Alt-')
             .replace('Shift+', 'Shift-')
             .toLowerCase();
+    },
+
+    handleCreationAction(e) {
+        const btn = e.target.closest('.creation-btn');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const action = btn.dataset.action;
+        const blockId = btn.dataset.id;
+        const view = this.editors.get(blockId);
+
+        if (action === 'type') {
+            if (view) view.focus();
+        } else if (action === 'dictate') {
+            if (this._recordingBlockId === blockId) {
+                this.stopSpeechRecognition();
+            } else {
+                this.startSpeechRecognition(blockId, btn);
+            }
+        } else if (action === 'task') {
+            if (view) {
+                const taskPrefix = '- [ ] ';
+                const pos = view.state.doc.length;
+                view.dispatch({
+                    changes: { from: pos, insert: taskPrefix },
+                    selection: { anchor: pos + taskPrefix.length }
+                });
+                view.focus();
+            }
+        } else if (action === 'template') {
+            this.showTemplatePicker(btn);
+        }
+    },
+
+    async showTemplatePicker(anchorBtn) {
+        // Remove any existing picker
+        const existing = document.querySelector('.template-picker');
+        if (existing) { existing.remove(); return; }
+
+        const templates = await AppSettings.getTemplates();
+        if (templates.length === 0) return;
+
+        const block = anchorBtn.closest('.block');
+        if (!block) return;
+
+        const picker = document.createElement('div');
+        picker.className = 'template-picker';
+        picker.innerHTML = templates.map(t =>
+            `<button class="template-picker-item" data-template-id="${t.id}">${escapeHtml(t.name)}</button>`
+        ).join('');
+
+        block.style.position = 'relative';
+        block.appendChild(picker);
+
+        const applyTemplate = async (e) => {
+            const item = e.target.closest('.template-picker-item');
+            if (!item) return;
+
+            const templateId = item.dataset.templateId;
+            const template = templates.find(t => t.id === templateId);
+            picker.remove();
+
+            if (template && template.content) {
+                const view = this.editors.get('new');
+                if (view) {
+                    const { snippet } = window.CodeMirror;
+                    snippet(template.content)(view, null, 0, view.state.doc.length);
+                    view.focus();
+                }
+            } else {
+                // Blank template — just focus
+                const view = this.editors.get('new');
+                if (view) view.focus();
+            }
+        };
+        picker.addEventListener('click', applyTemplate);
+
+        // Close on outside click
+        const closeOnOutside = (ev) => {
+            if (!picker.contains(ev.target)) {
+                picker.remove();
+                document.removeEventListener('click', closeOnOutside);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
     },
 
     handleMicClick(e) {
@@ -2431,6 +2534,15 @@ const DocumentView = {
                     this.originalContents.delete('new');
                     this.originalContents.set(newBlock.id, originalContent);
                 }
+
+                // Update dictation state if recording on the new block
+                if (this._recordingBlockId === 'new') {
+                    this._recordingBlockId = newBlock.id;
+                    const micBtn = currentBlock.querySelector('.mic-btn');
+                    if (micBtn) micBtn.dataset.id = newBlock.id;
+                    const creationMicBtn = currentBlock.querySelector('.creation-btn.mic-action');
+                    if (creationMicBtn) creationMicBtn.dataset.id = newBlock.id;
+                }
             }
 
             // Check if more content was typed while we were awaiting createBlock
@@ -2445,6 +2557,7 @@ const DocumentView = {
             const container = document.getElementById('viewContainer');
             const newPlaceholderHtml = `
                 <article class="block empty" data-id="new">
+                    ${this.renderCreationActions('new')}
                     <div class="block-tags">
                         ${this.getSelectedContextBadge()}
                     </div>

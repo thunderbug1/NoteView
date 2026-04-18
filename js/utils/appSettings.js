@@ -95,6 +95,28 @@ const AppSettings = {
         await this.saveKeys(keyMap);
     },
 
+    // --- Note Templates ---
+
+    _defaultTemplates: [
+        { id: 'meeting', name: 'Meeting Notes', content: '# ${1:Meeting Title}\n\n**Attendees:** ${2:Attendees}\n\n## Agenda\n\n## Notes\n\n## Action Items\n- [ ] ' },
+        { id: 'daily', name: 'Daily Note', content: '# ${1:Daily Note}\n\n## Tasks\n- [ ] \n\n## Notes\n' },
+        { id: 'blank', name: 'Blank', content: '' }
+    ],
+
+    async getTemplates() {
+        const settings = await this.load();
+        if (settings.templates && settings.templates.length > 0) {
+            return settings.templates;
+        }
+        return [...this._defaultTemplates];
+    },
+
+    async saveTemplates(templates) {
+        const settings = await this.load();
+        settings.templates = templates;
+        await this.save(settings);
+    },
+
     async _ensureGitignore(dir) {
         try {
             const handle = await dir.getFileHandle('.gitignore', { create: true });

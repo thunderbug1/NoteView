@@ -128,6 +128,17 @@ const SettingsView = {
                     </div>
                 </div>
 
+                <div class="settings-section" id="templatesSection">
+                    <h3>Note Templates</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Manage Templates</label>
+                            <p class="settings-item-hint">Create, edit, or delete templates available in the new note action bar.</p>
+                        </div>
+                        <button id="manageTemplatesBtn" class="settings-btn secondary">Manage Templates...</button>
+                    </div>
+                </div>
+
                 <div class="settings-section">
                     <h3>About NoteView</h3>
                     <div class="settings-item">
@@ -243,6 +254,12 @@ const SettingsView = {
         const managePresetsBtn = document.getElementById('managePresetsBtn');
         if (managePresetsBtn) {
             managePresetsBtn.addEventListener('click', () => this._openPresetModal());
+        }
+
+        // Manage templates button
+        const manageTemplatesBtn = document.getElementById('manageTemplatesBtn');
+        if (manageTemplatesBtn) {
+            manageTemplatesBtn.addEventListener('click', () => this._openTemplateModal());
         }
     },
 
@@ -512,6 +529,113 @@ const SettingsView = {
             }
             modal.close();
             this._openPresetModal();
+        });
+    },
+
+    // --- Template Management ---
+
+    async _openTemplateModal() {
+        const templates = await AppSettings.getTemplates();
+        const templatesHtml = templates.length === 0
+            ? '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0">No templates yet. Add one below.</div>'
+            : `<div class="tag-editor-list">${templates.map(t => `
+                <div class="tag-editor-row" data-template-id="${escapeHtml(t.id)}">
+                    <span class="tag-name">${escapeHtml(t.name)}</span>
+                    <span class="tag-count" style="font-size:0.75rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(t.content || '(blank)')}</span>
+                    <div class="tag-actions">
+                        <button class="tag-action-btn rename" data-template-id="${escapeHtml(t.id)}">Edit</button>
+                        <button class="tag-action-btn delete" data-template-id="${escapeHtml(t.id)}">Delete</button>
+                    </div>
+                </div>`).join('')}</div>`;
+
+        const modal = Modal.create({
+            title: 'Manage Note Templates',
+            content: `
+                ${templatesHtml}
+                <button class="ai-add-profile-btn" id="addTemplateBtn" style="margin-top:0.75rem">+ Add Template</button>
+                <div id="templateFormContainer"></div>
+            `,
+            width: '520px'
+        });
+
+        modal.querySelector('#addTemplateBtn').addEventListener('click', () => {
+            this._showTemplateForm(modal, null);
+        });
+
+        const list = modal.querySelector('.tag-editor-list');
+        if (list) {
+            list.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.tag-action-btn');
+                if (!btn) return;
+                const templateId = btn.dataset.templateId;
+                const template = templates.find(t => t.id === templateId);
+                if (!template) return;
+
+                if (btn.classList.contains('rename')) {
+                    this._showTemplateForm(modal, template);
+                } else if (btn.classList.contains('delete')) {
+                    const updated = templates.filter(t => t.id !== templateId);
+                    await AppSettings.saveTemplates(updated);
+                    modal.close();
+                    this._openTemplateModal();
+                }
+            });
+        }
+    },
+
+    _showTemplateForm(modal, existingTemplate = null) {
+        const container = modal.querySelector('#templateFormContainer');
+        if (!container) return;
+
+        const isEdit = !!existingTemplate;
+        const t = existingTemplate || { name: '', content: '' };
+
+        container.innerHTML = `
+            <div class="ai-profile-form" style="margin-top:0.5rem">
+                <div class="ai-form-row">
+                    <label>Name</label>
+                    <input type="text" id="templateName" value="${escapeHtml(t.name)}" placeholder="e.g. Meeting Notes">
+                </div>
+                <div class="ai-form-row">
+                    <label>Content</label>
+                    <textarea id="templateContent" rows="6" style="width:100%;font-family:monospace;font-size:0.85rem;padding:0.5rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text);resize:vertical" placeholder="# Template content&#10;- [ ] Task goes here">${escapeHtml(t.content)}</textarea>
+                    <p class="settings-item-hint" style="margin-top:0.35rem">Use <code>${'\\${1:placeholder}'}</code> for tab stops. Tab navigates between them. <code>$0</code> marks the final cursor position.</p>
+                </div>
+                <div class="ai-form-actions">
+                    <button class="ai-form-cancel" id="templateCancel">Cancel</button>
+                    <button class="ai-form-save" id="templateSave">${isEdit ? 'Update' : 'Add Template'}</button>
+                </div>
+            </div>
+        `;
+
+        container.querySelector('#templateCancel').addEventListener('click', () => {
+            container.innerHTML = '';
+        });
+
+        container.querySelector('#templateSave').addEventListener('click', async () => {
+            const name = container.querySelector('#templateName').value.trim();
+            const content = container.querySelector('#templateContent').value;
+            if (!name) {
+                alert('Template name is required.');
+                return;
+            }
+
+            const templates = await AppSettings.getTemplates();
+            if (isEdit) {
+                const idx = templates.findIndex(tp => tp.id === t.id);
+                if (idx >= 0) {
+                    templates[idx] = { ...templates[idx], name, content };
+                }
+            } else {
+                templates.push({
+                    id: 'tpl-' + Date.now(),
+                    name,
+                    content
+                });
+            }
+            await AppSettings.saveTemplates(templates);
+            modal.close();
+            this._openTemplateModal();
         });
     }
 };

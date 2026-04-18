@@ -10,7 +10,7 @@ import {ViewPlugin, Decoration, WidgetType, keymap, placeholder} from "@codemirr
 import {EditorState, StateField, Prec} from "@codemirror/state";
 import {unifiedMergeView} from "@codemirror/merge";
 import {indentWithTab, indentMore, indentLess} from "@codemirror/commands";
-import {autocompletion, completionKeymap, closeBracketsKeymap} from "@codemirror/autocomplete";
+import {autocompletion, completionKeymap, closeBracketsKeymap, snippet} from "@codemirror/autocomplete";
 
 window.CodeMirror = {
     EditorView,
@@ -32,6 +32,7 @@ window.CodeMirror = {
     autocompletion,
     completionKeymap,
     closeBracketsKeymap,
+    snippet,
     foldService
 };
 
