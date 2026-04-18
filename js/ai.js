@@ -14,6 +14,7 @@ const AIAssistant = {
     _streamingResponse: '',
     _currentBlockId: null,
     _lastProfileId: null,
+    _lastInstruction: '',
     _diffEditorView: null,
 
     // Batch state
@@ -30,6 +31,7 @@ const AIAssistant = {
 
         this.enabled = !!ai.enabled;
         this._lastProfileId = ai.lastProfileId || null;
+        this._lastInstruction = ai.lastInstruction || '';
 
         // Load profiles (without keys) from settings
         this.profiles = Array.isArray(ai.profiles)
@@ -52,7 +54,8 @@ const AIAssistant = {
             { id: 'preset-default-summarize', title: 'Summarize', instruction: 'Summarize this note concisely, preserving all key facts and action items.' },
             { id: 'preset-default-expand', title: 'Expand', instruction: 'Expand on the ideas in this note. Add more detail, examples, and structure while keeping the original intent.' },
             { id: 'preset-default-fix', title: 'Fix Grammar', instruction: 'Fix grammar, spelling, and punctuation in this note. Keep the original meaning and style.' },
-            { id: 'preset-default-todo', title: 'Extract Tasks', instruction: 'Extract all action items and tasks from this note. Format them as a markdown task list with checkboxes.' }
+            { id: 'preset-default-todo', title: 'Extract Tasks', instruction: 'Extract all action items and tasks from this note. Format them as a markdown task list with checkboxes.' },
+            { id: 'preset-default-last', title: 'Last', instruction: '' }
         ];
     },
 
@@ -66,7 +69,8 @@ const AIAssistant = {
             enabled: this.enabled,
             profiles: this.profiles,
             presets: this.presets,
-            lastProfileId: this._lastProfileId
+            lastProfileId: this._lastProfileId,
+            lastInstruction: this._lastInstruction
         };
         await AppSettings.save(settings);
     },
@@ -271,7 +275,12 @@ const AIAssistant = {
                 modal.querySelectorAll('.ai-preset-chip').forEach(c => c.classList.remove('active'));
                 if (!isActive) {
                     chip.classList.add('active');
-                    instructionEl.value = chip.dataset.presetId ? this.presets.find(p => p.id === chip.dataset.presetId)?.instruction || '' : '';
+                    const preset = chip.dataset.presetId ? this.presets.find(p => p.id === chip.dataset.presetId) : null;
+                    if (preset?.id === 'preset-default-last') {
+                        instructionEl.value = this._lastInstruction;
+                    } else {
+                        instructionEl.value = preset?.instruction || '';
+                    }
                 } else {
                     instructionEl.value = '';
                 }
@@ -327,6 +336,9 @@ const AIAssistant = {
     async _send(blockId, instruction, scope, profileId, modal) {
         const profile = this.profiles.find(p => p.id === profileId);
         if (!profile) return;
+
+        this._lastInstruction = instruction;
+        this._persist();
 
         const apiKey = this._apiKeys[profileId] || '';
         if (!apiKey) {
@@ -385,7 +397,15 @@ const AIAssistant = {
 
             const block = Store.blocks.find(b => b.id === blockId);
             const original = block ? block.content || '' : '';
-            let modified = this._stripCodeFences(this._streamingResponse);
+            const raw = this._streamingResponse.trim();
+
+            if (!raw) {
+                modal.querySelector('#aiNoChanges').style.display = '';
+                modal.querySelector('#aiResponseArea').classList.remove('visible');
+                return;
+            }
+
+            let modified = this._stripCodeFences(raw);
 
             if (modified === original) {
                 modal.querySelector('#aiNoChanges').style.display = '';
@@ -447,7 +467,7 @@ const AIAssistant = {
     },
 
     _buildMessages(blockId, instruction, scope) {
-        const systemPrompt = `You are an AI assistant integrated into NoteView, a markdown note-taking app. The user will provide one or more markdown notes as context. Follow the user's instruction and return the COMPLETE modified content of the target note in markdown format. Do not wrap your response in code fences. Output only the final markdown content.`;
+        const systemPrompt = `Return only the modified markdown. No code fences, no commentary. If no changes are needed, return nothing.`;
 
         const messages = [{ role: 'system', content: systemPrompt }];
 
@@ -633,7 +653,12 @@ const AIAssistant = {
                 modal.querySelectorAll('.ai-preset-chip').forEach(c => c.classList.remove('active'));
                 if (!isActive) {
                     chip.classList.add('active');
-                    instructionEl.value = chip.dataset.presetId ? this.presets.find(p => p.id === chip.dataset.presetId)?.instruction || '' : '';
+                    const preset = chip.dataset.presetId ? this.presets.find(p => p.id === chip.dataset.presetId) : null;
+                    if (preset?.id === 'preset-default-last') {
+                        instructionEl.value = this._lastInstruction;
+                    } else {
+                        instructionEl.value = preset?.instruction || '';
+                    }
                 } else {
                     instructionEl.value = '';
                 }

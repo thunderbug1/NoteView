@@ -250,22 +250,7 @@ const DocumentView = {
         }
 
         // Tags
-        const tags = block.tags || [];
-        const selectedContexts = SelectionManager.selections?.context || new Set();
-        const sortedTags = [...tags].sort((a, b) => {
-            const aSelected = selectedContexts.has(a);
-            const bSelected = selectedContexts.has(b);
-            if (aSelected && !bSelected) return -1;
-            if (!aSelected && bSelected) return 1;
-            return a.localeCompare(b);
-        });
-
-        parts.push(`
-            <div class="block-tags">
-                ${sortedTags.map(tag => TagModal._renderBadge(tag)).join('')}
-                <button class="add-tag-btn" data-id="${block.id}">+ Tag</button>
-            </div>
-        `);
+        parts.push(this.renderTagsHtml(block));
 
         // Dates
         const dateParts = [];
@@ -343,6 +328,41 @@ const DocumentView = {
             return `<div class="block-metadata">${parts.join('')}</div>`;
         }
         return '';
+    },
+
+    renderTagsHtml(block) {
+        const tags = block.tags || [];
+        const selectedContexts = SelectionManager.selections?.context || new Set();
+        const sortedTags = [...tags].sort((a, b) => {
+            const aSelected = selectedContexts.has(a);
+            const bSelected = selectedContexts.has(b);
+            if (aSelected && !bSelected) return -1;
+            if (!aSelected && bSelected) return 1;
+            return a.localeCompare(b);
+        });
+
+        return `
+            <div class="block-tags">
+                ${sortedTags.map(tag => TagModal._renderBadge(tag)).join('')}
+                <button class="add-tag-btn" data-id="${block.id}">+ Tag</button>
+            </div>
+        `;
+    },
+
+    updateBlockTags(blockId) {
+        const article = document.querySelector(`article.block[data-id="${blockId}"]`);
+        if (!article) return false;
+
+        const block = Store.blocks.find(b => b.id === blockId);
+        if (!block) return false;
+
+        const tagsDiv = article.querySelector('.block-tags');
+        if (!tagsDiv) return false;
+
+        const temp = document.createElement('div');
+        temp.innerHTML = this.renderTagsHtml(block);
+        tagsDiv.replaceWith(temp.firstElementChild);
+        return true;
     },
 
     attachEventListeners() {

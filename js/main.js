@@ -730,17 +730,31 @@ const App = {
         if (!block) return;
 
         // Use options to pass the update, ensuring Store.saveBlock can diff properly
-        const options = (typeof commitMessage === 'string') 
+        const options = (typeof commitMessage === 'string')
             ? { commit: true, commitMessage, [property]: value }
             : { ...commitMessage, [property]: value };
 
         await Store.saveBlock(block, options);
-        
+
         // Invalidate timeline cache after saving
         TimelineView.invalidateCache();
         // Update tag counts to refresh contacts sidebar
         SelectionManager.updateTagCounts();
+
+        // Fast path: update tag badges directly without full re-render
+        if (property === 'tags' && Store.currentView === 'document' && !this._needsFullRenderAfterTagChange(id)) {
+            if (DocumentView.updateBlockTags(id)) return;
+        }
+
         this.render();
+    },
+
+    _needsFullRenderAfterTagChange(blockId) {
+        const block = Store.blocks.find(b => b.id === blockId);
+        if (!block || block.pinned) return false;
+
+        const sel = SelectionManager.selections;
+        return (sel?.context?.size > 0) || (sel?.excluded?.size > 0) || !!Store.searchQuery;
     },
 
     async updateBlockProperties(id, properties, commitMessage) {
