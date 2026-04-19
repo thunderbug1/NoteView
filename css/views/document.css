@@ -474,9 +474,7 @@
 
 @media (max-width: 768px) {
     .task-toggle-btn {
-        padding: 0.5rem;
-        min-width: 44px;
-        min-height: 44px;
+        display: none;
     }
 }
 

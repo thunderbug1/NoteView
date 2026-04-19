@@ -947,10 +947,10 @@ const DocumentView = {
         toolbar.className = 'mobile-toolbar hidden';
         toolbar.innerHTML = `
             <button class="mobile-toolbar-btn" data-action="outdent" title="Outdent">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 8 3 12 7 16"></polyline><line x1="11" y1="4" x2="21" y2="4"></line><line x1="11" y1="9" x2="21" y2="9"></line><line x1="11" y1="14" x2="21" y2="14"></line><line x1="11" y1="19" x2="21" y2="19"></line></svg>
             </button>
             <button class="mobile-toolbar-btn" data-action="indent" title="Indent">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 7 12 3 16"></polyline><line x1="11" y1="4" x2="21" y2="4"></line><line x1="11" y1="9" x2="21" y2="9"></line><line x1="11" y1="14" x2="21" y2="14"></line><line x1="11" y1="19" x2="21" y2="19"></line></svg>
             </button>
             <button class="mobile-toolbar-btn" data-action="toggleTask" title="Toggle task">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
