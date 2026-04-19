@@ -945,17 +945,20 @@ const DocumentView = {
         const toolbar = document.createElement('div');
         toolbar.className = 'mobile-toolbar hidden';
         toolbar.innerHTML = `
-            <button class="mobile-indent-outdent" data-action="outdent" title="Outdent">
+            <button class="mobile-toolbar-btn" data-action="outdent" title="Outdent">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
-            <button class="mobile-indent-outdent" data-action="indent" title="Indent">
+            <button class="mobile-toolbar-btn" data-action="indent" title="Indent">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button class="mobile-toolbar-btn" data-action="toggleTask" title="Toggle task">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
             </button>
         `;
         document.body.appendChild(toolbar);
         this._mobileToolbar = toolbar;
 
-        toolbar.querySelectorAll('.mobile-indent-outdent').forEach(btn => {
+        toolbar.querySelectorAll('.mobile-toolbar-btn').forEach(btn => {
             btn.addEventListener('mousedown', (e) => {
                 e.preventDefault();
             });
@@ -970,6 +973,8 @@ const DocumentView = {
                     indentMore(view);
                 } else if (action === 'outdent') {
                     indentLess(view);
+                } else if (action === 'toggleTask') {
+                    this.toggleTaskOnCurrentLine(view);
                 }
             }, { passive: false });
         });
@@ -3071,12 +3076,17 @@ const DocumentView = {
 
             if (newBlock && editor) {
                 if (window.innerWidth <= 768) {
-                    // On mobile, focus first to trigger keyboard, then let
-                    // visualViewport handler + fallback scroll into position
                     editor.focus();
                     setTimeout(() => {
-                        newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 300);
+                        const toolbarHeight = this._mobileToolbar && !this._mobileToolbar.classList.contains('hidden')
+                            ? this._mobileToolbar.offsetHeight : 0;
+                        const container = document.getElementById('viewContainer');
+                        const containerRect = container.getBoundingClientRect();
+                        const blockRect = newBlock.getBoundingClientRect();
+                        const visibleHeight = containerRect.height - toolbarHeight;
+                        const scrollTarget = container.scrollTop + blockRect.top - containerRect.top - (visibleHeight - blockRect.height) / 2;
+                        container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+                    }, 500);
                 } else {
                     newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     setTimeout(() => editor.focus(), 150);
