@@ -718,6 +718,17 @@ const App = {
         // Invalidate timeline cache after deleting
         TimelineView.invalidateCache();
         SelectionManager.updateTagCounts();
+
+        // Surgical DOM removal for document view (no filters active)
+        if (Store.currentView === 'document') {
+            const sel = SelectionManager.selections;
+            const hasFilters = (sel?.context?.size > 0) || (sel?.excluded?.size > 0) || !!Store.searchQuery || !!sel?.time;
+            if (!hasFilters && DocumentView.removeBlockElement(id)) {
+                this.updateUndoRedoUI();
+                return;
+            }
+        }
+
         this.render();
     },
 
@@ -742,20 +753,30 @@ const App = {
         // Update tag counts to refresh contacts sidebar
         SelectionManager.updateTagCounts();
 
-        // Fast path: update tag badges directly without full re-render
-        if (property === 'tags' && Store.currentView === 'document' && !this._needsFullRenderAfterTagChange(id)) {
-            if (DocumentView.updateBlockTags(id)) return;
+        // Fast path: surgical metadata update without full re-render
+        if (this._canSurgicalPropertyUpdate(property, id)) {
+            if (property === 'tags' && DocumentView.updateBlockTags(id)) return;
+            if (DocumentView.updateBlockMetadata(id)) return;
         }
 
         this.render();
     },
 
-    _needsFullRenderAfterTagChange(blockId) {
-        const block = Store.blocks.find(b => b.id === blockId);
-        if (!block || block.pinned) return false;
+    _canSurgicalPropertyUpdate(property, blockId) {
+        if (Store.currentView !== 'document') return false;
+        // Pinned affects block ordering
+        if (property === 'pinned') return false;
 
+        // Active filters may change block visibility
         const sel = SelectionManager.selections;
-        return (sel?.context?.size > 0) || (sel?.excluded?.size > 0) || !!Store.searchQuery;
+        if ((sel?.context?.size > 0) || (sel?.excluded?.size > 0) || !!Store.searchQuery || !!sel?.time) return false;
+
+        // Check if sort order depends on this property
+        const sortConfig = Store.getSortConfig('document');
+        const sortFields = (sortConfig?.clauses || []).map(c => c.field);
+        if (sortFields.includes(property)) return false;
+
+        return true;
     },
 
     async updateBlockProperties(id, properties, commitMessage) {
@@ -768,11 +789,16 @@ const App = {
             : { ...commitMessage, ...properties };
 
         await Store.saveBlock(block, options);
-        
+
         // Invalidate timeline cache after saving
         TimelineView.invalidateCache();
         // Update tag counts to refresh contacts sidebar
         SelectionManager.updateTagCounts();
+
+        // Fast path: surgical metadata update without full re-render
+        const allSurgical = Object.keys(properties).every(p => this._canSurgicalPropertyUpdate(p, id));
+        if (allSurgical && DocumentView.updateBlockMetadata(id)) return;
+
         this.render();
     },
 

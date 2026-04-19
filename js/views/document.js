@@ -64,6 +64,9 @@ const DocumentView = {
 
         const sorted = SortManager.sortItems('document', blocks);
 
+        // Save scroll anchor before DOM rebuild
+        const scrollAnchor = this._saveScrollAnchor();
+
         // Build HTML for blocks - use div containers for CodeMirror
         container.innerHTML = sorted.map(block => `
             <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${block.id}">
@@ -141,8 +144,11 @@ const DocumentView = {
         // Restore collapsed state after DOM rebuild
         this.restoreCollapsedState(sorted);
 
-        // On mobile, disable scrolling when content fits to prevent elastic bouncing
-        requestAnimationFrame(() => this.adjustScrollability());
+        // Restore scroll position after DOM rebuild
+        requestAnimationFrame(() => {
+            this._restoreScrollFromAnchor(scrollAnchor);
+            this.adjustScrollability();
+        });
     },
 
     adjustScrollability() {
@@ -152,6 +158,67 @@ const DocumentView = {
             return;
         }
         container.style.overflowY = container.scrollHeight <= container.clientHeight ? 'hidden' : '';
+    },
+
+    _saveScrollAnchor() {
+        let anchorEl = this._focusedBlockId
+            ? document.querySelector(`article.block[data-id="${this._focusedBlockId}"]`)
+            : null;
+
+        if (!anchorEl) {
+            const blockEls = document.querySelectorAll('article.block:not([data-id="new"])');
+            const viewCenter = window.innerHeight / 2;
+            let minDist = Infinity;
+            for (const el of blockEls) {
+                const rect = el.getBoundingClientRect();
+                const center = rect.top + rect.height / 2;
+                const dist = Math.abs(center - viewCenter);
+                if (dist < minDist) {
+                    minDist = dist;
+                    anchorEl = el;
+                }
+            }
+        }
+
+        if (!anchorEl) return null;
+        return { id: anchorEl.dataset.id, offset: anchorEl.getBoundingClientRect().top };
+    },
+
+    _restoreScrollFromAnchor(anchor) {
+        if (!anchor) return;
+        const el = document.querySelector(`article.block[data-id="${anchor.id}"]`);
+        if (!el) return;
+        const newOffset = el.getBoundingClientRect().top;
+        window.scrollBy(0, newOffset - anchor.offset);
+    },
+
+    removeBlockElement(blockId) {
+        const article = document.querySelector(`article.block[data-id="${blockId}"]`);
+        if (!article) return false;
+
+        // Clean up editor
+        const editor = this.editors.get(blockId);
+        if (editor) {
+            editor.destroy();
+            this.editors.delete(blockId);
+        }
+
+        // Clear tracked state
+        this.originalContents.delete(blockId);
+        this.collapsedBlocks.delete(blockId);
+        const timeout = this.saveTimeouts.get(blockId);
+        if (timeout) {
+            clearTimeout(timeout);
+            this.saveTimeouts.delete(blockId);
+        }
+
+        // Clear focus if this block was focused
+        if (this._focusedBlockId === blockId) {
+            this._focusedBlockId = null;
+        }
+
+        article.remove();
+        return true;
     },
 
     handleSplitMarkerClick(e) {
@@ -338,20 +405,96 @@ const DocumentView = {
         return true;
     },
 
+    updateBlockMetadata(blockId) {
+        const article = document.querySelector(`article.block[data-id="${blockId}"]`);
+        if (!article) return false;
+
+        const block = Store.blocks.find(b => b.id === blockId);
+        if (!block) return false;
+
+        const metadataDiv = article.querySelector('.block-metadata');
+        if (!metadataDiv) return false;
+
+        const temp = document.createElement('div');
+        temp.innerHTML = this.renderBlockMetadata(block);
+        const newMetadata = temp.firstElementChild;
+        if (!newMetadata) return false;
+
+        metadataDiv.replaceWith(newMetadata);
+
+        // Re-attach per-button listeners on the new metadata
+        newMetadata.querySelectorAll('.history-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                if (id && id !== 'new') HistoryView.openHistory(id);
+            });
+        });
+        if (window.AIAssistant) {
+            newMetadata.querySelectorAll('.ai-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (btn.classList.contains('ai-btn-disabled')) {
+                        AIAssistant._showToast('Enable AI Features in Settings first');
+                        return;
+                    }
+                    const id = btn.dataset.id;
+                    if (id && id !== 'new') AIAssistant.openOverlay(id);
+                });
+            });
+        }
+        newMetadata.querySelectorAll('.mic-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleMicClick(e);
+            });
+        });
+        newMetadata.querySelectorAll('.task-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleTaskToggleClick(e);
+            });
+        });
+        newMetadata.querySelectorAll('.block-menu-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showBlockMenu(btn);
+            });
+        });
+
+        return true;
+    },
+
     attachEventListeners() {
         const container = document.getElementById('viewContainer');
 
         // Initialize CodeMirror editors for each block
+        const activeBlockIds = new Set();
         container.querySelectorAll('.codemirror-container').forEach(cmContainer => {
             const blockId = cmContainer.dataset.id;
+            activeBlockIds.add(blockId);
+
+            // Reuse existing editor if available
+            const existingEditor = this.editors.get(blockId);
+            if (existingEditor) {
+                cmContainer.textContent = '';
+                cmContainer.appendChild(existingEditor.dom);
+                return;
+            }
+
             const initialContent = cmContainer.textContent;
-
-            // Clear the text content before initializing CodeMirror
             cmContainer.textContent = '';
-
-            // Create CodeMirror instance
             this.createEditor(cmContainer, blockId, initialContent);
         });
+
+        // Clean up orphaned editors (blocks no longer in the DOM)
+        for (const [id, editor] of this.editors) {
+            if (!activeBlockIds.has(id)) {
+                editor.destroy();
+                this.editors.delete(id);
+                this.originalContents.delete(id);
+            }
+        }
 
         // AI Assistant buttons
         container.querySelectorAll('.ai-btn').forEach(btn => {
