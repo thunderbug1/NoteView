@@ -7,7 +7,7 @@ import {markdown} from "@codemirror/lang-markdown";
 import {languages} from "@codemirror/language-data";
 import {foldService} from "@codemirror/language";
 import {ViewPlugin, Decoration, WidgetType, keymap, placeholder} from "@codemirror/view";
-import {EditorState, StateField, Prec} from "@codemirror/state";
+import {EditorState, StateField, Prec, Annotation} from "@codemirror/state";
 import {unifiedMergeView} from "@codemirror/merge";
 import {indentWithTab, indentMore, indentLess} from "@codemirror/commands";
 import {autocompletion, completionKeymap, closeBracketsKeymap, snippet} from "@codemirror/autocomplete";
@@ -33,6 +33,7 @@ window.CodeMirror = {
     completionKeymap,
     closeBracketsKeymap,
     snippet,
+    Annotation,
     foldService
 };
 
