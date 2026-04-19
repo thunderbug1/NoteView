@@ -976,10 +976,17 @@ const DocumentView = {
 
         if (window.visualViewport) {
             const updatePosition = () => {
-                if (!this._mobileToolbar || this._mobileToolbar.classList.contains('hidden')) return;
+                if (!this._mobileToolbar) return;
                 const vv = window.visualViewport;
-                const offset = window.innerHeight - vv.height - vv.offsetTop;
-                toolbar.style.bottom = offset + 'px';
+                if (!vv) return;
+                const keyboardOpen = vv.height < window.innerHeight * 0.8;
+                if (keyboardOpen && this._focusedEditor) {
+                    this._mobileToolbar.classList.remove('hidden');
+                    const offset = window.innerHeight - vv.height - vv.offsetTop;
+                    this._mobileToolbar.style.bottom = offset + 'px';
+                } else if (!keyboardOpen) {
+                    this._mobileToolbar.classList.add('hidden');
+                }
             };
             window.visualViewport.addEventListener('resize', updatePosition);
             window.visualViewport.addEventListener('scroll', updatePosition);
@@ -989,12 +996,11 @@ const DocumentView = {
     showMobileToolbar() {
         if (!this._mobileToolbar) return;
         const vv = window.visualViewport;
-        if (!vv) return;
-        // Only show when virtual keyboard is open
-        if (vv.height >= window.innerHeight * 0.8) return;
-        this._mobileToolbar.classList.remove('hidden');
-        const offset = window.innerHeight - vv.height - vv.offsetTop;
-        this._mobileToolbar.style.bottom = offset + 'px';
+        if (vv && vv.height < window.innerHeight * 0.8) {
+            this._mobileToolbar.classList.remove('hidden');
+            const offset = window.innerHeight - vv.height - vv.offsetTop;
+            this._mobileToolbar.style.bottom = offset + 'px';
+        }
     },
 
     hideMobileToolbar() {
