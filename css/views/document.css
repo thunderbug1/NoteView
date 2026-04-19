@@ -394,30 +394,6 @@
     white-space: pre-wrap;
 }
 
-/* History Button */
-.history-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    padding: 0.2rem 0.6rem;
-    border-radius: var(--radius-full);
-    font-size: 0.7rem;
-    font-weight: 500;
-    cursor: pointer;
-    margin-left: 0.5rem;
-    color: var(--text-muted);
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-
-.history-btn:hover {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    border-color: var(--border-light);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
-}
 
 /* 3-Dot Block Menu Button */
 .block-menu-btn {

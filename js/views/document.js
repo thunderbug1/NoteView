@@ -257,7 +257,6 @@ const DocumentView = {
             parts.push(`
                 <div class="block-dates">
                     ${dateParts.join(' · ')}
-                    <button class="history-btn" data-id="${block.id}" title="View Revision History"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px; vertical-align:text-bottom;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> History</button>
                 </div>
             `);
         }
@@ -318,7 +317,7 @@ const DocumentView = {
         return `
             <div class="block-tags">
                 ${sortedTags.map(tag => TagModal._renderBadge(tag)).join('')}
-                <button class="add-tag-btn" data-id="${block.id}">+ Tag</button>
+                <button class="add-tag-btn" data-id="${block.id}" title="Edit tags"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             </div>
         `;
     },
@@ -352,16 +351,6 @@ const DocumentView = {
 
             // Create CodeMirror instance
             this.createEditor(cmContainer, blockId, initialContent);
-        });
-
-        // History
-        container.querySelectorAll('.history-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const blockId = e.currentTarget.dataset.id;
-                if (blockId && blockId !== 'new') {
-                    HistoryView.openHistory(blockId);
-                }
-            });
         });
 
         // AI Assistant buttons
@@ -408,6 +397,10 @@ const DocumentView = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 Copy note text
             </div>
+            <div class="menu-item" data-action="history">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Revision history
+            </div>
             <div class="menu-divider"></div>
             <div class="menu-item menu-item-danger" data-action="delete">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -446,6 +439,8 @@ const DocumentView = {
                 const editor = this.editors.get(blockId);
                 const content = editor ? editor.state.doc.toString() : (block?.content || '');
                 navigator.clipboard.writeText(content);
+            } else if (action === 'history') {
+                HistoryView.openHistory(blockId);
             } else if (action === 'delete') {
                 App.deleteBlock(blockId);
             }

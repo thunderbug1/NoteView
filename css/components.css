@@ -452,17 +452,19 @@
 /* Add Tag Button */
 .add-tag-btn {
     background: transparent;
-    border: 1px dashed var(--border);
+    border: none;
     font-size: 0.75rem;
     color: var(--text-secondary);
-    padding: 0.2rem 0.5rem;
+    padding: 0.15rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
 }
 
 .add-tag-btn:hover {
-    border-color: var(--accent);
     color: var(--accent);
 }
 
