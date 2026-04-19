@@ -984,11 +984,7 @@ const App = {
     },
 
     handleNewNote() {
-        if (Store.currentView === 'document') {
-            DocumentView.focusNewBlock();
-        } else {
-            this.showNewNoteModal();
-        }
+        this.showNewNoteModal();
     },
 
     showNewNoteModal() {
