@@ -971,6 +971,8 @@
     .document-view .block-metadata {
         gap: 0.35rem;
         padding: 0 0.5rem;
+        position: relative;
+        z-index: 55;
     }
 
     .document-view .block-metadata .block-dates {

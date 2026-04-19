@@ -464,6 +464,8 @@
 
     .content-toolbar {
         padding: 0.25rem 0.5rem;
+        position: relative;
+        z-index: 55;
     }
 }
 
