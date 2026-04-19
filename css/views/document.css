@@ -986,4 +986,12 @@
     .document-view .block:first-child {
         margin-top: 2rem;
     }
+
+    .document-view .block > .collapse-btn {
+        position: relative;
+        left: 0;
+        top: 0;
+        margin-right: 0.25rem;
+        margin-left: -0.25rem;
+    }
 }
