@@ -121,6 +121,7 @@
     gap: 0.25rem;
     margin-left: auto;
     flex-shrink: 0;
+    border-top: none;
 }
 
 .remove-tag {
@@ -981,6 +982,7 @@
 
     .document-view .block-actions {
         gap: 0.15rem;
+        border-top: none;
     }
 
     .document-view .block:first-child {
