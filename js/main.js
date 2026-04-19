@@ -229,13 +229,15 @@ const App = {
         });
 
         // Touch swipe for sidebars
-        let touchStartX = 0, touchStartY = 0;
+        let touchStartX = 0, touchStartY = 0, touchStartTarget = null;
+        const interactiveSelector = 'button, .toolbar-btn, .content-toolbar, .block-metadata, .block-actions, a, input, [contenteditable]';
         document.addEventListener('touchstart', e => {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
+            touchStartTarget = e.target;
         }, { passive: true });
         document.addEventListener('touchend', e => {
-            if (e.target.closest('button, .toolbar-btn, .content-toolbar, a, input, [contenteditable]')) return;
+            if (touchStartTarget?.closest(interactiveSelector) || e.target.closest(interactiveSelector)) return;
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
             if (Math.abs(dx) < 50 || dy > 30) return;

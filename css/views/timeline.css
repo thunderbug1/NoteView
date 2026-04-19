@@ -43,7 +43,7 @@
     top: 2rem;
     bottom: 2rem;
     width: 2px;
-    background: linear-gradient(180deg, var(--accent), #8b5cf6, var(--accent));
+    background: var(--accent);
     border-radius: 1px;
     opacity: 0.5;
 }
