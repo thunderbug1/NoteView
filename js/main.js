@@ -187,6 +187,7 @@ const App = {
         const sidebarEdgeLeft = document.getElementById('sidebarEdgeLeft');
         const sidebarEdgeRight = document.getElementById('sidebarEdgeRight');
         const screenWidth = () => window.innerWidth;
+        const interactiveSelector = 'button, .toolbar-btn, .content-toolbar, .block-metadata, .block-actions, a, input, [contenteditable], .block-menu-btn, .task-toggle-btn, .mic-btn, .creation-btn';
 
         function openSidebar() {
             sidebar.classList.add('sidebar-open');
@@ -217,15 +218,16 @@ const App = {
             closeSidebar();
             closeSidebarRight();
         });
-        // Hardware edge listeners replaced with software edge-tap detection
-        // to prevent capturing fat-finger taps meant for nearby buttons.
+
+        // Sensitive edge zones for sidebar triggers (without blocking scroll)
+        // Any tap or small sideways movement starting within 25px of the rim
+        // will open sidebars, unless it's a significant vertical scroll (dy > 30).
         document.addEventListener('click', (e) => {
-            if (e.target.closest('button, .toolbar-btn, .block-actions, a, input, [contenteditable], .block-menu-btn, .task-toggle-btn, .mic-btn, .creation-btn')) {
-                return;
-            }
-            if (e.clientX < 15 && !sidebar.classList.contains('sidebar-open')) {
+            if (e.target.closest(interactiveSelector)) return;
+            const w = screenWidth();
+            if (e.clientX < 20 && !sidebar.classList.contains('sidebar-open')) {
                 openSidebar();
-            } else if (e.clientX > window.innerWidth - 15 && !sidebarRight.classList.contains('sidebar-open')) {
+            } else if (e.clientX > w - 20 && !sidebarRight.classList.contains('sidebar-open')) {
                 openSidebarRight();
             }
         });
@@ -240,7 +242,7 @@ const App = {
 
         // Touch swipe for sidebars
         let touchStartX = 0, touchStartY = 0, touchStartTarget = null;
-        const interactiveSelector = 'button, .toolbar-btn, .content-toolbar, .block-metadata, .block-actions, a, input, [contenteditable]';
+
         document.addEventListener('touchstart', e => {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
@@ -249,9 +251,29 @@ const App = {
         document.addEventListener('touchend', e => {
             if (touchStartTarget?.closest(interactiveSelector) || e.target.closest(interactiveSelector)) return;
             const dx = e.changedTouches[0].clientX - touchStartX;
-            const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
-            if (Math.abs(dx) < 50 || dy > 30) return;
+            const dy = e.changedTouches[0].clientY - touchStartY;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
             const w = screenWidth();
+
+            // 1. Check if this is a sensitive edge gesture (tap or small move starting near rim)
+            const edgeZone = 25;
+            const fromLeftEdge = touchStartX < edgeZone;
+            const fromRightEdge = touchStartX > w - edgeZone;
+
+            if (fromLeftEdge || fromRightEdge) {
+                if (absDy < 30) { // Not a vertical scroll
+                    if (fromLeftEdge && (dx > 5 || absDx < 5)) {
+                        if (!sidebar.classList.contains('sidebar-open')) { openSidebar(); return; }
+                    }
+                    if (fromRightEdge && (dx < -5 || absDx < 5)) {
+                        if (!sidebarRight.classList.contains('sidebar-open')) { openSidebarRight(); return; }
+                    }
+                }
+            }
+
+            // 2. Standard swipe logic for larger horizontal movements
+            if (absDx < 50 || absDy > 30) return;
 
             if (dx > 0 && !sidebar.classList.contains('sidebar-open') &&
                 !sidebarRight.classList.contains('sidebar-open')) {

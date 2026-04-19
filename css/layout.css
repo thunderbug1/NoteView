@@ -454,11 +454,13 @@
     }
     #sidebarOverlay.active { display: block; }
 
-    #viewContainer { padding: 1rem; }
+    #main { overflow-y: auto; }
+    #viewContainer { padding: 1rem; overflow: visible; }
 
     .content-toolbar {
         padding: 0.25rem 0.5rem;
-        position: relative;
+        position: sticky;
+        top: 0;
         z-index: 55;
     }
 }
