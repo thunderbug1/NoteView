@@ -441,13 +441,7 @@ const DocumentView = {
                 });
             });
         }
-        newMetadata.querySelectorAll('.mic-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.handleMicClick(e);
-            });
-        });
+        // Mic-btn clicks handled by container-level delegation in render()
         newMetadata.querySelectorAll('.task-toggle-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -842,6 +836,8 @@ const DocumentView = {
         this._recordingBlockId = blockId;
         this._isStopping = false;
         this._lastResultIndex = 0;
+        this._recognitionSession = (this._recognitionSession || 0) + 1;
+        const sessionId = this._recognitionSession;
 
         // Visual: activate the button
         btnElement.classList.add('recording');
@@ -857,6 +853,7 @@ const DocumentView = {
         view.focus();
 
         const onresult = (event) => {
+            if (this._recognitionSession !== sessionId) return;
             let finalTranscript = '';
             for (let i = Math.max(event.resultIndex, this._lastResultIndex); i < event.results.length; i++) {
                 const result = event.results[i];
@@ -875,23 +872,27 @@ const DocumentView = {
         };
 
         const onerror = (event) => {
+            if (this._recognitionSession !== sessionId) return;
             console.warn('Speech recognition error:', event.error);
             this.stopSpeechRecognition();
         };
 
         const onend = () => {
+            if (this._recognitionSession !== sessionId) return;
             if (!this._isStopping && this._recordingBlockId === blockId) {
                 // Create fresh instance to prevent buffered results leaking across sessions
                 this._lastResultIndex = 0;
+                this._recognitionSession++;
+                const newSessionId = this._recognitionSession;
                 try {
                     const NewRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const newRecognition = new NewRecognition();
                     newRecognition.continuous = true;
                     newRecognition.interimResults = true;
                     newRecognition.lang = '';
-                    newRecognition.onresult = onresult;
-                    newRecognition.onerror = onerror;
-                    newRecognition.onend = onend;
+                    newRecognition.onresult = (e) => { if (this._recognitionSession === newSessionId) onresult(e); };
+                    newRecognition.onerror = (e) => { if (this._recognitionSession === newSessionId) onerror(e); };
+                    newRecognition.onend = () => { if (this._recognitionSession === newSessionId) onend(); };
                     this._recognition = newRecognition;
                     newRecognition.start();
                 } catch (e) {
