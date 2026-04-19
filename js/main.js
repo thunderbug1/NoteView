@@ -219,15 +219,32 @@ const App = {
             closeSidebarRight();
         });
 
-        // Sensitive edge zones for sidebar triggers (without blocking scroll)
-        // Any tap or small sideways movement starting within 25px of the rim
-        // will open sidebars, unless it's a significant vertical scroll (dy > 30).
+        // Direct interaction with sidebar edges
+        sidebarEdgeLeft?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openSidebar();
+        });
+        sidebarEdgeRight?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openSidebarRight();
+        });
+        sidebarEdgeLeft?.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            openSidebar();
+        }, { passive: true });
+        sidebarEdgeRight?.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            openSidebarRight();
+        }, { passive: true });
+
+        // Document click listener still useful for clicks just outside interactive elements 
+        // that happened to be in the edge zones
         document.addEventListener('click', (e) => {
             if (e.target.closest(interactiveSelector)) return;
             const w = screenWidth();
-            if (e.clientX < 20 && !sidebar.classList.contains('sidebar-open')) {
+            if (e.clientX < 15 && !sidebar.classList.contains('sidebar-open')) {
                 openSidebar();
-            } else if (e.clientX > w - 20 && !sidebarRight.classList.contains('sidebar-open')) {
+            } else if (e.clientX > w - 15 && !sidebarRight.classList.contains('sidebar-open')) {
                 openSidebarRight();
             }
         });
@@ -256,23 +273,7 @@ const App = {
             const absDy = Math.abs(dy);
             const w = screenWidth();
 
-            // 1. Check if this is a sensitive edge gesture (tap or small move starting near rim)
-            const edgeZone = 25;
-            const fromLeftEdge = touchStartX < edgeZone;
-            const fromRightEdge = touchStartX > w - edgeZone;
-
-            if (fromLeftEdge || fromRightEdge) {
-                if (absDy < 30) { // Not a vertical scroll
-                    if (fromLeftEdge && (dx > 5 || absDx < 5)) {
-                        if (!sidebar.classList.contains('sidebar-open')) { openSidebar(); return; }
-                    }
-                    if (fromRightEdge && (dx < -5 || absDx < 5)) {
-                        if (!sidebarRight.classList.contains('sidebar-open')) { openSidebarRight(); return; }
-                    }
-                }
-            }
-
-            // 2. Standard swipe logic for larger horizontal movements
+            // 1. Standard swipe logic for horizontal movements
             if (absDx < 50 || absDy > 30) return;
 
             if (dx > 0 && !sidebar.classList.contains('sidebar-open') &&

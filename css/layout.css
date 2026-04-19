@@ -394,18 +394,23 @@
         height: 100dvh;
         width: 8px;
         z-index: 50;
-        pointer-events: none;
+        pointer-events: auto;
         transition: background 0.2s;
+        cursor: pointer;
     }
 
     .sidebar-edge-left {
         left: 0;
-        background: var(--border);
+        background: transparent;
     }
 
     .sidebar-edge-right {
         right: 0;
-        background: var(--border);
+        background: transparent;
+    }
+
+    .sidebar-edge:hover {
+        background: var(--accent-light, rgba(59, 130, 246, 0.15));
     }
 
     .sidebar-edge-left.hidden { display: none; }
