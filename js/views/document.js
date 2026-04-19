@@ -698,6 +698,7 @@ const DocumentView = {
         this._recognition = recognition;
         this._recordingBlockId = blockId;
         this._isStopping = false;
+        this._lastResultIndex = 0;
 
         // Visual: activate the button
         btnElement.classList.add('recording');
@@ -712,14 +713,15 @@ const DocumentView = {
         // Focus the editor so cursor position is known
         view.focus();
 
-        recognition.onresult = (event) => {
+        const onresult = (event) => {
             let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
+            for (let i = Math.max(event.resultIndex, this._lastResultIndex); i < event.results.length; i++) {
                 const result = event.results[i];
                 if (result.isFinal) {
                     finalTranscript += result[0].transcript;
                 }
             }
+            this._lastResultIndex = event.results.length;
 
             if (finalTranscript) {
                 const currentView = this.editors.get(blockId);
@@ -729,16 +731,26 @@ const DocumentView = {
             }
         };
 
-        recognition.onerror = (event) => {
+        const onerror = (event) => {
             console.warn('Speech recognition error:', event.error);
             this.stopSpeechRecognition();
         };
 
-        recognition.onend = () => {
-            // Auto-restart if user didn't explicitly stop (Chrome pauses after silence)
+        const onend = () => {
             if (!this._isStopping && this._recordingBlockId === blockId) {
+                // Create fresh instance to prevent buffered results leaking across sessions
+                this._lastResultIndex = 0;
                 try {
-                    recognition.start();
+                    const NewRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    const newRecognition = new NewRecognition();
+                    newRecognition.continuous = true;
+                    newRecognition.interimResults = true;
+                    newRecognition.lang = '';
+                    newRecognition.onresult = onresult;
+                    newRecognition.onerror = onerror;
+                    newRecognition.onend = onend;
+                    this._recognition = newRecognition;
+                    newRecognition.start();
                 } catch (e) {
                     this.cleanupRecognition();
                 }
@@ -747,6 +759,10 @@ const DocumentView = {
             }
         };
 
+        recognition.onresult = onresult;
+        recognition.onerror = onerror;
+        recognition.onend = onend;
+
         recognition.start();
     },
 
@@ -754,14 +770,17 @@ const DocumentView = {
         this._isStopping = true;
         if (this._recognition) {
             this._recognition.stop();
+            // onend will call cleanupRecognition()
+        } else {
+            this.cleanupRecognition();
         }
-        this.cleanupRecognition();
     },
 
     cleanupRecognition() {
         const blockId = this._recordingBlockId;
         this._recognition = null;
         this._recordingBlockId = null;
+        this._lastResultIndex = 0;
 
         if (blockId) {
             const btn = document.querySelector(`.mic-btn[data-id="${blockId}"]`);
