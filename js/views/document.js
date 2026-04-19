@@ -865,7 +865,20 @@ const DocumentView = {
             let currentTranscript = '';
             for (let i = 0; i < event.results.length; i++) {
                 if (event.results[i].isFinal) {
-                    currentTranscript += event.results[i][0].transcript;
+                    const chunk = event.results[i][0].transcript;
+                    // Detect if this engine provides cumulative results in separate indices (Android bug)
+                    // or standard disjoint chunks. We check if the new chunk naturally extends 
+                    // the previous one.
+                    const normalizedPrev = currentTranscript.trim().toLowerCase();
+                    const normalizedChunk = chunk.trim().toLowerCase();
+                    
+                    if (normalizedPrev && normalizedChunk.startsWith(normalizedPrev)) {
+                        // Buggy cumulative mode: the new chunk already contains the old one
+                        currentTranscript = chunk;
+                    } else {
+                        // Standard mode: chunks are disjoint segments
+                        currentTranscript += chunk;
+                    }
                 }
             }
 
