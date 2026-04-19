@@ -398,19 +398,7 @@ const Store = {
                     await GitStore.init(this.directoryHandle); // INIT GIT HERE
                     await this.loadBlocks();
                     return true;
-                } else if (permission === 'prompt') {
-                    // Try to auto-request permission (works if previously granted in this origin)
-                    try {
-                        const granted = await savedHandle.requestPermission({ mode: 'readwrite' });
-                        if (granted === 'granted') {
-                            this.directoryHandle = savedHandle;
-                            await this.saveVault(savedHandle);
-                            await GitStore.init(this.directoryHandle);
-                            await this.loadBlocks();
-                            return true;
-                        }
-                    } catch (_) { /* requestPermission may fail without user gesture */ }
-                    // Fallback: show permission button
+                } else {
                     const error = new Error('Permission required to access saved folder');
                     error.name = 'NotAllowedError';
                     error.needsPermission = true;

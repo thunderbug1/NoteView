@@ -45,6 +45,18 @@ const VaultModal = {
             });
         }
 
+        // Pre-warm permissions for all vaults while we have user gesture
+        vaultList.forEach(v => {
+            Store.getVaultHandle(v.name).then(handle => {
+                if (!handle) return;
+                handle.queryPermission({ mode: 'readwrite' }).then(perm => {
+                    if (perm !== 'granted') {
+                        handle.requestPermission({ mode: 'readwrite' }).catch(() => {});
+                    }
+                }).catch(() => {});
+            }).catch(() => {});
+        });
+
         // Divider
         const divider = document.createElement('div');
         divider.className = 'menu-divider';
