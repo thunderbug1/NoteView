@@ -647,6 +647,10 @@ const DocumentView = {
     },
 
     handleCreationAction(e) {
+        if (this._creationDebounce) return;
+        this._creationDebounce = true;
+        setTimeout(() => { this._creationDebounce = false; }, 300);
+
         const btn = e.target.closest('.creation-btn');
         if (!btn) return;
         e.preventDefault();
@@ -733,6 +737,10 @@ const DocumentView = {
     },
 
     handleMicClick(e) {
+        if (this._micDebounce) return;
+        this._micDebounce = true;
+        setTimeout(() => { this._micDebounce = false; }, 300);
+
         const micBtn = e.target.closest('.mic-btn');
         if (!micBtn) return;
         e.preventDefault();
@@ -835,9 +843,9 @@ const DocumentView = {
         this._recognition = recognition;
         this._recordingBlockId = blockId;
         this._isStopping = false;
-        this._lastResultIndex = 0;
+        this._insertedTranscript = '';
         this._recognitionSession = (this._recognitionSession || 0) + 1;
-        const sessionId = this._recognitionSession;
+        let sessionId = this._recognitionSession;
 
         // Visual: activate the button
         btnElement.classList.add('recording');
@@ -854,19 +862,20 @@ const DocumentView = {
 
         const onresult = (event) => {
             if (this._recognitionSession !== sessionId) return;
-            let finalTranscript = '';
-            for (let i = Math.max(event.resultIndex, this._lastResultIndex); i < event.results.length; i++) {
-                const result = event.results[i];
-                if (result.isFinal) {
-                    finalTranscript += result[0].transcript;
+            let currentTranscript = '';
+            for (let i = 0; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    currentTranscript += event.results[i][0].transcript;
                 }
             }
-            this._lastResultIndex = event.results.length;
 
-            if (finalTranscript) {
+            if (currentTranscript.length > this._insertedTranscript.length) {
+                const newText = currentTranscript.substring(this._insertedTranscript.length);
+                this._insertedTranscript = currentTranscript;
+                
                 const currentView = this.editors.get(blockId);
                 if (currentView) {
-                    this.insertTextAtSelection(currentView, finalTranscript);
+                    this.insertTextAtSelection(currentView, newText);
                 }
             }
         };
@@ -881,18 +890,18 @@ const DocumentView = {
             if (this._recognitionSession !== sessionId) return;
             if (!this._isStopping && this._recordingBlockId === blockId) {
                 // Create fresh instance to prevent buffered results leaking across sessions
-                this._lastResultIndex = 0;
+                this._insertedTranscript = '';
                 this._recognitionSession++;
-                const newSessionId = this._recognitionSession;
+                sessionId = this._recognitionSession; // Update local closure for the new session
                 try {
                     const NewRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const newRecognition = new NewRecognition();
                     newRecognition.continuous = true;
                     newRecognition.interimResults = true;
                     newRecognition.lang = '';
-                    newRecognition.onresult = (e) => { if (this._recognitionSession === newSessionId) onresult(e); };
-                    newRecognition.onerror = (e) => { if (this._recognitionSession === newSessionId) onerror(e); };
-                    newRecognition.onend = () => { if (this._recognitionSession === newSessionId) onend(); };
+                    newRecognition.onresult = onresult;
+                    newRecognition.onerror = onerror;
+                    newRecognition.onend = onend;
                     this._recognition = newRecognition;
                     newRecognition.start();
                 } catch (e) {
@@ -924,7 +933,7 @@ const DocumentView = {
         const blockId = this._recordingBlockId;
         this._recognition = null;
         this._recordingBlockId = null;
-        this._lastResultIndex = 0;
+        this._insertedTranscript = '';
 
         if (blockId) {
             const btn = document.querySelector(`.mic-btn[data-id="${blockId}"]`);
