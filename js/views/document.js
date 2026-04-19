@@ -1007,11 +1007,15 @@ const DocumentView = {
             const offset = window.innerHeight - vv.height - vv.offsetTop;
             this._mobileToolbar.style.bottom = offset + 'px';
         }
+        const fab = document.getElementById('fabNewNote');
+        if (fab) fab.style.display = 'none';
     },
 
     hideMobileToolbar() {
         if (!this._mobileToolbar) return;
         this._mobileToolbar.classList.add('hidden');
+        const fab = document.getElementById('fabNewNote');
+        if (fab) fab.style.display = '';
     },
 
     async handleSplitNote(view, from, to) {

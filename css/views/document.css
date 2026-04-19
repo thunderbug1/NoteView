@@ -714,8 +714,10 @@
     transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-:root[data-theme="dark"] .mobile-toolbar {
-    background: #2d2d2d;
+@media (prefers-color-scheme: dark) {
+    .mobile-toolbar {
+        background: #2d2d2d;
+    }
 }
 
 .mobile-toolbar.hidden {
@@ -741,10 +743,12 @@
     transition: background 0.1s ease;
 }
 
-:root[data-theme="dark"] .mobile-toolbar button {
-    background: #4a4a4a;
-    color: #e5e5e5;
-    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.3);
+@media (prefers-color-scheme: dark) {
+    .mobile-toolbar button {
+        background: #4a4a4a;
+        color: #e5e5e5;
+        box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.3);
+    }
 }
 
 .mobile-toolbar button:active {
@@ -752,9 +756,11 @@
     color: #ffffff;
 }
 
-:root[data-theme="dark"] .mobile-toolbar button:active {
-    background: #666666;
-    color: #ffffff;
+@media (prefers-color-scheme: dark) {
+    .mobile-toolbar button:active {
+        background: #666666;
+        color: #ffffff;
+    }
 }
 
 /* Note modal (wikilink reference) */
