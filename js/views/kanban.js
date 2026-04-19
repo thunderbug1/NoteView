@@ -88,11 +88,15 @@ const KanbanView = {
 
             html += `
                 <div class="kanban-column" data-column-id="${col.id}">
-                    <h4>${col.label} <span class="count">(${colTasks.length})</span></h4>
+                    <div class="kanban-column-header">
+                        <h4>${col.label} <span class="count">(${colTasks.length})</span></h4>
+                        <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </button>
+                    </div>
                     <div class="blocks">
                         ${colHtml}
                     </div>
-                    <button class="kanban-add-task-btn" data-column-id="${col.id}">+ Add task</button>
                 </div>
             `;
         });
