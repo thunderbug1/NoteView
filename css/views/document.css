@@ -1014,6 +1014,51 @@
     color: var(--text-primary);
 }
 
+.extract-cut-tags-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0.5rem 0 1rem;
+}
+.extract-cut-tags-row label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+.extract-cut-tags-row #extract-tag-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+.extract-cut-tags-row #extract-tag-badges .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--tag-bg, var(--bg-tertiary));
+    color: var(--tag-text, var(--text-secondary));
+}
+.extract-cut-tags-row .badge-remove {
+    cursor: pointer;
+    opacity: 0.6;
+    margin-left: 0.2rem;
+}
+.extract-cut-tags-row .badge-remove:hover {
+    opacity: 1;
+}
+.extract-cut-tags-row input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
 /* Mobile metadata bar */
 @media (max-width: 768px) {
     .document-view .block-metadata {

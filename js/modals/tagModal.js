@@ -5,7 +5,7 @@
  */
 
 const TagModal = {
-    show(blockId) {
+    show(blockId, options = {}) {
         const allTags = SelectionManager.getAllContextTags();
         const block = Store.blocks.find(b => b.id === blockId);
         const initialTags = block ? (block.tags || []) : [];
@@ -40,7 +40,10 @@ const TagModal = {
         const modal = Modal.create({
             title: 'Manage Tags',
             content,
-            onClose: saveOnClose
+            onClose: () => {
+                saveOnClose();
+                if (options.onClose) options.onClose();
+            }
         });
 
         const input = document.getElementById('tagModalInput');
