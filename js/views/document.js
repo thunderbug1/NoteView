@@ -93,9 +93,6 @@ const DocumentView = {
         if (this._deleteHandler) {
             container.removeEventListener('click', this._deleteHandler);
         }
-        // Add event delegation for delete button
-        this._deleteHandler = this.handleDeleteClick.bind(this);
-        container.addEventListener('click', this._deleteHandler);
 
         // Add event delegation for split marker click
         if (this._splitHandler) {
@@ -117,13 +114,6 @@ const DocumentView = {
         }
         this._taskToggleHandler = this.handleTaskToggleClick.bind(this);
         container.addEventListener('click', this._taskToggleHandler);
-
-        // Add event delegation for pin button click
-        if (this._pinHandler) {
-            container.removeEventListener('click', this._pinHandler);
-        }
-        this._pinHandler = this.handlePinClick.bind(this);
-        container.addEventListener('click', this._pinHandler);
 
         // Add event delegation for mic button click
         if (this._micHandler) {
@@ -280,14 +270,6 @@ const DocumentView = {
             </button>
         `);
 
-        // Pin button
-        actions.push(`
-            <button class="pin-btn ${block.pinned ? 'pinned' : ''}" data-id="${block.id}" title="${block.pinned ? 'Unpin note' : 'Pin note'}">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="${block.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z"/></svg>
-            </button>
-        `);
-
-
         // Microphone / Speech-to-Text button
         if (this.isSpeechRecognitionSupported()) {
             actions.push(`
@@ -307,18 +289,10 @@ const DocumentView = {
             `);
         }
 
-        // Copy button
+        // 3-dot overflow menu (pin, copy, delete)
         actions.push(`
-            <button class="copy-btn" data-id="${block.id}" title="Copy note text">
-                <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <svg class="copied-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            </button>
-        `);
-
-        // Delete button (always shown, far right)
-        actions.push(`
-            <button class="delete-btn" data-id="${block.id}" title="Delete note">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <button class="block-menu-btn" data-id="${block.id}" title="More actions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
             </button>
         `);
 
@@ -390,20 +364,6 @@ const DocumentView = {
             });
         });
 
-        // Copy buttons
-        container.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const blockId = e.currentTarget.dataset.id;
-                if (!blockId) return;
-                const editor = this.editors.get(blockId);
-                const content = editor ? editor.state.doc.toString() : (Store.blocks.find(b => b.id === blockId)?.content || '');
-                navigator.clipboard.writeText(content).then(() => {
-                    btn.classList.add('copied');
-                    setTimeout(() => btn.classList.remove('copied'), 1500);
-                });
-            });
-        });
-
         // AI Assistant buttons
         container.querySelectorAll('.ai-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -418,19 +378,94 @@ const DocumentView = {
             });
         });
 
+        // 3-dot block menu buttons
+        container.querySelectorAll('.block-menu-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.showBlockMenu(btn);
+            });
+        });
+
         // Setup mobile keyboard scroll handling
         this.setupMobileKeyboardHandler();
     },
 
-    // Event delegation for delete button
-    handleDeleteClick(e) {
-        const deleteBtn = e.target.closest('.delete-btn');
-        if (!deleteBtn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const blockId = deleteBtn.dataset.id;
-        if (blockId && blockId !== 'new') {
-            App.deleteBlock(blockId);
+    showBlockMenu(btn) {
+        this.closeBlockMenu();
+        const blockId = btn.dataset.id;
+        if (!blockId || blockId === 'new') return;
+        const block = Store.blocks.find(b => b.id === blockId);
+        const isPinned = block?.pinned;
+
+        const menu = document.createElement('div');
+        menu.className = 'task-context-menu block-action-menu';
+        menu.innerHTML = `
+            <div class="menu-item" data-action="pin">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z"/></svg>
+                ${isPinned ? 'Unpin note' : 'Pin note'}
+            </div>
+            <div class="menu-item" data-action="copy">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy note text
+            </div>
+            <div class="menu-divider"></div>
+            <div class="menu-item menu-item-danger" data-action="delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                Delete note
+            </div>
+        `;
+
+        const rect = btn.getBoundingClientRect();
+        menu.style.left = `${rect.right - 180}px`;
+        const menuTop = rect.bottom + 4;
+        menu.style.top = `${menuTop}px`;
+        document.body.appendChild(menu);
+
+        // Adjust if menu goes off bottom of viewport
+        requestAnimationFrame(() => {
+            const menuRect = menu.getBoundingClientRect();
+            if (menuRect.bottom > window.innerHeight) {
+                menu.style.top = `${rect.top - menuRect.height - 4}px`;
+            }
+        });
+
+        const closeHandler = (evt) => {
+            if (!menu.contains(evt.target) && evt.target !== btn) {
+                this.closeBlockMenu();
+            }
+        };
+
+        const handleAction = (evt) => {
+            const item = evt.target.closest('.menu-item');
+            if (!item) return;
+            const action = item.dataset.action;
+            if (action === 'pin' && block) {
+                App.updateBlockProperty(blockId, 'pinned', !block.pinned,
+                    block.pinned ? 'Unpin note' : 'Pin note');
+            } else if (action === 'copy') {
+                const editor = this.editors.get(blockId);
+                const content = editor ? editor.state.doc.toString() : (block?.content || '');
+                navigator.clipboard.writeText(content);
+            } else if (action === 'delete') {
+                App.deleteBlock(blockId);
+            }
+            this.closeBlockMenu();
+        };
+
+        menu.addEventListener('click', handleAction);
+        document.addEventListener('click', closeHandler);
+        document.addEventListener('scroll', closeHandler, true);
+        menu._cleanup = () => {
+            document.removeEventListener('click', closeHandler);
+            document.removeEventListener('scroll', closeHandler, true);
+        };
+    },
+
+    closeBlockMenu() {
+        const existing = document.querySelector('.block-action-menu');
+        if (existing) {
+            existing._cleanup?.();
+            existing.remove();
         }
     },
 
@@ -442,21 +477,6 @@ const DocumentView = {
         const blockId = tagBtn.dataset.id;
         if (blockId) {
             App.showTagModal(blockId);
-        }
-    },
-
-    handlePinClick(e) {
-        const pinBtn = e.target.closest('.pin-btn');
-        if (!pinBtn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const blockId = pinBtn.dataset.id;
-        if (blockId && blockId !== 'new') {
-            const block = Store.blocks.find(b => b.id === blockId);
-            if (block) {
-                App.updateBlockProperty(blockId, 'pinned', !block.pinned,
-                    block.pinned ? 'Unpin note' : 'Pin note');
-            }
         }
     },
 

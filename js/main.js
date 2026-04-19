@@ -235,6 +235,7 @@ const App = {
             touchStartY = e.touches[0].clientY;
         }, { passive: true });
         document.addEventListener('touchend', e => {
+            if (e.target.closest('button, .toolbar-btn, .content-toolbar, a, input, [contenteditable]')) return;
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
             if (Math.abs(dx) < 50 || dy > 30) return;

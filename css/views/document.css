@@ -419,8 +419,8 @@
     transform: translateY(-1px);
 }
 
-/* Delete Button */
-.delete-btn {
+/* 3-Dot Block Menu Button */
+.block-menu-btn {
     background: transparent;
     border: none;
     padding: 0.3rem;
@@ -437,21 +437,29 @@
     z-index: 10;
 }
 
-.document-view .block:hover .delete-btn,
-.document-view .block:focus-within .delete-btn {
+.document-view .block:hover .block-menu-btn,
+.document-view .block:focus-within .block-menu-btn {
     opacity: 0.5;
 }
 
-.delete-btn:hover {
+.block-menu-btn:hover {
     opacity: 1 !important;
-    color: var(--danger, #ef4444);
-    background: rgba(239, 68, 68, 0.1);
-    transform: scale(1.1);
+    color: var(--text-primary);
+    background: var(--bg-hover);
 }
 
-/* Content modal delete button is always visible */
-.content-modal .delete-btn {
+.content-modal .block-menu-btn {
     opacity: 0.6;
+}
+
+/* Block action menu (reuses .task-context-menu) */
+.block-action-menu .menu-item-danger {
+    color: var(--danger, #ef4444);
+}
+
+.block-action-menu .menu-item-danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger, #ef4444);
 }
 
 /* Task Toggle Button */
@@ -496,47 +504,6 @@
     }
 }
 
-/* Pin Button */
-.pin-btn {
-    background: transparent;
-    border: none;
-    padding: 0.3rem;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    color: var(--text-muted);
-    opacity: 0;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: auto;
-    position: relative;
-    z-index: 10;
-}
-
-.document-view .block:hover .pin-btn,
-.document-view .block:focus-within .pin-btn {
-    opacity: 0.5;
-}
-
-.pin-btn:hover {
-    opacity: 1 !important;
-    color: var(--accent);
-    background: var(--accent-light, rgba(59, 130, 246, 0.1));
-    transform: scale(1.1);
-}
-
-/* Pinned (active) state - always visible with accent */
-.pin-btn.pinned {
-    opacity: 1 !important;
-    color: var(--accent);
-}
-
-.pin-btn.pinned:hover {
-    background: var(--accent-light, rgba(59, 130, 246, 0.1));
-    transform: scale(1.1);
-}
-
 /* Pinned block visual indicator */
 .document-view .block.block-pinned {
     border-color: var(--accent);
@@ -549,11 +516,6 @@
     height: auto;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-}
-
-/* Content modal pin button is always visible */
-.content-modal .pin-btn {
-    opacity: 0.6;
 }
 
 /* Collapse / Expand Button */
@@ -608,58 +570,6 @@
     height: auto;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
-}
-
-/* Copy Button */
-.copy-btn {
-    background: transparent;
-    border: none;
-    padding: 0.3rem;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    color: var(--text-muted);
-    opacity: 0;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: auto;
-    position: relative;
-    z-index: 10;
-}
-
-.document-view .block:hover .copy-btn,
-.document-view .block:focus-within .copy-btn {
-    opacity: 0.5;
-}
-
-.copy-btn:hover {
-    opacity: 1 !important;
-    color: var(--accent);
-    background: var(--accent-light, rgba(59, 130, 246, 0.1));
-    transform: scale(1.1);
-}
-
-.copy-btn .copied-icon {
-    display: none;
-}
-
-.copy-btn.copied .copy-icon {
-    display: none;
-}
-
-.copy-btn.copied .copied-icon {
-    display: inline;
-}
-
-.copy-btn.copied {
-    opacity: 1 !important;
-    color: var(--success, #22c55e);
-}
-
-/* Content modal copy button is always visible */
-.content-modal .copy-btn {
-    opacity: 0.6;
 }
 
 /* Microphone / Speech-to-Text Button */
