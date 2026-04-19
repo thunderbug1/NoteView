@@ -1149,6 +1149,12 @@
     transform: scale(0.95);
 }
 
+/* AI Processing State */
+@keyframes thinking-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(0.98); }
+}
+
 .icon-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;

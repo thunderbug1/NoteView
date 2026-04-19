@@ -82,7 +82,6 @@ const DocumentView = {
             </article>
         `).join('') + `
             <article class="block empty" data-id="new">
-                ${this.renderCreationActions('new')}
                 <div class="block-tags">
                     ${this.getSelectedContextBadge()}
                 </div>
@@ -124,13 +123,6 @@ const DocumentView = {
         }
         this._micHandler = this.handleMicClick.bind(this);
         container.addEventListener('click', this._micHandler);
-
-        // Add event delegation for creation action buttons
-        if (this._creationHandler) {
-            container.removeEventListener('click', this._creationHandler);
-        }
-        this._creationHandler = this.handleCreationAction.bind(this);
-        container.addEventListener('click', this._creationHandler);
 
         // Add event delegation for collapse button click
         if (this._collapseHandler) {
@@ -282,18 +274,6 @@ const DocumentView = {
         return `<button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${block.id}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isCollapsed ? '15 18 9 12 15 6' : '6 9 12 15 18 9'}"/></svg>
         </button>`;
-    },
-
-    renderCreationActions(blockId) {
-        const micBtn = this.isSpeechRecognitionSupported()
-            ? `<button class="creation-btn mic-action" data-action="dictate" data-id="${blockId}" title="Start dictation"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> Dictate</button>`
-            : '';
-        return `<div class="block-creation-actions">
-            <button class="creation-btn" data-action="type" data-id="${blockId}" title="Start typing"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Type</button>
-            ${micBtn}
-            <button class="creation-btn" data-action="task" data-id="${blockId}" title="Add a task"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg> Task</button>
-            <button class="creation-btn" data-action="template" data-id="${blockId}" title="Create from template"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg> Template</button>
-        </div>`;
     },
 
     // Render metadata header above block (like Obsidian/Tana)
@@ -646,44 +626,7 @@ const DocumentView = {
             .toLowerCase();
     },
 
-    handleCreationAction(e) {
-        if (this._creationDebounce) return;
-        this._creationDebounce = true;
-        setTimeout(() => { this._creationDebounce = false; }, 300);
-
-        const btn = e.target.closest('.creation-btn');
-        if (!btn) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const action = btn.dataset.action;
-        const blockId = btn.dataset.id;
-        const view = this.editors.get(blockId);
-
-        if (action === 'type') {
-            if (view) view.focus();
-        } else if (action === 'dictate') {
-            if (this._recordingBlockId === blockId) {
-                this.stopSpeechRecognition();
-            } else {
-                this.startSpeechRecognition(blockId, btn);
-            }
-        } else if (action === 'task') {
-            if (view) {
-                const taskPrefix = '- [ ] ';
-                const pos = view.state.doc.length;
-                view.dispatch({
-                    changes: { from: pos, insert: taskPrefix },
-                    selection: { anchor: pos + taskPrefix.length }
-                });
-                view.focus();
-            }
-        } else if (action === 'template') {
-            this.showTemplatePicker(btn);
-        }
-    },
-
-    async showTemplatePicker(anchorBtn) {
+    async showTemplatePicker(anchorBtn, blockId) {
         // Remove any existing picker
         const existing = document.querySelector('.template-picker');
         if (existing) { existing.remove(); return; }
@@ -711,8 +654,9 @@ const DocumentView = {
             const template = templates.find(t => t.id === templateId);
             picker.remove();
 
+            const effectiveId = blockId || anchorBtn.dataset.id || 'new';
             if (template && template.content) {
-                const view = this.editors.get('new');
+                const view = this.editors.get(effectiveId);
                 if (view) {
                     const { snippet } = window.CodeMirror;
                     snippet(template.content)(view, null, 0, view.state.doc.length);
@@ -720,7 +664,7 @@ const DocumentView = {
                 }
             } else {
                 // Blank template — just focus
-                const view = this.editors.get('new');
+                const view = this.editors.get(effectiveId);
                 if (view) view.focus();
             }
         };
@@ -834,6 +778,10 @@ const DocumentView = {
         const view = this.editors.get(blockId);
         if (!view) return;
 
+        const { Annotation } = window.CodeMirror;
+        const dictationGroup = Annotation.define();
+        const groupAnnotation = dictationGroup.of(Date.now());
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
@@ -842,6 +790,7 @@ const DocumentView = {
 
         this._recognition = recognition;
         this._recordingBlockId = blockId;
+        this._recordingBtn = btnElement;
         this._isStopping = false;
         this._insertedTranscript = '';
         this._recognitionSession = (this._recognitionSession || 0) + 1;
@@ -888,7 +837,7 @@ const DocumentView = {
                 
                 const currentView = this.editors.get(blockId);
                 if (currentView) {
-                    this.insertTextAtSelection(currentView, newText);
+                    this.insertTextAtSelection(currentView, newText, groupAnnotation);
                 }
             }
         };
@@ -944,16 +893,17 @@ const DocumentView = {
 
     cleanupRecognition() {
         const blockId = this._recordingBlockId;
+        const btn = this._recordingBtn;
         this._recognition = null;
         this._recordingBlockId = null;
+        this._recordingBtn = null;
         this._insertedTranscript = '';
 
+        if (btn) {
+            btn.classList.remove('recording');
+            btn.title = 'Dictate text';
+        }
         if (blockId) {
-            const btn = document.querySelector(`.mic-btn[data-id="${blockId}"]`);
-            if (btn) {
-                btn.classList.remove('recording');
-                btn.title = 'Dictate text';
-            }
             const block = document.querySelector(`.block[data-id="${blockId}"]`);
             if (block) {
                 block.classList.remove('block-recording');
@@ -1301,14 +1251,16 @@ const DocumentView = {
         return `${prefix}\`\`\`${infoString}\n${body}\`\`\`${suffix}`;
     },
 
-    insertTextAtSelection(view, text) {
+    insertTextAtSelection(view, text, annotations) {
         const selection = view.state.selection.main;
         const anchor = selection.from + text.length;
-        view.dispatch({
+        const dispatch = {
             changes: { from: selection.from, to: selection.to, insert: text },
             selection: { anchor, head: anchor },
             scrollIntoView: true
-        });
+        };
+        if (annotations) dispatch.annotations = annotations;
+        view.dispatch(dispatch);
         view.focus();
     },
 
@@ -2935,7 +2887,6 @@ const DocumentView = {
             const container = document.getElementById('viewContainer');
             const newPlaceholderHtml = `
                 <article class="block empty" data-id="new">
-                    ${this.renderCreationActions('new')}
                     <div class="block-tags">
                         ${this.getSelectedContextBadge()}
                     </div>

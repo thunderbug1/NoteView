@@ -988,6 +988,210 @@ const App = {
         URL.revokeObjectURL(url);
     },
 
+    handleAIMicClick(modalBlockId, btn) {
+        if (!DocumentView.isSpeechRecognitionSupported()) return;
+
+        if (this._aiDictationActive) {
+            this.stopAIDictation(modalBlockId);
+        } else {
+            this.startAIDictation(modalBlockId, btn);
+        }
+    },
+
+    _setAIButtonState(btn, state) {
+        if (!btn) return;
+        btn.classList.remove('ai-recording', 'ai-processing', 'ai-error');
+
+        const micSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
+
+        switch (state) {
+            case 'idle':
+                btn.innerHTML = micSvg + ' AI <span class="ai-sparkle">\u2728</span>';
+                btn.title = 'Dictate to AI';
+                this._setAILockout(false);
+                break;
+            case 'recording':
+                btn.classList.add('ai-recording');
+                btn.innerHTML = micSvg + ' Listening...';
+                btn.title = 'Stop AI Dictation';
+                break;
+            case 'processing':
+                btn.classList.add('ai-processing');
+                btn.innerHTML = '<span class="ai-thinking-dots"></span> Thinking...';
+                btn.title = 'AI is processing your dictation';
+                this._setAILockout(true);
+                break;
+            case 'error':
+                btn.classList.add('ai-error');
+                btn.innerHTML = micSvg + ' Error';
+                btn.title = 'AI processing failed';
+                this._setAILockout(false);
+                setTimeout(() => this._setAIButtonState(btn, 'idle'), 2000);
+                break;
+        }
+    },
+
+    _setAILockout(locked) {
+        const modal = this._aiDictationBtn && this._aiDictationBtn.closest('.tag-modal');
+        if (!modal) return;
+        const blockId = this._aiDictationBlockId;
+        const buttons = modal.querySelectorAll('.creation-btn');
+        buttons.forEach(b => { b.disabled = locked; });
+        const view = DocumentView.editors.get(blockId);
+        if (view) {
+            const { EditorView, EditorState } = window.CodeMirror;
+            view.dispatch({ effects: [EditorView.editable.of(!locked), EditorState.readOnly.of(locked)] });
+        }
+    },
+
+    startAIDictation(modalBlockId, btn) {
+        if (this._aiRecognition) {
+            this.stopAIDictation();
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        this._aiRecognition = new SpeechRecognition();
+        this._aiRecognition.continuous = true;
+        this._aiRecognition.interimResults = true;
+
+        this._aiDictationBtn = btn;
+        this._setAIButtonState(btn, 'recording');
+
+        this._aiDictationActive = true;
+        this._aiTranscript = '';
+        this._aiDictationBlockId = modalBlockId;
+
+        this._aiRecognition.onresult = (event) => {
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                }
+            }
+            if (finalTranscript) {
+                this._aiTranscript += finalTranscript + ' ';
+            }
+        };
+
+        this._aiRecognition.onerror = (event) => {
+            console.error('AI Speech Recognition Error:', event.error);
+            this.stopAIDictation(modalBlockId);
+        };
+
+        this._aiRecognition.onend = () => {
+            if (this._aiDictationActive && !this._isStoppingAIDictation) {
+                try { this._aiRecognition.start(); } catch(e) {}
+            } else {
+                this._cleanupAIDictation(modalBlockId);
+            }
+        };
+
+        this._aiRecognition.start();
+        Common.showToast('AI Listening... Speak your note.');
+    },
+
+    async stopAIDictation(modalBlockId) {
+        this._aiDictationActive = false;
+        this._isStoppingAIDictation = true;
+
+        if (this._aiRecognition) {
+            this._aiRecognition.stop();
+        }
+
+        const transcript = (this._aiTranscript || '').trim();
+        this._aiRecognition = null;
+
+        if (transcript) {
+            Common.showToast('Processing dictation with AI...', 3000);
+            await this.processDictationWithAI(transcript, modalBlockId || this._aiDictationBlockId);
+        } else {
+            this._cleanupAIDictation(modalBlockId);
+            Common.showToast('No speech detected.');
+        }
+
+        setTimeout(() => { this._isStoppingAIDictation = false; }, 500);
+    },
+
+    _cleanupAIDictation(modalBlockId) {
+        this._aiRecognition = null;
+        if (this._aiDictationBtn) {
+            this._setAIButtonState(this._aiDictationBtn, 'idle');
+        }
+    },
+
+    async processDictationWithAI(transcript, targetBlockId) {
+        if (this._aiDictationBtn) {
+            this._setAIButtonState(this._aiDictationBtn, 'processing');
+        }
+        if (!AIAssistant.isConfigured()) {
+            Common.showToast('AI is not configured. Please set up an API key in Settings.');
+            this._fallbackDictation(transcript, targetBlockId);
+            return;
+        }
+
+        try {
+            const profile = AIAssistant.profiles[0];
+            const apiKey = AIAssistant._apiKeys[profile.id];
+            
+            const instruction = "The user dictated the following text. Format it into a proper markdown note. If they list tasks, format them as a markdown task list with checkboxes (- [ ]). Be concise and accurate to the dictated content. Do not output anything except the formatted note. Text: " + transcript;
+
+            const url = profile.endpointUrl.replace(/[\\/]+$/, '') + '/chat/completions';
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: profile.model,
+                    messages: [
+                        { role: 'system', content: 'You are a helpful note-taking assistant. Output only the requested formatted note. No surrounding text, no conversational filler, and no code block formatting unless appropriate.' },
+                        { role: 'user', content: instruction }
+                    ]
+                })
+            });
+
+            if (!response.ok) throw new Error('API failed');
+
+            const data = await response.json();
+            let noteContent = data.choices && data.choices[0] && data.choices[0].message.content;
+            if (!noteContent) noteContent = transcript;
+
+            noteContent = noteContent.replace(/^```([a-z]+)?\n?/igm, '').replace(/```$/gm, '').trim();
+
+            this._fallbackDictation(noteContent + '\n', targetBlockId);
+            Common.showToast('Note formatted by AI successfully!');
+        } catch (err) {
+            console.error('AI dictation failed:', err);
+            Common.showToast('AI processing failed. Falling back to raw text.');
+            if (this._aiDictationBtn) {
+                this._setAIButtonState(this._aiDictationBtn, 'error');
+            }
+            this._fallbackDictation(transcript + '\n', targetBlockId);
+        } finally {
+            // Only reset to idle on success; error path already sets its own state
+            if (this._aiDictationBtn && !this._aiDictationBtn.classList.contains('ai-error')) {
+                this._cleanupAIDictation();
+            } else {
+                this._aiRecognition = null;
+                this._aiDictationBtn = null;
+            }
+        }
+    },
+
+    _fallbackDictation(content, modalBlockId) {
+        if (!modalBlockId) return;
+        const view = DocumentView.editors.get(modalBlockId);
+        if (view) {
+            const docLength = view.state.doc.length;
+            view.dispatch({
+                changes: { from: docLength, insert: (docLength > 0 ? '\n' : '') + content },
+                selection: { anchor: docLength + (docLength > 0 ? 1 : 0) + content.length }
+            });
+            view.focus();
+        }
+    },
+
     handleNewNote() {
         this.showNewNoteModal();
     },
@@ -1035,16 +1239,15 @@ const App = {
                     cmContainer.dataset.id = createdBlockId;
                 }
 
-                // Update mic button data-id
-                const micBtn = modal.querySelector('.mic-btn');
-                if (micBtn) {
-                    micBtn.dataset.id = createdBlockId;
-                }
-
-                // Update tag button data-id
-                modal.querySelectorAll('.add-tag-btn').forEach(btn => {
-                    btn.dataset.id = createdBlockId;
+                // Update all buttons with the new ID
+                modal.querySelectorAll('[data-id="' + modalBlockId + '"]').forEach(el => {
+                    el.dataset.id = createdBlockId;
                 });
+                
+                // CRITICAL: Update AI dictation target if it's currently recording
+                if (this._aiDictationBlockId === modalBlockId) {
+                    this._aiDictationBlockId = createdBlockId;
+                }
 
                 // Check if more content was typed while we were awaiting createBlock
                 if (editor) {
@@ -1094,17 +1297,33 @@ const App = {
         };
 
         const content = `
+            <div class="block block-creation-actions" style="margin-bottom: 0.75rem;">
+                <button class="creation-btn" data-action="type" data-id="${modalBlockId}" title="Start typing">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Type
+                </button>
+                ${DocumentView.isSpeechRecognitionSupported() ? `
+                <button class="creation-btn mic-btn" data-action="dictate" data-id="${modalBlockId}" title="Dictate text">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> Dictate
+                </button>
+                ${AIAssistant.isConfigured() ? `
+                <button class="creation-btn ai-mic-btn" data-action="ai-dictate" data-id="${modalBlockId}" title="Dictate to AI">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> AI ✨
+                </button>` : ''}
+                ` : ''}
+                <button class="creation-btn" data-action="task" data-id="${modalBlockId}" title="Add a task">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg> Task
+                </button>
+                <button class="creation-btn" data-action="template" data-id="${modalBlockId}" title="Create from template">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg> Template
+                </button>
+            </div>
             <div class="block-metadata">
                 <div class="block-tags">
                     ${modalTags.map(tag => TagModal._renderBadge(tag)).join('')}
                     <button class="add-tag-btn" data-id="${modalBlockId}">+ Tag</button>
                 </div>
-                ${DocumentView.isSpeechRecognitionSupported() ? `
-                <button class="mic-btn" data-id="${modalBlockId}" title="Dictate text">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                </button>` : ''}
             </div>
-            <div class="block-editor">
+            <div class="block block-editor">
                 <div class="codemirror-container" data-id="${modalBlockId}"></div>
             </div>
         `;
@@ -1115,6 +1334,9 @@ const App = {
             modalClass: 'tag-modal content-modal active-recording-preventer',
             onClose: () => {
                 DocumentView.stopSpeechRecognition();
+                if (this._aiDictationActive) {
+                    this.stopAIDictation(modalBlockId);
+                }
                 // Clean up editor reference if still mapped to modalBlockId
                 if (!createdBlockId) {
                     DocumentView.editors.delete(modalBlockId);
@@ -1164,15 +1386,42 @@ const App = {
             App.render();
         };
 
-        // Mic button
-        const micBtn = modal.querySelector('.mic-btn');
-        if (micBtn) {
-            micBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                DocumentView.handleMicClick(e);
-            });
-        }
+        // Creation options — single event delegation
+        const actionsDiv = modal.querySelector('.block-creation-actions');
+        actionsDiv.addEventListener('click', (e) => {
+            const btn = e.target.closest('.creation-btn');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            const action = btn.dataset.action;
+            const currentId = btn.dataset.id;
+            const view = DocumentView.editors.get(currentId);
+
+            if (action === 'type') {
+                if (view) view.focus();
+            } else if (action === 'task') {
+                if (view) {
+                    const taskPrefix = '- [ ] ';
+                    const selection = view.state.selection.main;
+                    view.dispatch({
+                        changes: { from: selection.from, insert: taskPrefix },
+                        selection: { anchor: selection.from + taskPrefix.length }
+                    });
+                    view.focus();
+                }
+            } else if (action === 'template') {
+                DocumentView.showTemplatePicker(btn, currentId);
+            } else if (action === 'dictate') {
+                if (DocumentView._recordingBlockId === currentId) {
+                    DocumentView.stopSpeechRecognition();
+                } else {
+                    DocumentView.startSpeechRecognition(currentId, btn);
+                }
+            } else if (action === 'ai-dictate') {
+                this.handleAIMicClick(currentId, btn);
+            }
+        });
 
         // Initialize CodeMirror for the modal
         const cmContainer = modal.querySelector('.codemirror-container');

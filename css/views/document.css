@@ -655,6 +655,47 @@
     animation: mic-pulse 1.5s ease-in-out infinite;
 }
 
+/* AI mic button recording state */
+.creation-btn.ai-mic-btn.ai-recording {
+    color: var(--danger, #ef4444);
+    border-color: var(--danger, #ef4444);
+    background: rgba(239, 68, 68, 0.08);
+    animation: mic-pulse 1.5s ease-in-out infinite;
+}
+
+/* AI mic button processing state */
+.creation-btn.ai-mic-btn.ai-processing {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.15));
+    cursor: wait;
+    animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+
+.ai-thinking-dots::after {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-left: 2px;
+    animation: ai-dot-pulse 1.2s ease-in-out infinite;
+}
+
+/* AI mic button error state */
+.creation-btn.ai-mic-btn.ai-error {
+    color: var(--danger, #ef4444);
+    border-color: var(--danger, #ef4444);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.creation-btn.ai-mic-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    animation: none;
+}
+
 /* Template picker dropdown */
 .template-picker {
     position: absolute;
