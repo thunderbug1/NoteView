@@ -99,8 +99,7 @@ const AppSettings = {
 
     _defaultTemplates: [
         { id: 'meeting', name: 'Meeting Notes', content: '# ${1:Meeting Title}\n\n**Attendees:** ${2:Attendees}\n\n## Agenda\n\n## Notes\n\n## Action Items\n- [ ] ' },
-        { id: 'daily', name: 'Daily Note', content: '# ${1:Daily Note}\n\n## Tasks\n- [ ] \n\n## Notes\n' },
-        { id: 'blank', name: 'Blank', content: '' }
+        { id: 'daily', name: 'Daily Note', content: '# ${1:Daily Note}\n\n## Tasks\n- [ ] \n\n## Notes\n' }
     ],
 
     async getTemplates() {
