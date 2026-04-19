@@ -692,6 +692,10 @@ const App = {
                 break;
         }
 
+        // Hide FAB in kanban — columns have their own add-task buttons
+        const fab = document.getElementById('fabNewNote');
+        if (fab) fab.style.display = (view === 'kanban') ? 'none' : '';
+
         // Update undo/redo button states
         this.updateUndoRedoUI();
 

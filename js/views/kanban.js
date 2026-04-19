@@ -92,6 +92,7 @@ const KanbanView = {
                     <div class="blocks">
                         ${colHtml}
                     </div>
+                    <button class="kanban-add-task-btn" data-column-id="${col.id}">+ Add task</button>
                 </div>
             `;
         });
@@ -460,6 +461,22 @@ const KanbanView = {
             if (isMobile) {
                 KanbanView.setupMobileInteractions(card);
             }
+        });
+
+        // Add-task buttons
+        container.querySelectorAll('.kanban-add-task-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const col = KanbanView.getColumnById(btn.dataset.columnId);
+                if (!col) return;
+                const content = `- [${col.state}] New task`;
+                const newBlock = await Store.createBlock(content);
+                TimelineView.invalidateCache();
+                SelectionManager.updateTagCounts();
+                await App.render();
+                // Highlight the new card
+                const newCard = container.querySelector(`.kanban-card[data-block-id="${newBlock.id}"]`);
+                if (newCard) KanbanView.highlightAndScrollToCard(newCard);
+            });
         });
 
         KanbanView.setupColumnDropTargets(columns);
