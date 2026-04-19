@@ -389,12 +389,12 @@
     .sidebar-edge {
         display: block;
         position: fixed;
-        top: 50px; /* Offset to clear the toolbar */
-        height: calc(100vh - 50px);
-        height: calc(100dvh - 50px);
+        top: 0;
+        height: 100vh;
+        height: 100dvh;
         width: 8px;
-        cursor: pointer;
         z-index: 50;
+        pointer-events: none;
         transition: background 0.2s;
     }
 

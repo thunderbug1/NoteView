@@ -217,8 +217,18 @@ const App = {
             closeSidebar();
             closeSidebarRight();
         });
-        sidebarEdgeLeft?.addEventListener('click', openSidebar);
-        sidebarEdgeRight?.addEventListener('click', openSidebarRight);
+        // Hardware edge listeners replaced with software edge-tap detection
+        // to prevent capturing fat-finger taps meant for nearby buttons.
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('button, .toolbar-btn, .block-actions, a, input, [contenteditable], .block-menu-btn, .task-toggle-btn, .mic-btn, .creation-btn')) {
+                return;
+            }
+            if (e.clientX < 15 && !sidebar.classList.contains('sidebar-open')) {
+                openSidebar();
+            } else if (e.clientX > window.innerWidth - 15 && !sidebarRight.classList.contains('sidebar-open')) {
+                openSidebarRight();
+            }
+        });
 
         // Desktop right sidebar toggle
         const sidebarRightToggle = document.getElementById('sidebarRightToggle');
