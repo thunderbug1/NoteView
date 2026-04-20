@@ -1040,9 +1040,13 @@ const App = {
         const buttons = modal.querySelectorAll('.creation-btn');
         buttons.forEach(b => { b.disabled = locked; });
         const view = DocumentView.editors.get(blockId);
-        if (view) {
-            const { EditorView, EditorState } = window.CodeMirror;
-            view.dispatch({ effects: [EditorView.editable.of(!locked), EditorState.readOnly.of(locked)] });
+        if (view && view.dom) {
+            try {
+                const { EditorView, EditorState } = window.CodeMirror;
+                view.dispatch({ effects: [EditorView.editable.of(!locked), EditorState.readOnly.of(locked)] });
+            } catch (e) {
+                // Editor was destroyed during async AI processing
+            }
         }
     },
 
@@ -1063,15 +1067,37 @@ const App = {
         this._aiTranscript = '';
         this._aiDictationBlockId = modalBlockId;
 
+        // Create transcript preview element above the editor
+        const modal = btn.closest('.tag-modal');
+        let preview = modal && modal.querySelector('.ai-transcript-preview');
+        if (!preview && modal) {
+            preview = document.createElement('div');
+            preview.className = 'ai-transcript-preview';
+            const editorContainer = modal.querySelector('.block-editor');
+            if (editorContainer) {
+                editorContainer.parentNode.insertBefore(preview, editorContainer);
+            }
+        }
+
         this._aiRecognition.onresult = (event) => {
             let finalTranscript = '';
+            let interimTranscript = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 if (event.results[i].isFinal) {
                     finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
                 }
             }
             if (finalTranscript) {
                 this._aiTranscript += finalTranscript + ' ';
+            }
+
+            // Show live transcript in the preview element
+            if (preview) {
+                const displayText = this._aiTranscript + (interimTranscript ? interimTranscript + '...' : '');
+                preview.textContent = displayText;
+                preview.classList.toggle('has-content', !!displayText);
             }
         };
 
@@ -1083,14 +1109,13 @@ const App = {
         this._aiRecognition.onend = () => {
             if (this._aiDictationActive && !this._isStoppingAIDictation) {
                 try { this._aiRecognition.start(); } catch(e) {}
-            } else {
-                this._isStoppingAIDictation = false;
-                this._cleanupAIDictation(modalBlockId);
             }
+            // Don't cleanup here when stopAIDictation initiated the stop —
+            // processDictationWithAI handles its own cleanup
         };
 
         this._aiRecognition.start();
-        Common.showToast('AI Listening... Speak your note.');
+        Common.showToast('AI Listening... Speak your command.');
     },
 
     async stopAIDictation(modalBlockId) {
@@ -1115,6 +1140,8 @@ const App = {
 
     _cleanupAIDictation(modalBlockId) {
         this._aiRecognition = null;
+        const preview = document.querySelector('.ai-transcript-preview');
+        if (preview) preview.remove();
         if (this._aiDictationBtn) {
             this._setAIButtonState(this._aiDictationBtn, 'idle');
         }
@@ -1126,15 +1153,29 @@ const App = {
         }
         if (!AIAssistant.isConfigured()) {
             Common.showToast('AI is not configured. Please set up an API key in Settings.');
-            this._fallbackDictation(transcript, targetBlockId);
+            this._insertAIContent(transcript + '\n', targetBlockId);
             return;
+        }
+
+        // Show thinking indicator in the preview area
+        const modal = this._aiDictationBtn && this._aiDictationBtn.closest('.tag-modal');
+        let thinkingPreview = modal && modal.querySelector('.ai-transcript-preview');
+        if (!thinkingPreview && modal) {
+            thinkingPreview = document.createElement('div');
+            thinkingPreview.className = 'ai-transcript-preview has-content ai-thinking';
+            const editorContainer = modal.querySelector('.block-editor');
+            if (editorContainer) {
+                editorContainer.parentNode.insertBefore(thinkingPreview, editorContainer);
+            }
+        }
+        if (thinkingPreview) {
+            thinkingPreview.className = 'ai-transcript-preview has-content ai-thinking';
+            thinkingPreview.innerHTML = '<span class="ai-thinking-dots"></span> Writing note...';
         }
 
         try {
             const profile = AIAssistant.profiles[0];
             const apiKey = AIAssistant._apiKeys[profile.id];
-            
-            const instruction = "The user dictated the following text. Format it into a proper markdown note. If they list tasks, format them as a markdown task list with checkboxes (- [ ]). Be concise and accurate to the dictated content. Do not output anything except the formatted note. Text: " + transcript;
 
             const url = profile.endpointUrl.replace(/[\\/]+$/, '') + '/chat/completions';
             const response = await fetch(url, {
@@ -1146,31 +1187,63 @@ const App = {
                 body: JSON.stringify({
                     model: profile.model,
                     messages: [
-                        { role: 'system', content: 'You are a helpful note-taking assistant. Output only the requested formatted note. No surrounding text, no conversational filler, and no code block formatting unless appropriate.' },
-                        { role: 'user', content: instruction }
-                    ]
+                        { role: 'system', content: 'You are a note-taking assistant. The user will speak a command — perform the command and write the resulting note in well-structured markdown. Use headings, lists, indentation where appropriate. If the user tells you to note a task, use task checkboxes (- [ ]). Output only the note content, no commentary or code fences.' },
+                        { role: 'user', content: transcript }
+                    ],
+                    stream: true
                 })
             });
 
             if (!response.ok) throw new Error('API failed');
 
-            const data = await response.json();
-            let noteContent = data.choices && data.choices[0] && data.choices[0].message.content;
+            // Accumulate full response before touching the editor
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullContent = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const data = line.slice(6).trim();
+                    if (data === '[DONE]') break;
+                    try {
+                        const parsed = JSON.parse(data);
+                        const chunk = parsed.choices?.[0]?.delta?.content || '';
+                        if (chunk) fullContent += chunk;
+                    } catch { /* skip malformed chunks */ }
+                }
+            }
+
+            // Strip code fences if the model wrapped them
+            let noteContent = fullContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
             if (!noteContent) noteContent = transcript;
 
-            noteContent = noteContent.replace(/^```([a-z]+)?\n?/igm, '').replace(/```$/gm, '').trim();
+            // Remove thinking indicator and transcript preview
+            if (thinkingPreview) thinkingPreview.remove();
+            const transcriptPreview = modal && modal.querySelector('.ai-transcript-preview');
+            if (transcriptPreview) transcriptPreview.remove();
 
-            this._fallbackDictation(noteContent + '\n', targetBlockId);
-            Common.showToast('Note formatted by AI successfully!');
+            // Insert content into editor — this triggers promoteModalBlock via the update listener
+            this._insertAIContent(noteContent + '\n', targetBlockId);
+            Common.showToast('Note created by AI.');
         } catch (err) {
             console.error('AI dictation failed:', err);
             Common.showToast('AI processing failed. Falling back to raw text.');
             if (this._aiDictationBtn) {
                 this._setAIButtonState(this._aiDictationBtn, 'error');
             }
-            this._fallbackDictation(transcript + '\n', targetBlockId);
+            if (thinkingPreview) thinkingPreview.remove();
+            this._insertAIContent(transcript + '\n', targetBlockId);
         } finally {
-            // Only reset to idle on success; error path already sets its own state
+            this._aiIsStreaming = false;
             if (this._aiDictationBtn && !this._aiDictationBtn.classList.contains('ai-error')) {
                 this._cleanupAIDictation();
             } else {
@@ -1180,24 +1253,95 @@ const App = {
         }
     },
 
-    _fallbackDictation(content, modalBlockId) {
+    _insertAIContent(content, modalBlockId) {
         if (!modalBlockId) return;
+
+        const modal = this._aiDictationBtn && this._aiDictationBtn.closest('.tag-modal');
+        const preview = modal && modal.querySelector('.ai-transcript-preview');
+        if (preview) preview.remove();
+
         const view = DocumentView.editors.get(modalBlockId);
-        if (view) {
-            const docLength = view.state.doc.length;
+        if (view && view.dom) {
+            const head = view.state.selection.main.head;
+            const charBefore = head > 0 ? view.state.doc.sliceString(head - 1, head) : '';
+            const prefix = (head > 0 && charBefore !== '\n') ? '\n' : '';
             view.dispatch({
-                changes: { from: docLength, insert: (docLength > 0 ? '\n' : '') + content },
-                selection: { anchor: docLength + (docLength > 0 ? 1 : 0) + content.length }
+                changes: { from: head, insert: prefix + content },
+                selection: { anchor: head + prefix.length + content.length }
             });
             view.focus();
         }
     },
 
     handleNewNote() {
-        this.showNewNoteModal();
+        if (document.querySelector('.content-modal')) return;
+        this.showCreationPicker();
     },
 
-    showNewNoteModal() {
+    showCreationPicker() {
+        if (document.querySelector('.content-modal')) return;
+
+        const speechSupported = DocumentView.isSpeechRecognitionSupported();
+        const aiConfigured = AIAssistant.isConfigured();
+
+        const typeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+        const micIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
+        const taskIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>';
+        const templateIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>';
+
+        let methods = `
+            <button class="creation-picker-card" data-method="type">
+                ${typeIcon}
+                <span class="creation-picker-label">Type</span>
+                <span class="creation-picker-desc">Write a note manually</span>
+            </button>`;
+
+        if (speechSupported) {
+            methods += `
+            <button class="creation-picker-card" data-method="dictate">
+                ${micIcon}
+                <span class="creation-picker-label">Dictate</span>
+                <span class="creation-picker-desc">Speech to text</span>
+            </button>`;
+            if (aiConfigured) {
+                methods += `
+            <button class="creation-picker-card" data-method="ai-dictate">
+                ${micIcon}
+                <span class="creation-picker-label">AI Dictate</span>
+                <span class="creation-picker-desc">AI-formatted speech</span>
+            </button>`;
+            }
+        }
+
+        methods += `
+            <button class="creation-picker-card" data-method="task">
+                ${taskIcon}
+                <span class="creation-picker-label">Task</span>
+                <span class="creation-picker-desc">Add a new task</span>
+            </button>
+            <button class="creation-picker-card" data-method="template">
+                ${templateIcon}
+                <span class="creation-picker-label">Template</span>
+                <span class="creation-picker-desc">Start from a template</span>
+            </button>`;
+
+        const modal = Modal.create({
+            title: 'Create Note',
+            content: `<div class="creation-picker-grid">${methods}</div>`,
+            modalClass: 'tag-modal creation-picker'
+        });
+
+        modal.querySelectorAll('.creation-picker-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                const method = card.dataset.method;
+                modal.close();
+                this.showNewNoteModal(method);
+            });
+        });
+    },
+
+    showNewNoteModal(method = 'type') {
         const modalBlockId = 'new-modal';
         let modalTags = SelectionManager.getActiveTags();
         let createdBlockId = null;
@@ -1259,7 +1403,10 @@ const App = {
                 }
 
                 DocumentView.pendingNewTags = null;
-                App.render();
+                SelectionManager.updateTagCounts();
+
+                // Don't call App.render() here — it would move the modal's editor
+                // to the main view. The full render happens when the modal closes.
 
                 // Show hint if the new note is hidden by active filters
                 const reasons = Store.getBlockingFilters(newBlock);
@@ -1303,27 +1450,15 @@ const App = {
         };
 
         const micSvg = this._micSvg;
+        let actionBtnHtml = '';
+        if (method === 'dictate') {
+            actionBtnHtml = `<button class="creation-btn mic-btn active-method" data-action="dictate" data-id="${modalBlockId}" title="Stop dictation">${micSvg} Stop</button>`;
+        } else if (method === 'ai-dictate') {
+            actionBtnHtml = `<button class="creation-btn ai-mic-btn active-method" data-action="ai-dictate" data-id="${modalBlockId}" title="Stop AI Dictation">${micSvg} AI <span class="ai-sparkle">\u2728</span></button>`;
+        }
+
         const content = `
-            <div class="block block-creation-actions" style="margin-bottom: 0.75rem;">
-                <button class="creation-btn" data-action="type" data-id="${modalBlockId}" title="Start typing">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Type
-                </button>
-                ${DocumentView.isSpeechRecognitionSupported() ? `
-                <button class="creation-btn mic-btn" data-action="dictate" data-id="${modalBlockId}" title="Dictate text">
-                    ${micSvg} Dictate
-                </button>
-                ${AIAssistant.isConfigured() ? `
-                <button class="creation-btn ai-mic-btn" data-action="ai-dictate" data-id="${modalBlockId}" title="Dictate to AI">
-                    ${micSvg} AI ✨
-                </button>` : ''}
-                ` : ''}
-                <button class="creation-btn" data-action="task" data-id="${modalBlockId}" title="Add a task">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg> Task
-                </button>
-                <button class="creation-btn" data-action="template" data-id="${modalBlockId}" title="Create from template">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg> Template
-                </button>
-            </div>
+            ${actionBtnHtml ? `<div class="block block-creation-actions" style="margin-bottom: 0.75rem;">${actionBtnHtml}</div>` : ''}
             <div class="block-metadata">
                 <div class="block-tags">
                     ${modalTags.map(tag => TagModal._renderBadge(tag)).join('')}
@@ -1342,12 +1477,10 @@ const App = {
             onClose: () => {
                 DocumentView.stopSpeechRecognition();
                 if (this._aiDictationActive) {
-                    this.stopAIDictation(modalBlockId);
+                    this.stopAIDictation(createdBlockId || modalBlockId);
                 }
-                // Clean up editor reference if still mapped to modalBlockId
-                if (!createdBlockId) {
-                    DocumentView.editors.delete(modalBlockId);
-                }
+                const preview = modal.querySelector('.ai-transcript-preview');
+                if (preview) preview.remove();
             }
         });
 
@@ -1365,7 +1498,6 @@ const App = {
                     renderModalTags();
                 }
             }
-            Store.blocks = Store.blocks.filter(b => b.id !== 'new');
         };
 
         // Content auto-create: triggered by CM6 update listener (set up after editor creation)
@@ -1379,64 +1511,149 @@ const App = {
         const origClose = modal.close.bind(modal);
         modal.close = () => {
             Store.blocks = Store.blocks.filter(b => b.id !== 'new');
+            const promotedId = createdBlockId;
+            const promotedContent = promotedId ? Store.blocks.find(b => b.id === promotedId)?.content : null;
+
+            // Destroy the modal editor before origClose removes the DOM
+            if (promotedId) {
+                const ed = DocumentView.editors.get(promotedId);
+                if (ed) { ed.destroy(); DocumentView.editors.delete(promotedId); }
+            } else {
+                DocumentView.editors.delete(modalBlockId);
+            }
+
             origClose();
-            App.render();
+            Store._filteredBlocksCache.invalidate();
+            SelectionManager.updateTagCounts();
+            TimelineView.invalidateCache();
+
+            if (promotedId && promotedContent && Store.currentView === 'document') {
+                // Efficient insert: add the block to the DOM without a full render
+                const viewContainer = document.getElementById('viewContainer');
+                const newBlockArticle = viewContainer.querySelector('[data-id="new"]');
+                if (newBlockArticle) {
+                    const block = Store.blocks.find(b => b.id === promotedId);
+                    if (block) {
+                        const article = document.createElement('article');
+                        article.className = 'block';
+                        article.dataset.id = promotedId;
+                        article.innerHTML = `
+                            ${DocumentView.renderCollapseButton(block)}
+                            <div class="block-split-marker" data-id="${promotedId}" title="Split note here">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
+                            </div>
+                            ${DocumentView.renderBlockMetadata(block)}
+                            <div class="block-editor">
+                                <div class="codemirror-container" data-id="${promotedId}">${Common.escapeHtml(block.content || '')}</div>
+                                <span class="save-indicator" data-id="${promotedId}">saved</span>
+                            </div>
+                        `;
+                        newBlockArticle.parentNode.insertBefore(article, newBlockArticle);
+                        // Create editor for the inserted block
+                        const cmContainer = article.querySelector('.codemirror-container');
+                        if (cmContainer) {
+                            DocumentView.createEditor(cmContainer, promotedId, block.content || '');
+                        }
+                    }
+                }
+            } else {
+                App.render();
+            }
         };
 
-        // Creation options — single event delegation
+        // Stop button for dictate/AI-dictate modes
         const actionsDiv = modal.querySelector('.block-creation-actions');
-        actionsDiv.addEventListener('click', (e) => {
-            const btn = e.target.closest('.creation-btn');
-            if (!btn) return;
-            e.preventDefault();
-            e.stopPropagation();
-
-            const action = btn.dataset.action;
-            const currentId = btn.dataset.id;
-            const view = DocumentView.editors.get(currentId);
-
-            if (action === 'type') {
-                if (view) view.focus();
-            } else if (action === 'task') {
-                if (view) {
-                    const taskPrefix = '- [ ] ';
-                    const selection = view.state.selection.main;
-                    view.dispatch({
-                        changes: { from: selection.from, insert: taskPrefix },
-                        selection: { anchor: selection.from + taskPrefix.length }
-                    });
-                    view.focus();
-                }
-            } else if (action === 'template') {
-                DocumentView.showTemplatePicker(btn, currentId);
-            } else if (action === 'dictate') {
-                if (DocumentView._recordingBlockId === currentId) {
+        if (actionsDiv) {
+            actionsDiv.addEventListener('click', (e) => {
+                const btn = e.target.closest('.creation-btn');
+                if (!btn) return;
+                e.preventDefault();
+                const action = btn.dataset.action;
+                if (action === 'dictate') {
                     DocumentView.stopSpeechRecognition();
-                } else {
-                    DocumentView.startSpeechRecognition(currentId, btn);
+                    actionsDiv.remove();
+                } else if (action === 'ai-dictate') {
+                    this.handleAIMicClick(modalBlockId, btn);
+                    if (!this._aiDictationActive) actionsDiv.remove();
                 }
-            } else if (action === 'ai-dictate') {
-                this.handleAIMicClick(currentId, btn);
-            }
-        });
+            });
+        }
 
         // Initialize CodeMirror for the modal
         const cmContainer = modal.querySelector('.codemirror-container');
 
-        DocumentView.waitForCodeMirror().then(() => {
-            const { EditorView } = window.CodeMirror;
+        const initEditor = (initialContent = '') => {
+            DocumentView.waitForCodeMirror().then(() => {
+                const { EditorView } = window.CodeMirror;
 
-            DocumentView.createEditor(cmContainer, modalBlockId, '', [
-                EditorView.updateListener.of((update) => {
-                    if (update.docChanged) {
-                        onEditorContentChanged(update.state.doc.toString());
+                DocumentView.createEditor(cmContainer, modalBlockId, initialContent, [
+                    EditorView.updateListener.of((update) => {
+                        if (update.docChanged && !this._aiIsStreaming) {
+                            onEditorContentChanged(update.state.doc.toString());
+                        }
+                    })
+                ]);
+
+                const editor = DocumentView.editors.get(modalBlockId);
+                if (!editor) return;
+
+                if (method === 'task') {
+                    const taskPrefix = '- [ ] ';
+                    const docLen = editor.state.doc.length;
+                    if (docLen === 0) {
+                        editor.dispatch({
+                            changes: { from: 0, insert: taskPrefix },
+                            selection: { anchor: taskPrefix.length }
+                        });
                     }
-                })
-            ]);
+                    editor.focus();
+                } else if (method === 'dictate') {
+                    editor.focus();
+                    const btn = modal.querySelector('[data-action="dictate"]');
+                    if (btn) {
+                        DocumentView.startSpeechRecognition(modalBlockId, btn);
+                        Common.showToast('Listening... Tap mic to stop.');
+                    }
+                } else if (method === 'ai-dictate') {
+                    editor.focus();
+                    const btn = modal.querySelector('[data-action="ai-dictate"]');
+                    if (btn) {
+                        this.startAIDictation(modalBlockId, btn);
+                    }
+                } else {
+                    editor.focus();
+                }
+            });
+        };
 
-            const editor = DocumentView.editors.get(modalBlockId);
-            if (editor) editor.focus();
-        });
+        if (method === 'template') {
+            DocumentView.waitForCodeMirror().then(async () => {
+                const templates = await AppSettings.getTemplates();
+                if (templates.length === 0) {
+                    initEditor('');
+                    return;
+                }
+                const pickerHtml = templates.map(t =>
+                    `<button class="creation-btn template-select-btn" data-template-id="${t.id}">${escapeHtml(t.name)}</button>`
+                ).join('');
+                const pickerWrap = document.createElement('div');
+                pickerWrap.className = 'template-picker-inline';
+                pickerWrap.innerHTML = pickerHtml;
+                const metadata = modal.querySelector('.block-metadata');
+                metadata.before(pickerWrap);
+
+                pickerWrap.addEventListener('click', async (e) => {
+                    const btn = e.target.closest('.template-select-btn');
+                    if (!btn) return;
+                    const template = templates.find(t => t.id === btn.dataset.templateId);
+                    pickerWrap.remove();
+                    const content = template && template.content ? template.content : '';
+                    initEditor(content);
+                });
+            });
+        } else {
+            initEditor('');
+        }
 
         // Ctrl+Enter closes the modal (block is already auto-saved)
         cmContainer.addEventListener('keydown', (e) => {

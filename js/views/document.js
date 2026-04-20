@@ -2308,9 +2308,9 @@ const DocumentView = {
             blur: (event, view) => {
                 const currentId = container.dataset.id;
                 const content = view.state.doc.toString();
-                if (currentId !== 'new') {
-                    // Skip blur handling during undo/redo execution
-                    if (UndoRedoManager.isExecuting) {
+                if (currentId !== 'new' && currentId !== 'new-modal') {
+                    // Skip blur handling during undo/redo or AI streaming
+                    if (UndoRedoManager.isExecuting || App._aiIsStreaming || App._aiDictationActive) {
                         return;
                     }
                      if (content.trim() === '') {

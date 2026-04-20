@@ -594,6 +594,16 @@
     50% { opacity: 0.6; }
 }
 
+@keyframes thinking-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes ai-dot-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
 /* Keep metadata bar visible during recording */
 .document-view .block.block-recording .block-metadata {
     opacity: 1;
@@ -696,6 +706,29 @@
     animation: none;
 }
 
+/* AI dictation transcript preview */
+.ai-transcript-preview {
+    display: none;
+    padding: 0.6rem 0.75rem;
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border);
+    min-height: 2.5rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+.ai-transcript-preview.has-content {
+    display: block;
+}
+.ai-transcript-preview.ai-thinking {
+    font-style: normal;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
 /* Template picker dropdown */
 .template-picker {
     position: absolute;
@@ -735,6 +768,119 @@
         max-width: 800px;
         height: auto;
         max-height: 90vh;
+    }
+}
+
+/* Creation method picker */
+.creation-picker .tag-modal-body {
+    padding: 1rem;
+}
+
+.creation-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+.creation-picker-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text);
+    transition: all 0.15s ease;
+    min-height: 80px;
+}
+
+.creation-picker-card:hover {
+    background: var(--bg-tertiary, var(--bg-primary));
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.creation-picker-card:active {
+    transform: scale(0.97);
+}
+
+.creation-picker-card svg {
+    opacity: 0.7;
+    margin-bottom: 0.15rem;
+}
+
+.creation-picker-card:hover svg {
+    opacity: 1;
+}
+
+.creation-picker-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.creation-picker-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Template picker inline (within creation modal) */
+.template-picker-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.template-select-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.35rem 0.7rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+    transition: all 0.15s ease;
+    min-height: 44px;
+}
+
+.template-select-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* Active method highlight */
+.creation-btn.active-method {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.08));
+}
+
+@media (max-width: 768px) {
+    .creation-picker-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .creation-picker-card {
+        flex-direction: row;
+        gap: 0.5rem;
+        min-height: 56px;
+        padding: 0.6rem 0.75rem;
+        align-items: center;
+    }
+
+    .creation-picker-card svg {
+        margin-bottom: 0;
+    }
+
+    .creation-picker-desc {
+        text-align: left;
     }
 }
 
