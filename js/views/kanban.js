@@ -3,6 +3,8 @@
  */
 
 const KanbanView = {
+    collapsedGroups: new Map(),
+
     columns: [
         { id: 'todo', label: 'Todo', state: ' ' },
         { id: 'progress', label: 'In Progress', state: '/' },
@@ -190,10 +192,15 @@ const KanbanView = {
             `;
         });
 
+        const groupKey = key || '__ungrouped';
+        const isCollapsed = this.collapsedGroups.get(groupKey) || false;
         const swimlaneClass = isUngrouped ? 'kanban-swimlane kanban-swimlane-ungrouped' : 'kanban-swimlane';
         return `
-            <div class="${swimlaneClass}" data-group-key="${escapeHtml(key || '__ungrouped')}">
-                <div class="kanban-swimlane-label">${escapeHtml(label)} <span class="kanban-swimlane-count">(${tasks.length})</span></div>
+            <div class="${swimlaneClass}${isCollapsed ? ' kanban-swimlane-collapsed' : ''}" data-group-key="${escapeHtml(groupKey)}">
+                <div class="kanban-swimlane-label">
+                    <button class="kanban-swimlane-collapse">${isCollapsed ? '&#9654;' : '&#9660;'}</button>
+                    ${escapeHtml(label)} <span class="kanban-swimlane-count">(${tasks.length})</span>
+                </div>
                 <div class="kanban-board">${columnsHtml}</div>
             </div>
         `;
@@ -543,6 +550,28 @@ const KanbanView = {
     },
 
     attachEventListeners(container) {
+        // Swimlane collapse toggle
+        container.querySelectorAll('.kanban-swimlane-label').forEach(label => {
+            label.addEventListener('click', (e) => {
+                const swimlane = label.closest('.kanban-swimlane');
+                if (!swimlane) return;
+                const key = swimlane.dataset.groupKey;
+                const board = swimlane.querySelector('.kanban-board');
+                const btn = label.querySelector('.kanban-swimlane-collapse');
+                const isCollapsed = this.collapsedGroups.get(key) || false;
+                this.collapsedGroups.set(key, !isCollapsed);
+                if (isCollapsed) {
+                    swimlane.classList.remove('kanban-swimlane-collapsed');
+                    if (board) board.style.display = '';
+                    if (btn) btn.innerHTML = '&#9660;';
+                } else {
+                    swimlane.classList.add('kanban-swimlane-collapsed');
+                    if (board) board.style.display = 'none';
+                    if (btn) btn.innerHTML = '&#9654;';
+                }
+            });
+        });
+
         const cards = container.querySelectorAll('.kanban-card');
         const columns = container.querySelectorAll('.kanban-column .blocks');
         const isMobile = window.innerWidth <= 768;

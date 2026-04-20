@@ -2108,7 +2108,6 @@ const DocumentView = {
 
             if (block.isCollapsible && !selectionInsideBlock) {
                 const startLine = state.doc.lineAt(block.from);
-                const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
 
                 builder.push(Decoration.replace({
                     widget: new widgets.FencedBlockWidget(block),
@@ -2121,16 +2120,8 @@ const DocumentView = {
                     }
                 }).range(startLine.from));
 
-                // Replace interior lines (including closing ```) with nothing.
-                // Decoration.replace() updates CM's height map so the gutter
-                // collapses in sync with the content.
-                if (endLine.number > startLine.number) {
-                    const interiorFrom = state.doc.line(startLine.number + 1).from;
-                    const interiorTo = endLine.number < state.doc.lines
-                        ? state.doc.line(endLine.number + 1).from
-                        : endLine.to;
-                    builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
-                }
+                // Interior collapse handled by createFencedBlockCollapseExtension (StateField)
+                // — ViewPlugin decorations cannot span line breaks.
             } else if (!selectionInsideBlock) {
                 builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
             }
@@ -2261,6 +2252,57 @@ const DocumentView = {
             update(deco, tr) {
                 if (tr.docChanged || tr.selection) {
                     return self.buildHiddenLineDecorations(tr.state);
+                }
+                return deco.map(tr.changes);
+            },
+            provide: f => EditorView.decorations.from(f)
+        });
+    },
+
+    /**
+     * Build cross-line Decoration.replace() ranges for fenced block interiors.
+     * Called from a StateField (NOT a ViewPlugin) so it CAN span line breaks.
+     */
+    buildFencedBlockInteriorDecorations(state) {
+        const { Decoration } = window.CodeMirror;
+        const fencedBlocks = this.getFencedBlocks(state.doc.toString());
+        const builder = [];
+
+        for (const block of fencedBlocks) {
+            if (!block.isCollapsible) continue;
+            if (this.isSelectionInsideBlock(state, block)) continue;
+
+            const startLine = state.doc.lineAt(block.from);
+            const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
+
+            if (endLine.number > startLine.number) {
+                const interiorFrom = state.doc.line(startLine.number + 1).from;
+                const interiorTo = endLine.number < state.doc.lines
+                    ? state.doc.line(endLine.number + 1).from
+                    : endLine.to;
+                builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
+            }
+        }
+
+        return builder.length > 0 ? Decoration.set(builder, true) : Decoration.none;
+    },
+
+    /**
+     * Create a StateField extension for fenced block interior collapse.
+     * StateField-based decorations CAN span line breaks (unlike ViewPlugin
+     * decorations), so the collapsed interior is properly removed from
+     * CM's height map. Summary-line decorations remain in the ViewPlugin.
+     */
+    createFencedBlockCollapseExtension() {
+        const { StateField, EditorView } = window.CodeMirror;
+        const self = this;
+        return StateField.define({
+            create(state) {
+                return self.buildFencedBlockInteriorDecorations(state);
+            },
+            update(deco, tr) {
+                if (tr.docChanged || tr.selection) {
+                    return self.buildFencedBlockInteriorDecorations(tr.state);
                 }
                 return deco.map(tr.changes);
             },
@@ -2499,6 +2541,7 @@ const DocumentView = {
                 EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }, { autocomplete: wikilinkCompletionSource }]),
                 EditorView.lineWrapping,
                 this.createHiddenLineExtension(),
+                this.createFencedBlockCollapseExtension(),
                 this.createLivePreviewPlugin(),
                 this.createIndentFolding(),
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),

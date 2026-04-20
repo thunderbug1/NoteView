@@ -117,7 +117,7 @@ const GitStore = {
                 parents: c.commit.parent
             }));
         } catch (err) {
-            console.error('Failed to get full history:', err);
+            console.warn('Failed to get full history:', err);
             return [];
         }
     },

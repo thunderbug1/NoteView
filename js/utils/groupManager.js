@@ -116,7 +116,7 @@ const GroupManager = {
 
         const modal = Modal.create({
             title: 'Group by Tag Group',
-            modalClass: 'group-modal',
+            modalClass: 'tag-modal group-modal',
             content: html
         });
 

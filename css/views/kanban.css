@@ -318,3 +318,18 @@
 .kanban-swimlane .kanban-board {
     border-top: none;
 }
+
+.kanban-swimlane-label {
+    cursor: pointer;
+}
+
+.kanban-swimlane-collapse {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.65rem;
+    padding: 0;
+    margin-right: 0.3rem;
+    vertical-align: middle;
+}
