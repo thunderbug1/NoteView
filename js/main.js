@@ -988,6 +988,8 @@ const App = {
         URL.revokeObjectURL(url);
     },
 
+    _micSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
+
     handleAIMicClick(modalBlockId, btn) {
         if (!DocumentView.isSpeechRecognitionSupported()) return;
 
@@ -1002,7 +1004,7 @@ const App = {
         if (!btn) return;
         btn.classList.remove('ai-recording', 'ai-processing', 'ai-error');
 
-        const micSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
+        const micSvg = this._micSvg;
 
         switch (state) {
             case 'idle':
@@ -1082,6 +1084,7 @@ const App = {
             if (this._aiDictationActive && !this._isStoppingAIDictation) {
                 try { this._aiRecognition.start(); } catch(e) {}
             } else {
+                this._isStoppingAIDictation = false;
                 this._cleanupAIDictation(modalBlockId);
             }
         };
@@ -1108,8 +1111,6 @@ const App = {
             this._cleanupAIDictation(modalBlockId);
             Common.showToast('No speech detected.');
         }
-
-        setTimeout(() => { this._isStoppingAIDictation = false; }, 500);
     },
 
     _cleanupAIDictation(modalBlockId) {
@@ -1243,7 +1244,7 @@ const App = {
                 modal.querySelectorAll('[data-id="' + modalBlockId + '"]').forEach(el => {
                     el.dataset.id = createdBlockId;
                 });
-                
+
                 // CRITICAL: Update AI dictation target if it's currently recording
                 if (this._aiDictationBlockId === modalBlockId) {
                     this._aiDictationBlockId = createdBlockId;
@@ -1272,6 +1273,9 @@ const App = {
                         }
                     });
                 }
+            } catch (err) {
+                console.error('Failed to create note:', err);
+                Common.showToast('Failed to create note: ' + (err.message || 'Unknown error'));
             } finally {
                 isCreating = false;
             }
@@ -1292,10 +1296,13 @@ const App = {
                     Store.blocks[existingIdx] = tempBlock;
                 }
                 DocumentView.pendingNewTags = [...modalTags];
-                TagModal.show(tempId);
+                TagModal.show(tempId, {
+                    onClose: () => syncTagsFromPending()
+                });
             }
         };
 
+        const micSvg = this._micSvg;
         const content = `
             <div class="block block-creation-actions" style="margin-bottom: 0.75rem;">
                 <button class="creation-btn" data-action="type" data-id="${modalBlockId}" title="Start typing">
@@ -1303,11 +1310,11 @@ const App = {
                 </button>
                 ${DocumentView.isSpeechRecognitionSupported() ? `
                 <button class="creation-btn mic-btn" data-action="dictate" data-id="${modalBlockId}" title="Dictate text">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> Dictate
+                    ${micSvg} Dictate
                 </button>
                 ${AIAssistant.isConfigured() ? `
                 <button class="creation-btn ai-mic-btn" data-action="ai-dictate" data-id="${modalBlockId}" title="Dictate to AI">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg> AI ✨
+                    ${micSvg} AI ✨
                 </button>` : ''}
                 ` : ''}
                 <button class="creation-btn" data-action="task" data-id="${modalBlockId}" title="Add a task">
@@ -1349,38 +1356,28 @@ const App = {
             btn.addEventListener('click', () => openTagModal());
         });
 
-        // Auto-save: combined tag sync + content auto-create
-        let lastContent = '';
-        const autoSaveInterval = setInterval(() => {
-            // --- Tag sync ---
-            if (!createdBlockId && DocumentView.pendingNewTags && DocumentView.pendingNewTags.length >= 0) {
+        // Tag sync: called when tag modal closes instead of polling
+        const syncTagsFromPending = () => {
+            if (!createdBlockId && DocumentView.pendingNewTags) {
                 const pending = DocumentView.pendingNewTags;
                 if (JSON.stringify(pending) !== JSON.stringify(modalTags)) {
                     modalTags = [...pending];
                     renderModalTags();
                 }
             }
-            // Clean up temp block once tag modal is gone
-            Store.blocks = Store.blocks.filter(b => b.id === 'new');
+            Store.blocks = Store.blocks.filter(b => b.id !== 'new');
+        };
 
-            // --- Content auto-create ---
-            if (!createdBlockId) {
-                const editor = DocumentView.editors.get(modalBlockId);
-                if (editor) {
-                    const content = editor.state.doc.toString();
-                    if (content.trim() && content !== lastContent) {
-                        lastContent = content;
-                        promoteModalBlock(content);
-                    }
-                }
+        // Content auto-create: triggered by CM6 update listener (set up after editor creation)
+        const onEditorContentChanged = (content) => {
+            if (!createdBlockId && content.trim()) {
+                promoteModalBlock(content);
             }
-        }, 300);
+        };
 
-        // Clean up interval when modal overlay is removed
+        // Clean up on close
         const origClose = modal.close.bind(modal);
         modal.close = () => {
-            clearInterval(autoSaveInterval);
-            // Clean up any temp block
             Store.blocks = Store.blocks.filter(b => b.id !== 'new');
             origClose();
             App.render();
@@ -1427,11 +1424,18 @@ const App = {
         const cmContainer = modal.querySelector('.codemirror-container');
 
         DocumentView.waitForCodeMirror().then(() => {
-            DocumentView.createEditor(cmContainer, modalBlockId, '');
-            setTimeout(() => {
-                const editor = DocumentView.editors.get(modalBlockId);
-                if (editor) editor.focus();
-            }, 100);
+            const { EditorView } = window.CodeMirror;
+
+            DocumentView.createEditor(cmContainer, modalBlockId, '', [
+                EditorView.updateListener.of((update) => {
+                    if (update.docChanged) {
+                        onEditorContentChanged(update.state.doc.toString());
+                    }
+                })
+            ]);
+
+            const editor = DocumentView.editors.get(modalBlockId);
+            if (editor) editor.focus();
         });
 
         // Ctrl+Enter closes the modal (block is already auto-saved)

@@ -2383,7 +2383,7 @@ const DocumentView = {
     /**
      * Create a CodeMirror editor instance for a block.
      */
-    createEditor(container, blockId, initialContent) {
+    createEditor(container, blockId, initialContent, extraExtensions = []) {
         if (!window.CodeMirror) {
             console.error('CodeMirror not loaded');
             return;
@@ -2429,7 +2429,8 @@ const DocumentView = {
                             }, 150);
                         }
                     }
-                })
+                }),
+                ...extraExtensions
             ],
             parent: container
         });
