@@ -659,7 +659,7 @@ const TimelineView = {
         group.classList.remove('tl-date-collapsed');
     },
 
-    async render(blocks) {
+    async render(blocks, options = {}) {
         const container = document.getElementById('viewContainer');
         container.className = 'timeline-view';
         container.innerHTML = `
@@ -688,6 +688,8 @@ const TimelineView = {
             return;
         }
 
+        const { groupBy } = options;
+
         let html = '<div class="tl-container"><div class="tl-line"></div>';
 
         for (const [dateStr, events] of grouped) {
@@ -701,7 +703,13 @@ const TimelineView = {
                 <span class="tl-date-count">${events.length}</span>
             </div>`;
             html += `<div class="tl-date-events" ${isCollapsed ? 'style="display:none"' : ''}>`;
-            html += events.map(e => this.renderEvent(e)).join('');
+
+            if (groupBy) {
+                html += this.renderTagSubGroups(events, groupBy);
+            } else {
+                html += events.map(e => this.renderEvent(e)).join('');
+            }
+
             html += `</div></div>`;
         }
 
@@ -740,8 +748,48 @@ const TimelineView = {
         document.getElementById('tlRefreshBtn')?.addEventListener('click', () => {
             this.invalidateRawDataCache();
             this.invalidateCache();
-            this.render(blocks);
+            this.render(blocks, options);
         });
+    },
+
+    renderTagSubGroups(events, namespace) {
+        const groupEvents = new Map();
+        const ungroupedEvents = [];
+
+        for (const event of events) {
+            const tags = event.tags || [];
+            let assigned = false;
+            for (const tag of tags) {
+                const { segments, leaf } = Common.parseHierarchicalTag(tag);
+                if (segments.length > 0 && segments[0] === namespace) {
+                    const key = leaf;
+                    if (!groupEvents.has(key)) groupEvents.set(key, []);
+                    groupEvents.get(key).push(event);
+                    assigned = true;
+                    break;
+                }
+            }
+            if (!assigned) ungroupedEvents.push(event);
+        }
+
+        const sortedGroups = new Map([...groupEvents.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+
+        let html = '';
+        for (const [key, groupEventList] of sortedGroups) {
+            html += `<div class="tl-tag-group">`;
+            html += `<div class="tl-tag-group-header">${escapeHtml(Common.capitalizeFirst(key))}</div>`;
+            html += groupEventList.map(e => this.renderEvent(e)).join('');
+            html += `</div>`;
+        }
+
+        if (ungroupedEvents.length > 0) {
+            html += `<div class="tl-tag-group tl-tag-group-ungrouped">`;
+            html += `<div class="tl-tag-group-header">Other</div>`;
+            html += ungroupedEvents.map(e => this.renderEvent(e)).join('');
+            html += `</div>`;
+        }
+
+        return html;
     },
 
     async openDiffModal(blockId, filename, oid, parentsRaw) {

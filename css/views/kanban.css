@@ -282,3 +282,39 @@
         opacity: 1;
     }
 }
+
+/* --- Kanban Swimlanes (Grouped View) --- */
+
+.kanban-swimlane {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.kanban-swimlane-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--accent);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg-primary);
+}
+
+.kanban-swimlane-ungrouped .kanban-swimlane-label {
+    border-left-color: var(--border);
+}
+
+.kanban-swimlane-count {
+    color: var(--text-secondary);
+    font-weight: 400;
+    font-size: 0.7rem;
+}
+
+.kanban-swimlane .kanban-board {
+    border-top: none;
+}

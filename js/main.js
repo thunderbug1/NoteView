@@ -501,6 +501,8 @@ const App = {
 
         SortManager.initToolbar(() => this.render());
         SortManager.updateToolbar();
+        GroupManager.initToolbar(() => this.render());
+        GroupManager.updateToolbar();
 
         // Toolbar AI button
         const toolbarAiBtn = document.getElementById('toolbarAiBtn');
@@ -669,6 +671,7 @@ const App = {
         const view = Store.currentView;
 
         SortManager.updateToolbar();
+        GroupManager.updateToolbar();
 
         // Update toolbar AI button state
         const toolbarAiBtn = document.getElementById('toolbarAiBtn');
@@ -678,15 +681,17 @@ const App = {
             toolbarAiBtn.hidden = view === 'settings' || !aiReady;
         }
 
+        const groupBy = GroupManager.getGroupBy(view);
+
         switch (view) {
             case 'document':
-                DocumentView.render(blocks);
+                DocumentView.render(blocks, { groupBy });
                 break;
             case 'timeline':
-                TimelineView.render(blocks);
+                TimelineView.render(blocks, { groupBy });
                 break;
             case 'kanban':
-                KanbanView.render(blocks);
+                KanbanView.render(blocks, { groupBy });
                 break;
             case 'settings':
                 SettingsView.render(blocks);

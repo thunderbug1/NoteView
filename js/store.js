@@ -479,7 +479,8 @@ const Store = {
                         { field: 'lastUpdated', direction: 'desc' },
                         { field: 'id', direction: 'asc' }
                     ]
-                }
+                },
+                groupBy: null
             },
             kanban: {
                 sort: {
@@ -488,7 +489,11 @@ const Store = {
                         { field: 'deadline', direction: 'asc' },
                         { field: 'sourceOrder', direction: 'asc' }
                     ]
-                }
+                },
+                groupBy: null
+            },
+            timeline: {
+                groupBy: null
             }
         };
     },

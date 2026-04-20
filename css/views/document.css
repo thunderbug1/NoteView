@@ -1184,3 +1184,68 @@
         margin-left: -0.25rem;
     }
 }
+
+/* --- Document Group Sections --- */
+
+.doc-group {
+    border-left: 3px solid var(--accent);
+    margin-bottom: 1.5rem;
+    padding-left: 0.5rem;
+}
+
+.doc-group-ungrouped {
+    border-left-color: var(--border);
+}
+
+.doc-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg-primary);
+}
+
+.doc-group-header:hover {
+    background: var(--bg-secondary);
+}
+
+.doc-group-collapse {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.3rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.doc-group-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.doc-group-count {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+
+.doc-group-collapsed .doc-group-blocks {
+    display: none;
+}
+
+.doc-group-blocks {
+    padding-top: 0.25rem;
+}

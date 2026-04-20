@@ -53,7 +53,7 @@ const KanbanView = {
         return hierarchy;
     },
 
-    render(blocks) {
+    render(blocks, options = {}) {
         const container = document.getElementById('viewContainer');
         container.className = 'kanban-view';
 
@@ -66,13 +66,25 @@ const KanbanView = {
         // Apply sidebar filters
         const tasks = this.applyTaskFilters(allTasks);
 
+        const { groupBy } = options;
+
+        if (groupBy) {
+            const blockMap = new Map(blocks.map(b => [b.id, b]));
+            this.renderGroupedKanban(container, tasks, fullHierarchy, allTasksById, groupBy, blockMap);
+        } else {
+            this.renderFlatKanban(container, tasks, fullHierarchy, allTasksById);
+        }
+
+        this.attachEventListeners(container);
+    },
+
+    renderFlatKanban(container, tasks, fullHierarchy, allTasksById) {
         let html = '';
         this.columns.forEach(col => {
             const colTasks = tasks.filter(t => t.state === col.state);
             const colTaskIds = new Set(colTasks.map(t => t.id));
             const tasksById = new Map(colTasks.map(t => [t.id, t]));
 
-            // Detect orphaned tasks: parent exists in same column but was filtered out
             const orphanedIds = new Set();
             for (const task of colTasks) {
                 const entry = fullHierarchy.get(task.id);
@@ -102,7 +114,89 @@ const KanbanView = {
         });
 
         container.innerHTML = `<div class="kanban-board">${html}</div>`;
-        this.attachEventListeners(container);
+    },
+
+    renderGroupedKanban(container, tasks, fullHierarchy, allTasksById, namespace, blockMap) {
+        // Group tasks by tag namespace via their source block
+        const groupTasks = new Map();
+        const ungroupedTasks = [];
+
+        for (const task of tasks) {
+            const block = blockMap.get(task.blockId);
+            if (!block) { ungroupedTasks.push(task); continue; }
+
+            const tags = block.tags || [];
+            let assigned = false;
+            for (const tag of tags) {
+                const { segments, leaf } = Common.parseHierarchicalTag(tag);
+                if (segments.length > 0 && segments[0] === namespace) {
+                    const key = leaf;
+                    if (!groupTasks.has(key)) groupTasks.set(key, []);
+                    groupTasks.get(key).push(task);
+                    assigned = true;
+                    break;
+                }
+            }
+            if (!assigned) ungroupedTasks.push(task);
+        }
+
+        const sortedGroups = new Map([...groupTasks.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+
+        let html = '';
+        for (const [key, groupTaskList] of sortedGroups) {
+            html += this.renderSwimlane(key, groupTaskList, fullHierarchy, allTasksById, namespace, false);
+        }
+        if (ungroupedTasks.length > 0) {
+            html += this.renderSwimlane(null, ungroupedTasks, fullHierarchy, allTasksById, namespace, true);
+        }
+
+        container.innerHTML = html;
+    },
+
+    renderSwimlane(key, tasks, fullHierarchy, allTasksById, namespace, isUngrouped) {
+        const label = isUngrouped ? 'Other' : `${Common.capitalizeFirst(namespace)} / ${Common.capitalizeFirst(key)}`;
+        let columnsHtml = '';
+
+        this.columns.forEach(col => {
+            const colTasks = tasks.filter(t => t.state === col.state);
+            const colTaskIds = new Set(colTasks.map(t => t.id));
+            const tasksById = new Map(colTasks.map(t => [t.id, t]));
+
+            const orphanedIds = new Set();
+            for (const task of colTasks) {
+                const entry = fullHierarchy.get(task.id);
+                if (entry?.parentId) {
+                    const parentTask = allTasksById.get(entry.parentId);
+                    if (parentTask && parentTask.state === col.state && !colTaskIds.has(entry.parentId)) {
+                        orphanedIds.add(task.id);
+                    }
+                }
+            }
+
+            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds);
+
+            columnsHtml += `
+                <div class="kanban-column" data-column-id="${col.id}">
+                    <div class="kanban-column-header">
+                        <h4>${col.label} <span class="count">(${colTasks.length})</span></h4>
+                        <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </button>
+                    </div>
+                    <div class="blocks">
+                        ${colHtml}
+                    </div>
+                </div>
+            `;
+        });
+
+        const swimlaneClass = isUngrouped ? 'kanban-swimlane kanban-swimlane-ungrouped' : 'kanban-swimlane';
+        return `
+            <div class="${swimlaneClass}" data-group-key="${escapeHtml(key || '__ungrouped')}">
+                <div class="kanban-swimlane-label">${escapeHtml(label)} <span class="kanban-swimlane-count">(${tasks.length})</span></div>
+                <div class="kanban-board">${columnsHtml}</div>
+            </div>
+        `;
     },
 
     /**

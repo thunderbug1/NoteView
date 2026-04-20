@@ -468,3 +468,23 @@
         bottom: 5rem;
     }
 }
+
+/* --- Timeline Tag Sub-Groups --- */
+
+.tl-tag-group {
+    margin-bottom: 0.5rem;
+}
+
+.tl-tag-group-header {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    padding: 0.25rem 0 0.25rem 1.5rem;
+    border-left: 2px solid var(--accent);
+    margin-left: 0.75rem;
+}
+
+.tl-tag-group-ungrouped .tl-tag-group-header {
+    border-left-color: var(--border);
+}

@@ -1163,3 +1163,42 @@
 .icon-btn svg {
     pointer-events: none;
 }
+
+/* --- Group Menu --- */
+
+.group-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.group-menu-item {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.group-menu-item:hover {
+    background: var(--bg-hover);
+}
+
+.group-menu-active {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.group-menu-empty {
+    padding: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-align: center;
+}

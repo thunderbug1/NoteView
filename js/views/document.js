@@ -15,6 +15,8 @@ const DocumentView = {
     originalContents: new Map(), // blockId -> original content for change detection
     // Track which blocks are collapsed by block ID
     collapsedBlocks: new Map(),
+    // Track which groups are collapsed by group key
+    collapsedGroups: new Map(),
     fencedBlockThresholds: {
         lines: 12,
         chars: 800,
@@ -44,7 +46,7 @@ const DocumentView = {
         return this._taskMenus;
     },
 
-    async render(blocks) {
+    async render(blocks, options = {}) {
         // Stop any active speech recognition before re-rendering
         if (this._recordingBlockId) {
             this.stopSpeechRecognition();
@@ -67,20 +69,17 @@ const DocumentView = {
         // Save scroll anchor before DOM rebuild
         const scrollAnchor = this._saveScrollAnchor();
 
-        // Build HTML for blocks - use div containers for CodeMirror
-        container.innerHTML = sorted.map(block => `
-            <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${block.id}">
-                ${this.renderCollapseButton(block)}
-                <div class="block-split-marker" data-id="${block.id}" title="Split note here">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
-                </div>
-                ${this.renderBlockMetadata(block)}
-                <div class="block-editor">
-                    <div class="codemirror-container" data-id="${block.id}">${escapeHtml(block.content || '')}</div>
-                    <span class="save-indicator" data-id="${block.id}">saved</span>
-                </div>
-            </article>
-        `).join('') + `
+        const { groupBy } = options;
+        let html;
+
+        if (groupBy) {
+            const grouped = GroupManager.groupByNamespace(sorted, groupBy);
+            html = this.renderGroupedBlocks(grouped, groupBy);
+        } else {
+            html = this.renderFlatBlocks(sorted);
+        }
+
+        html += `
             <article class="block empty" data-id="new">
                 <div class="block-tags">
                     ${this.getSelectedContextBadge()}
@@ -90,6 +89,8 @@ const DocumentView = {
                 </div>
             </article>
         `;
+
+        container.innerHTML = html;
 
         // Remove old event delegation listener if exists
         if (this._deleteHandler) {
@@ -131,6 +132,13 @@ const DocumentView = {
         this._collapseHandler = this.handleCollapseClick.bind(this);
         container.addEventListener('click', this._collapseHandler);
 
+        // Add event delegation for group collapse
+        if (this._groupCollapseHandler) {
+            container.removeEventListener('click', this._groupCollapseHandler);
+        }
+        this._groupCollapseHandler = this.handleGroupCollapseClick.bind(this);
+        container.addEventListener('click', this._groupCollapseHandler);
+
         this.attachEventListeners();
 
         // Restore collapsed state after DOM rebuild
@@ -150,6 +158,61 @@ const DocumentView = {
             return;
         }
         container.style.overflowY = container.scrollHeight <= container.clientHeight ? 'hidden' : '';
+    },
+
+    renderFlatBlocks(blocks) {
+        return blocks.map(block => this.renderBlockHtml(block)).join('');
+    },
+
+    renderGroupedBlocks(grouped, namespace) {
+        let html = '';
+        const collapsed = this.collapsedGroups;
+
+        for (const [key, groupBlocks] of grouped.groups) {
+            if (groupBlocks.length === 0) continue;
+            const isCollapsed = collapsed.get(`${namespace}.${key}`) || false;
+            const label = `${Common.capitalizeFirst(namespace)} / ${Common.capitalizeFirst(key)}`;
+            html += `<div class="doc-group${isCollapsed ? ' doc-group-collapsed' : ''}" data-group="${escapeHtml(namespace)}" data-group-key="${escapeHtml(key)}">`;
+            html += `<div class="doc-group-header">`;
+            html += `<button class="doc-group-collapse">${isCollapsed ? '&#9654;' : '&#9660;'}</button>`;
+            html += `<h3 class="doc-group-title">${escapeHtml(label)}</h3>`;
+            html += `<span class="doc-group-count">${groupBlocks.length} note${groupBlocks.length !== 1 ? 's' : ''}</span>`;
+            html += `</div>`;
+            html += `<div class="doc-group-blocks">`;
+            html += groupBlocks.map(block => this.renderBlockHtml(block)).join('');
+            html += `</div></div>`;
+        }
+
+        if (grouped.ungrouped.length > 0) {
+            const isCollapsed = collapsed.get(`${namespace}.__ungrouped`) || false;
+            html += `<div class="doc-group doc-group-ungrouped${isCollapsed ? ' doc-group-collapsed' : ''}">`;
+            html += `<div class="doc-group-header">`;
+            html += `<button class="doc-group-collapse">${isCollapsed ? '&#9654;' : '&#9660;'}</button>`;
+            html += `<h3 class="doc-group-title">Other</h3>`;
+            html += `<span class="doc-group-count">${grouped.ungrouped.length} note${grouped.ungrouped.length !== 1 ? 's' : ''}</span>`;
+            html += `</div>`;
+            html += `<div class="doc-group-blocks">`;
+            html += grouped.ungrouped.map(block => this.renderBlockHtml(block)).join('');
+            html += `</div></div>`;
+        }
+
+        return html;
+    },
+
+    renderBlockHtml(block) {
+        return `
+            <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${block.id}">
+                ${this.renderCollapseButton(block)}
+                <div class="block-split-marker" data-id="${block.id}" title="Split note here">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
+                </div>
+                ${this.renderBlockMetadata(block)}
+                <div class="block-editor">
+                    <div class="codemirror-container" data-id="${block.id}">${escapeHtml(block.content || '')}</div>
+                    <span class="save-indicator" data-id="${block.id}">saved</span>
+                </div>
+            </article>
+        `;
     },
 
     _saveScrollAnchor() {
@@ -714,6 +777,36 @@ const DocumentView = {
                 }
             }
             return;
+        }
+    },
+
+    handleGroupCollapseClick(e) {
+        const header = e.target.closest('.doc-group-header');
+        if (!header) return;
+
+        const group = header.closest('.doc-group');
+        if (!group) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const namespace = group.dataset.group;
+        const key = group.dataset.groupKey;
+        const groupKey = key ? `${namespace}.${key}` : `${namespace}.__ungrouped`;
+
+        const isCollapsed = this.collapsedGroups.get(groupKey) || false;
+        this.collapsedGroups.set(groupKey, !isCollapsed);
+
+        const blocks = group.querySelector('.doc-group-blocks');
+        const btn = group.querySelector('.doc-group-collapse');
+        if (isCollapsed) {
+            group.classList.remove('doc-group-collapsed');
+            if (blocks) blocks.style.display = '';
+            if (btn) btn.innerHTML = '&#9660;';
+        } else {
+            group.classList.add('doc-group-collapsed');
+            if (blocks) blocks.style.display = 'none';
+            if (btn) btn.innerHTML = '&#9654;';
         }
     },
 
