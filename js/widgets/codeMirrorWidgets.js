@@ -366,6 +366,68 @@ function createCodeMirrorWidgets(documentView) {
         ignoreEvent() { return true; }
     }
 
+    class TableWidget extends WidgetType {
+        constructor(table) {
+            super();
+            this.table = table;
+        }
+        eq(other) {
+            return other.table.from === this.table.from
+                && other.table.to === this.table.to
+                && other.table.rawText === this.table.rawText;
+        }
+        toDOM(view) {
+            const wrap = document.createElement('div');
+            wrap.className = 'md-table-preview';
+
+            const table = document.createElement('table');
+            table.className = 'md-gfm-table';
+
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            this.table.headers.forEach((cell, i) => {
+                const th = document.createElement('th');
+                th.textContent = cell;
+                if (this.table.alignments[i] && this.table.alignments[i] !== 'left') {
+                    th.style.textAlign = this.table.alignments[i];
+                }
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            this.table.rows.forEach(row => {
+                const tr = document.createElement('tr');
+                row.forEach((cell, i) => {
+                    const td = document.createElement('td');
+                    td.textContent = cell;
+                    if (this.table.alignments[i] && this.table.alignments[i] !== 'left') {
+                        td.style.textAlign = this.table.alignments[i];
+                    }
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+
+            wrap.appendChild(table);
+
+            wrap.onmousedown = (e) => e.stopPropagation();
+            wrap.onclick = (e) => {
+                e.stopPropagation();
+                view.dispatch({
+                    selection: { anchor: this.table.from },
+                    scrollIntoView: true
+                });
+                view.focus();
+            };
+
+            return wrap;
+        }
+        ignoreEvent() { return true; }
+    }
+
     class AddDeadlineWidget extends WidgetType {
         constructor(from, to) {
             super();
@@ -474,6 +536,7 @@ function createCodeMirrorWidgets(documentView) {
         LinkWidget,
         WikilinkWidget,
         FencedBlockWidget,
+        TableWidget,
         AddDeadlineWidget,
         AddAssigneeWidget,
         AddPriorityWidget

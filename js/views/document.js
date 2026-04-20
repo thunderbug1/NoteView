@@ -1596,6 +1596,114 @@ const DocumentView = {
         return fencedBlocks;
     },
 
+    getTables(text, fencedBlocks) {
+        const tables = [];
+        const lines = text.split('\n');
+
+        // Build set of line ranges occupied by fenced blocks to skip them
+        const fencedRanges = [];
+        if (fencedBlocks) {
+            let offset = 0;
+            for (let i = 0; i < lines.length; i++) {
+                for (const fb of fencedBlocks) {
+                    if (offset >= fb.from && offset < fb.to) {
+                        fencedRanges.push(i);
+                        break;
+                    }
+                }
+                offset += lines[i].length + 1;
+            }
+        }
+        const fencedLineSet = new Set(fencedRanges);
+
+        const isTableRow = (line) => line.trim().length > 0 && line.includes('|');
+        const parseRow = (line) => {
+            let trimmed = line.trim();
+            if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+            if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
+            return trimmed.split('|').map(cell => cell.trim());
+        };
+        const isSeparator = (line) => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('|')) {
+                if (!trimmed.endsWith('|')) return false;
+                const inner = trimmed.slice(1, -1).trim();
+                return inner.split('|').every(cell => /^:?-+:?$/.test(cell.trim()));
+            }
+            return /^\s*:?-+:?\s*(\|\s*:?-+:?\s*)+$/.test(trimmed) || /^:?-+:?$/.test(trimmed.trim());
+        };
+        const parseAlignments = (line) => {
+            let trimmed = line.trim();
+            if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+            if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
+            return trimmed.split('|').map(cell => {
+                const c = cell.trim();
+                if (c.startsWith(':') && c.endsWith(':')) return 'center';
+                if (c.endsWith(':')) return 'right';
+                return 'left';
+            });
+        };
+
+        let i = 0;
+        while (i < lines.length - 1) {
+            if (fencedLineSet.has(i)) { i++; continue; }
+
+            if (isTableRow(lines[i]) && isSeparator(lines[i + 1])) {
+                const headers = parseRow(lines[i]);
+                const alignments = parseAlignments(lines[i + 1]);
+                const colCount = headers.length;
+                const bodyRows = [];
+                let j = i + 2;
+
+                while (j < lines.length && isTableRow(lines[j]) && !fencedLineSet.has(j)) {
+                    const row = parseRow(lines[j]);
+                    // Pad or truncate to match header column count
+                    while (row.length < colCount) row.push('');
+                    if (row.length > colCount) row.length = colCount;
+                    bodyRows.push(row);
+                    j++;
+                }
+
+                // Calculate character offsets
+                let from = 0;
+                for (let k = 0; k < i; k++) from += lines[k].length + 1;
+                let to = from;
+                for (let k = i; k < j; k++) to += lines[k].length + 1;
+
+                // Remove trailing newline from to if present
+                if (to > 0 && text[to - 1] === '\n') to--;
+
+                tables.push({
+                    from,
+                    to: Math.min(to, text.length),
+                    headers,
+                    alignments,
+                    rows: bodyRows,
+                    rawText: lines.slice(i, j).join('\n')
+                });
+
+                i = j;
+            } else {
+                i++;
+            }
+        }
+
+        return tables;
+    },
+
+    buildTableLineSet(doc, tables) {
+        const blockedLines = new Set();
+        for (const table of tables) {
+            const startLine = doc.lineAt(table.from).number;
+            const endPosition = Math.max(table.from, table.to - 1);
+            const endLine = doc.lineAt(endPosition).number;
+            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
+                blockedLines.add(lineNumber);
+            }
+        }
+        return blockedLines;
+    },
+
     buildFencedBlockLineSet(doc, fencedBlocks) {
         const blockedLines = new Set();
 
@@ -2093,6 +2201,8 @@ const DocumentView = {
         const builder = [];
         const fencedBlocks = this.getFencedBlocks(state.doc.toString());
         const fencedBlockLines = this.buildFencedBlockLineSet(state.doc, fencedBlocks);
+        const tables = this.getTables(state.doc.toString(), fencedBlocks);
+        const tableLines = this.buildTableLineSet(state.doc, tables);
 
         // Get lines containing cursors ONLY if editor is focused
         const cursorLines = new Set();
@@ -2124,6 +2234,25 @@ const DocumentView = {
                 // — ViewPlugin decorations cannot span line breaks.
             } else if (!selectionInsideBlock) {
                 builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
+            }
+        }
+
+        for (const table of tables) {
+            const selectionInsideTable = hasFocus && this.isSelectionInsideBlock(state, table);
+
+            if (!selectionInsideTable) {
+                const startLine = state.doc.lineAt(table.from);
+
+                builder.push(Decoration.replace({
+                    widget: new widgets.TableWidget(table),
+                    inclusive: false
+                }).range(startLine.from, startLine.to));
+
+                builder.push(Decoration.line({
+                    attributes: { class: 'md-table-summary-line' }
+                }).range(startLine.from));
+            } else {
+                builder.push(Decoration.mark({ class: 'md-table-source' }).range(table.from, table.to));
             }
         }
 
@@ -2161,6 +2290,7 @@ const DocumentView = {
         // lines and detect orphaned tasks.
         for (let i = 1; i <= state.doc.lines; i++) {
             if (fencedBlockLines.has(i)) continue;
+            if (tableLines.has(i)) continue;
 
             const line = state.doc.line(i);
 
@@ -2303,6 +2433,47 @@ const DocumentView = {
             update(deco, tr) {
                 if (tr.docChanged || tr.selection) {
                     return self.buildFencedBlockInteriorDecorations(tr.state);
+                }
+                return deco.map(tr.changes);
+            },
+            provide: f => EditorView.decorations.from(f)
+        });
+    },
+
+    buildTableInteriorDecorations(state) {
+        const { Decoration } = window.CodeMirror;
+        const fencedBlocks = this.getFencedBlocks(state.doc.toString());
+        const tables = this.getTables(state.doc.toString(), fencedBlocks);
+        const builder = [];
+
+        for (const table of tables) {
+            if (this.isSelectionInsideBlock(state, table)) continue;
+
+            const startLine = state.doc.lineAt(table.from);
+            const endLine = state.doc.lineAt(Math.max(table.from, table.to - 1));
+
+            if (endLine.number > startLine.number) {
+                const interiorFrom = state.doc.line(startLine.number + 1).from;
+                const interiorTo = endLine.number < state.doc.lines
+                    ? state.doc.line(endLine.number + 1).from
+                    : endLine.to;
+                builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
+            }
+        }
+
+        return builder.length > 0 ? Decoration.set(builder, true) : Decoration.none;
+    },
+
+    createTableCollapseExtension() {
+        const { StateField, EditorView } = window.CodeMirror;
+        const self = this;
+        return StateField.define({
+            create(state) {
+                return self.buildTableInteriorDecorations(state);
+            },
+            update(deco, tr) {
+                if (tr.docChanged || tr.selection) {
+                    return self.buildTableInteriorDecorations(tr.state);
                 }
                 return deco.map(tr.changes);
             },
@@ -2542,6 +2713,7 @@ const DocumentView = {
                 EditorView.lineWrapping,
                 this.createHiddenLineExtension(),
                 this.createFencedBlockCollapseExtension(),
+                this.createTableCollapseExtension(),
                 this.createLivePreviewPlugin(),
                 this.createIndentFolding(),
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),
