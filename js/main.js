@@ -99,7 +99,7 @@ const App = {
         container.innerHTML = `
             <div class="reopen-prompt">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                <h3>${name}</h3>
+                <h3>${escapeHtml(name)}</h3>
                 <p>Tap to reopen your vault</p>
                 <button class="reopen-btn">Open</button>
                 <button class="reopen-other-btn">Choose another vault</button>
@@ -1885,14 +1885,6 @@ window.addEventListener('beforeunload', () => {
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         if (window.SyncManager) SyncManager.onTabHidden();
-        if (Store.db) {
-            try {
-                Store.db.close();
-                Store.db = null;
-            } catch (e) {
-                // Ignore errors during cleanup
-            }
-        }
     } else if (window.SyncManager) {
         SyncManager.onTabVisible();
     }

@@ -201,6 +201,12 @@ const UndoRedoManager = {
                 await Store.directoryHandle.removeEntry(fileName);
             } catch (e) {
                 console.error('Failed to delete file during undo:', e);
+                return;
+            }
+            try {
+                await GitStore.commitBlock(fileName, `Undo: remove ${fileName}`);
+            } catch (e) {
+                console.error('Failed to commit after delete during undo:', e);
             }
 
             // Update contacts and cache
@@ -217,7 +223,7 @@ const UndoRedoManager = {
         const block = command.blockData;
         if (block) {
             // Create file
-            await Store.saveBlock(block, { commit: false });
+            await Store.saveBlock(block, { commit: true, commitMessage: `Redo: recreate ${block.id}` });
 
             // Add to Store.blocks if not already there
             if (!Store.blocks.find(b => b.id === block.id)) {
@@ -242,7 +248,7 @@ const UndoRedoManager = {
             block.lastUpdated = new Date().toISOString();
 
             // Save to disk
-            await Store.saveBlock(block, { commit: false });
+            await Store.saveBlock(block, { commit: true, commitMessage: `Undo: revert ${block.id}` });
 
             // Update cache
             Store.extractContacts();
@@ -261,7 +267,7 @@ const UndoRedoManager = {
             block.lastUpdated = new Date().toISOString();
 
             // Save to disk
-            await Store.saveBlock(block, { commit: false });
+            await Store.saveBlock(block, { commit: true, commitMessage: `Redo: re-apply ${block.id}` });
 
             // Update cache
             Store.extractContacts();
@@ -276,7 +282,7 @@ const UndoRedoManager = {
         const block = command.blockData;
         if (block) {
             // Create file
-            await Store.saveBlock(block, { commit: false });
+            await Store.saveBlock(block, { commit: true, commitMessage: `Undo: restore ${block.id}` });
 
             // Add back to Store.blocks at the correct position (sorted by id)
             const insertIndex = Store.blocks.findIndex(b => b.id > block.id);
@@ -309,6 +315,12 @@ const UndoRedoManager = {
                 await Store.directoryHandle.removeEntry(fileName);
             } catch (e) {
                 console.error('Failed to delete file during redo delete:', e);
+                return;
+            }
+            try {
+                await GitStore.commitBlock(fileName, `Redo: remove ${fileName}`);
+            } catch (e) {
+                console.error('Failed to commit after delete during redo:', e);
             }
 
             // Update contacts and cache
@@ -345,52 +357,6 @@ const UndoRedoManager = {
             }
         }
     },
-    async undoDelete(command) {
-        const block = command.blockData;
-        if (block) {
-            // Create file
-            await Store.saveBlock(block, { commit: false });
-
-            // Add back to Store.blocks at the correct position (sorted by id)
-            const insertIndex = Store.blocks.findIndex(b => b.id > block.id);
-            if (insertIndex === -1) {
-                Store.blocks.push(block);
-            } else {
-                Store.blocks.splice(insertIndex, 0, block);
-            }
-
-            // Update contacts and cache
-            Store.extractContacts();
-            Store._filteredBlocksCache.invalidate();
-            SelectionManager.updateTagCounts();
-        }
-    },
-
-    /**
-     * Redo a delete command - removes the block again
-     */
-    async redoDelete(command) {
-        const block = Store.blocks.find(b => b.id === command.blockId);
-        if (block) {
-            // Remove from Store.blocks
-            const index = Store.blocks.findIndex(b => b.id === command.blockId);
-            Store.blocks.splice(index, 1);
-
-            // Delete file
-            const fileName = block.filename || `${block.id}.md`;
-            try {
-                await Store.directoryHandle.removeEntry(fileName);
-            } catch (e) {
-                console.error('Failed to delete file during redo delete:', e);
-            }
-
-            // Update contacts and cache
-            Store.extractContacts();
-            Store._filteredBlocksCache.invalidate();
-            SelectionManager.updateTagCounts();
-        }
-    },
-
     /**
      * Create a diff between two block states (for update commands)
      * Only stores fields that actually changed

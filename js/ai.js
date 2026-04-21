@@ -511,7 +511,7 @@ const AIAssistant = {
                     }),
                     EditorView.theme({
                         '&': { height: '100%', width: '100%', fontFamily: 'Inter, sans-serif' },
-                        '.cm-merge-deleted': { backgroundColor: 'rgba(244, 63, 94, 0.2)", textDecoration: "line-through' },
+                        '.cm-merge-deleted': { backgroundColor: 'rgba(244, 63, 94, 0.2)', textDecoration: 'line-through' },
                         '.cm-merge-inserted': { backgroundColor: 'rgba(16, 185, 129, 0.2)', outline: 'none' }
                     }),
                     EditorView.editable.of(false),
@@ -1170,8 +1170,6 @@ const AIAssistant = {
             });
             result.status = 'accepted';
         }
-
-        result.status = 'accepted';
 
         // Update UI
         const item = modal.querySelector(`.ai-batch-review-item[data-index="${index}"]`);

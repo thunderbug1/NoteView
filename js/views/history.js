@@ -48,8 +48,8 @@ const HistoryView = {
         const commitsHtml = this.commits.map((c, i) => `
             <div class="history-commit-item ${i === 0 ? 'selected' : ''}" data-oid="${c.oid}">
                 <div class="commit-time">${Common.formatRelativeDate(new Date(c.timestamp))}</div>
-                <div class="commit-msg">${c.message}</div>
-                <div class="commit-oid">${c.oid.substring(0, 7)}</div>
+                <div class="commit-msg">${escapeHtml(c.message)}</div>
+                <div class="commit-oid">${escapeHtml(c.oid.substring(0, 7))}</div>
             </div>
         `).join('');
         
@@ -136,13 +136,17 @@ const HistoryView = {
     
     async restoreVersion() {
         if (!this.selectedOldContent) return;
-        
-        if (confirm("Are you sure you want to restore this version? Your current changes will be overwritten (but saved in history).")) {
-            await App.updateBlockProperty(this.currentBlockId, 'content', this.selectedOldContent);
-            await App.saveBlockContent(this.currentBlockId, this.selectedOldContent);
-            this.closeHistory();
-            App.render();
-        }
+
+        const confirmed = await Modal.confirm({
+            title: 'Restore Version',
+            message: 'Are you sure you want to restore this version? Your current changes will be overwritten (but saved in history).'
+        });
+        if (!confirmed) return;
+
+        await App.updateBlockProperty(this.currentBlockId, 'content', this.selectedOldContent);
+        await App.saveBlockContent(this.currentBlockId, this.selectedOldContent);
+        this.closeHistory();
+        App.render();
     },
     
     closeHistory() {
