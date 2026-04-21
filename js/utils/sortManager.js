@@ -219,7 +219,7 @@ const SortManager = {
         const definitions = this.getFieldDefinitions(view);
         const fieldMap = this.getFieldMap(view);
         const defaults = this.cloneClauses(Store.getDefaultViewPreferences()?.[view]?.sort?.clauses || []);
-        let draftClauses = this.normalizeClauses(view, Store.getSortConfig(view)?.clauses || []);
+        let draftClauses = this.cloneClauses(this.normalizeClauses(view, Store.getSortConfig(view)?.clauses || []));
 
         const modal = Modal.create({
             title: 'Sort Settings',
