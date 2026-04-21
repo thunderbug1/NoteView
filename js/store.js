@@ -1238,6 +1238,7 @@ const Store = {
         if (commit) {
             const message = commitMessage || `Update ${fileName}`;
             await GitStore.commitBlock(fileName, message);
+            if (window.SyncManager) SyncManager.onCommit();
         }
     },
 

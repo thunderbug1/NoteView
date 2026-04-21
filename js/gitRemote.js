@@ -36,14 +36,17 @@ const GitRemote = {
     async push() {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
+        const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+        const url = this._applyCorsProxy(this.config.url);
 
         try {
             await git.push({
                 fs,
                 dir,
                 remote: this.config.name,
-                ref: 'main', // Hardcoded for now
-                onAuth: () => this.config.auth
+                ref,
+                onAuth: () => this.config.auth,
+                ...(url !== this.config.url ? { url } : {})
             });
             console.log('Push successful');
             return true;
@@ -56,16 +59,19 @@ const GitRemote = {
     async pull() {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
+        const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+        const url = this._applyCorsProxy(this.config.url);
 
         try {
             await git.pull({
                 fs,
                 dir,
                 remote: this.config.name,
-                ref: 'main',
+                ref,
                 author: GitStore.author,
                 onAuth: () => this.config.auth,
-                fastForward: true, // Auto-merge if possible
+                ...(url !== this.config.url ? { url } : {}),
+                fastForward: true,
                 singleBranch: true
             });
             console.log('Pull successful');
@@ -95,12 +101,13 @@ const GitRemote = {
     async getStatus() {
         if (!this.config) return { hasRemote: false };
         const { git, fs, dir } = GitStore;
+        const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
 
         try {
             const head = await git.resolveRef({ fs, dir, ref: 'HEAD' });
             let remoteHead;
             try {
-                remoteHead = await git.resolveRef({ fs, dir, ref: `refs/remotes/${this.config.name}/main` });
+                remoteHead = await git.resolveRef({ fs, dir, ref: `refs/remotes/${this.config.name}/${ref}` });
             } catch (e) {
                 // Remote tracking branch might not exist yet
                 return { hasRemote: true, unpushed: 'unknown' };
@@ -123,6 +130,12 @@ const GitRemote = {
             console.error('Failed to get sync status:', err);
             return { hasRemote: true, error: err.message };
         }
+    },
+
+    _applyCorsProxy(url) {
+        const proxy = (window.SyncManager && SyncManager._config.corsProxy) || '';
+        if (!proxy || !url) return url;
+        return proxy.replace(/\/$/, '') + '/' + url;
     }
 };
 

@@ -152,6 +152,7 @@ const App = {
         }
         this.isInitialized = true;
         await GitRemote.init();
+        await SyncManager.init();
         this.setupEventListeners();
         SelectionManager.init();
         SelectionManager.updateTagCounts();
@@ -178,6 +179,64 @@ const App = {
         if (retryBtn) {
             retryBtn.addEventListener('click', () => location.reload());
         }
+    },
+
+    _syncIcons: {
+        idle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="13 10 18 10 18 15"/></svg>',
+        syncing: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="13 10 18 10 18 15"/></svg>',
+        error: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+        conflict: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+    },
+
+    _setupSyncStatusIndicator() {
+        const btn = document.getElementById('toolbarSyncBtn');
+        if (!btn) return;
+
+        // Click handler
+        btn.addEventListener('click', () => {
+            const status = SyncManager.getStatus();
+            if (!status.hasRemote) {
+                this.setView('settings');
+                return;
+            }
+            SyncManager.sync();
+        });
+
+        // Listen for status changes
+        window.addEventListener('sync-status-change', (e) => {
+            const { status, detail, pendingCommits, lastSyncTime } = e.detail;
+            const hasRemote = e.detail.hasRemote;
+
+            if (!hasRemote) {
+                btn.title = 'Sync: no remote configured';
+                btn.style.color = 'var(--text-muted)';
+                btn.style.animation = '';
+                return;
+            }
+
+            const iconMap = {
+                idle: { color: 'var(--text-secondary)', anim: '' },
+                syncing: { color: 'var(--accent)', anim: 'sync-pulse 1.2s ease-in-out infinite' },
+                error: { color: 'var(--color-danger, #f44)', anim: '' },
+                conflict: { color: 'var(--color-warning, #f90)', anim: '' }
+            };
+
+            const style = iconMap[status] || iconMap.idle;
+            btn.innerHTML = this._syncIcons[status] || this._syncIcons.idle;
+            btn.style.color = style.color;
+            btn.style.animation = style.anim;
+
+            let title = 'Sync: ';
+            if (status === 'idle' && pendingCommits > 0) {
+                title += `${pendingCommits} unpushed`;
+                btn.style.color = 'var(--accent)';
+            } else if (status === 'idle') {
+                title += lastSyncTime ? `synced (${formatRelativeDate(lastSyncTime)})` : 'ready';
+            } else {
+                title += detail || status;
+            }
+            btn.title = title;
+        });
     },
 
     setupSidebarListeners() {
@@ -515,6 +574,9 @@ const App = {
                 AIAssistant.openBatchOverlay();
             });
         }
+
+        // Toolbar sync button
+        this._setupSyncStatusIndicator();
 
         this.setupSidebarTagListeners();
 
@@ -1730,12 +1792,17 @@ window.addEventListener('beforeunload', () => {
 
 // Also close when page becomes hidden (user switches tabs)
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden && Store.db) {
-        try {
-            Store.db.close();
-            Store.db = null;
-        } catch (e) {
-            // Ignore errors during cleanup
+    if (document.hidden) {
+        if (window.SyncManager) SyncManager.onTabHidden();
+        if (Store.db) {
+            try {
+                Store.db.close();
+                Store.db = null;
+            } catch (e) {
+                // Ignore errors during cleanup
+            }
         }
+    } else if (window.SyncManager) {
+        SyncManager.onTabVisible();
     }
 });

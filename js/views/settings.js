@@ -72,6 +72,53 @@ const SettingsView = {
                 </div>
 
                 <div class="settings-section">
+                    <h3>Git Sync</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Remote Repository</label>
+                            <p class="settings-item-hint">Push and pull notes to a git remote for backup or multi-device sync.</p>
+                        </div>
+                        <button id="configRemoteBtn" class="settings-btn secondary">
+                            Configure...
+                        </button>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Auto-Sync</label>
+                            <p class="settings-item-hint">Automatically sync with the remote on a schedule or after local edits.</p>
+                        </div>
+                        <div class="ai-toggle-switch ${SyncManager._config.autoSync ? 'active' : ''}" id="autoSyncToggle" title="Toggle auto-sync"></div>
+                    </div>
+                    <div class="ai-settings-details ${SyncManager._config.autoSync ? 'visible' : ''}" id="syncSettingsDetails">
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <label>Sync Interval</label>
+                                <p class="settings-item-hint">How often to pull from the remote when idle.</p>
+                            </div>
+                            <select id="syncIntervalSelect" class="settings-select" style="font-size:0.85rem;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text)">
+                                <option value="0" ${!SyncManager._config.syncInterval ? 'selected' : ''}>Off (event-driven only)</option>
+                                <option value="1" ${SyncManager._config.syncInterval === 1 ? 'selected' : ''}>1 minute</option>
+                                <option value="5" ${SyncManager._config.syncInterval === 5 ? 'selected' : ''}>5 minutes</option>
+                                <option value="15" ${SyncManager._config.syncInterval === 15 ? 'selected' : ''}>15 minutes</option>
+                                <option value="30" ${SyncManager._config.syncInterval === 30 ? 'selected' : ''}>30 minutes</option>
+                            </select>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-item-info">
+                                <label>Commit Threshold</label>
+                                <p class="settings-item-hint">Push after this many local commits (default: 5).</p>
+                            </div>
+                            <input type="number" id="syncThresholdInput" value="${SyncManager._config.commitThreshold || 5}" min="1" max="100" style="width:4rem;font-size:0.85rem;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text);text-align:center">
+                        </div>
+                        <div class="settings-item">
+                            <button id="syncNowBtn" class="settings-btn secondary">
+                                Sync Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Tag Management</h3>
                     <div class="settings-item">
                         <div class="settings-item-info">
@@ -174,6 +221,56 @@ const SettingsView = {
         const manageTagsBtn = document.getElementById('manageTagsBtn');
         if (manageTagsBtn) {
             manageTagsBtn.addEventListener('click', () => this.openTagModal());
+        }
+
+        // Git sync: remote configuration
+        const configRemoteBtn = document.getElementById('configRemoteBtn');
+        if (configRemoteBtn) {
+            configRemoteBtn.addEventListener('click', () => this._openRemoteConfigModal());
+        }
+
+        // Auto-sync toggle
+        const autoSyncToggle = document.getElementById('autoSyncToggle');
+        if (autoSyncToggle) {
+            autoSyncToggle.addEventListener('click', async () => {
+                const newState = !SyncManager._config.autoSync;
+                await SyncManager.saveConfig({ autoSync: newState });
+                autoSyncToggle.classList.toggle('active', newState);
+                document.getElementById('syncSettingsDetails').classList.toggle('visible', newState);
+            });
+        }
+
+        // Sync interval
+        const syncIntervalSelect = document.getElementById('syncIntervalSelect');
+        if (syncIntervalSelect) {
+            syncIntervalSelect.addEventListener('change', async () => {
+                await SyncManager.saveConfig({ syncInterval: parseInt(syncIntervalSelect.value, 10) || 0 });
+            });
+        }
+
+        // Commit threshold
+        const syncThresholdInput = document.getElementById('syncThresholdInput');
+        if (syncThresholdInput) {
+            syncThresholdInput.addEventListener('change', async () => {
+                const val = Math.max(1, parseInt(syncThresholdInput.value, 10) || 5);
+                syncThresholdInput.value = val;
+                await SyncManager.saveConfig({ commitThreshold: val });
+            });
+        }
+
+        // Sync now button
+        const syncNowBtn = document.getElementById('syncNowBtn');
+        if (syncNowBtn) {
+            syncNowBtn.addEventListener('click', async () => {
+                syncNowBtn.disabled = true;
+                syncNowBtn.textContent = 'Syncing...';
+                try {
+                    await SyncManager.sync();
+                } finally {
+                    syncNowBtn.disabled = false;
+                    syncNowBtn.textContent = 'Sync Now';
+                }
+            });
         }
 
         // Shortcut remapping (unified for all shortcuts)
@@ -769,6 +866,131 @@ const SettingsView = {
             await AppSettings.saveTemplates(templates);
             modal.close();
             this._openTemplateModal();
+        });
+    },
+
+    // --- Git Remote Configuration ---
+
+    _openRemoteConfigModal() {
+        const cfg = GitRemote.config || {};
+        const syncCfg = SyncManager._config || {};
+
+        const modal = Modal.create({
+            title: 'Configure Git Remote',
+            content: `
+                <div class="ai-profile-form">
+                    <div class="ai-form-row">
+                        <label>Remote Name</label>
+                        <input type="text" id="remoteNameInput" value="${escapeHtml(cfg.name || 'origin')}" placeholder="origin">
+                    </div>
+                    <div class="ai-form-row">
+                        <label>Remote URL</label>
+                        <input type="url" id="remoteUrlInput" value="${escapeHtml(cfg.url || '')}" placeholder="https://github.com/user/repo.git">
+                        <p class="settings-item-hint" style="margin-top:0.35rem">HTTPS URL for the git repository. SSH is not supported in browsers.</p>
+                    </div>
+                    <div class="ai-form-row">
+                        <label>Branch</label>
+                        <input type="text" id="remoteBranchInput" value="${escapeHtml(syncCfg.branch || 'main')}" placeholder="main">
+                    </div>
+                    <div class="ai-form-row">
+                        <label>Username <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(for authenticated remotes)</span></label>
+                        <input type="text" id="remoteUserInput" value="${escapeHtml(cfg.auth?.username || '')}" placeholder="GitHub username or token">
+                    </div>
+                    <div class="ai-form-row">
+                        <label>Password / Token <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(stored locally in IndexedDB)</span></label>
+                        <div class="ai-api-key-field">
+                            <input type="password" id="remotePassInput" value="${escapeHtml(cfg.auth?.password || '')}" placeholder="Personal access token" autocomplete="off">
+                            <button type="button" class="ai-toggle-key-visibility" title="Show token">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ai-form-row">
+                        <label>CORS Proxy <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(optional)</span></label>
+                        <input type="url" id="remoteCorsInput" value="${escapeHtml(syncCfg.corsProxy || '')}" placeholder="https://cors.isomorphic-git.org">
+                        <p class="settings-item-hint" style="margin-top:0.35rem">Needed for private repos or self-hosted git servers. Public GitHub repos work without a proxy.</p>
+                    </div>
+                    <div class="ai-form-actions">
+                        ${cfg.url ? '<button class="ai-form-cancel" id="remoteRemoveBtn" style="margin-right:auto;color:var(--color-danger,#f44)">Remove Remote</button>' : ''}
+                        <button class="ai-form-cancel" id="remoteCancelBtn">Cancel</button>
+                        <button class="ai-form-save" id="remoteSaveBtn">Save &amp; Connect</button>
+                    </div>
+                </div>
+            `,
+            width: '500px'
+        });
+
+        // Toggle password visibility
+        modal.querySelector('.ai-toggle-key-visibility').addEventListener('click', () => {
+            const input = modal.querySelector('#remotePassInput');
+            const btn = modal.querySelector('.ai-toggle-key-visibility');
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+                btn.title = 'Hide token';
+            } else {
+                input.type = 'password';
+                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+                btn.title = 'Show token';
+            }
+        });
+
+        modal.querySelector('#remoteCancelBtn').addEventListener('click', () => modal.close());
+
+        const removeBtn = modal.querySelector('#remoteRemoveBtn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', async () => {
+                if (!confirm('Remove the git remote configuration? Your local notes are not affected.')) return;
+                try {
+                    await Store.saveRemoteConfig({});
+                    GitRemote.config = null;
+                    SyncManager._config.autoSync = false;
+                    SyncManager._stopIntervalSync();
+                    SyncManager._setStatus('idle', 'No remote configured');
+                } catch (err) {
+                    alert('Failed to remove remote: ' + err.message);
+                    return;
+                }
+                modal.close();
+            });
+        }
+
+        modal.querySelector('#remoteSaveBtn').addEventListener('click', async () => {
+            const name = modal.querySelector('#remoteNameInput').value.trim() || 'origin';
+            const url = modal.querySelector('#remoteUrlInput').value.trim();
+            const branch = modal.querySelector('#remoteBranchInput').value.trim() || 'main';
+            const user = modal.querySelector('#remoteUserInput').value.trim();
+            const pass = modal.querySelector('#remotePassInput').value;
+            const corsProxy = modal.querySelector('#remoteCorsInput').value.trim();
+
+            if (!url) {
+                alert('Remote URL is required.');
+                return;
+            }
+
+            const saveBtn = modal.querySelector('#remoteSaveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            try {
+                const auth = user ? { username: user, password: pass } : null;
+                await GitRemote.setRemote(name, url, auth);
+                await SyncManager.saveConfig({ branch, corsProxy });
+
+                saveBtn.textContent = 'Testing...';
+                try {
+                    await GitRemote.pull();
+                    saveBtn.textContent = 'Connected';
+                } catch (testErr) {
+                    saveBtn.textContent = 'Saved (connection test failed)';
+                    console.warn('[Settings] Connection test failed:', testErr);
+                }
+                setTimeout(() => modal.close(), 800);
+            } catch (err) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save & Connect';
+                alert('Failed to configure remote: ' + err.message);
+            }
         });
     }
 };

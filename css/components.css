@@ -1038,6 +1038,15 @@
     to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes sync-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+#toolbarSyncBtn svg {
+    display: block;
+}
+
 .task-context-menu .menu-section {
     padding: 0;
 }

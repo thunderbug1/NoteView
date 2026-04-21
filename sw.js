@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v10';
+const CACHE_NAME = 'noteview-v11';
 
 const PRECACHE_URLS = [
   './',
@@ -20,6 +20,7 @@ const PRECACHE_URLS = [
   './js/gitFs.js',
   './js/gitStore.js',
   './js/gitRemote.js',
+  './js/syncManager.js',
   './js/undoRedoManager.js',
   './js/store.js',
   './js/selectionManager.js',
