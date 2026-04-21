@@ -333,3 +333,79 @@
     margin-right: 0.3rem;
     vertical-align: middle;
 }
+
+/* --- Task Creation Modal --- */
+
+.task-create-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.task-create-input {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.9rem;
+    box-sizing: border-box;
+}
+
+.task-create-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.task-create-fields {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.task-create-fields label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    flex: 1;
+    min-width: 100px;
+}
+
+.task-create-fields select,
+.task-create-fields input[type="date"] {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.85rem;
+}
+
+.task-create-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding-top: 0.25rem;
+}
+
+.task-create-actions button {
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.task-create-actions .modal-cancel-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.task-create-actions .modal-confirm-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+}

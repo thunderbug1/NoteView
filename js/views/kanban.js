@@ -290,6 +290,8 @@ const KanbanView = {
         }
         // Copy button — always shown
         actionBtns += `<button class="kanban-action-btn" data-action="copy" title="Copy task text"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>`;
+        // Delete button — always shown
+        actionBtns += `<button class="kanban-action-btn kanban-action-delete" data-action="delete" title="Delete note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
 
         return `
             <div class="block kanban-card${nestedClass}${orphanedClass}${urgencyClass}" draggable="true" data-id="${task.id}" data-block-id="${task.blockId}" data-match-index="${task.matchIndex}" data-match-length="${task.matchLength}" data-prefix="${task.prefix}" data-column-id="${column ? column.id : ''}" data-depth="${depth}"${nestedStyle}>
@@ -432,6 +434,27 @@ const KanbanView = {
                             btn.innerHTML = origSvg;
                             btn.style.color = '';
                         }, 1500);
+                    });
+                }
+
+                if (action === 'delete') {
+                    const blockId = card.dataset.blockId;
+                    const delModal = Modal.create({
+                        title: 'Delete Note',
+                        content: `
+                            <p style="margin-bottom: 20px;">Delete this note permanently?</p>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                <button class="modal-cancel-btn" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">Cancel</button>
+                                <button class="modal-confirm-btn" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                            </div>
+                        `
+                    });
+                    delModal.querySelector('.modal-confirm-btn').addEventListener('click', () => {
+                        delModal.close();
+                        App.deleteBlock(blockId);
+                    });
+                    delModal.querySelector('.modal-cancel-btn').addEventListener('click', () => {
+                        delModal.close();
                     });
                 }
             });
@@ -592,17 +615,10 @@ const KanbanView = {
 
         // Add-task buttons
         container.querySelectorAll('.kanban-add-task-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
+            btn.addEventListener('click', () => {
                 const col = KanbanView.getColumnById(btn.dataset.columnId);
                 if (!col) return;
-                const content = `- [${col.state}] New task`;
-                const newBlock = await Store.createBlock(content);
-                TimelineView.invalidateCache();
-                SelectionManager.updateTagCounts();
-                await App.render();
-                // Highlight the new card
-                const newCard = container.querySelector(`.kanban-card[data-block-id="${newBlock.id}"]`);
-                if (newCard) KanbanView.highlightAndScrollToCard(newCard);
+                KanbanView.showCreateTaskModal(col);
             });
         });
 
@@ -615,6 +631,83 @@ const KanbanView = {
         void card.offsetWidth;
         card.classList.add('kanban-card-highlight');
         setTimeout(() => card.classList.remove('kanban-card-highlight'), 1500);
+    },
+
+    showCreateTaskModal(col) {
+        const assigneeOptions = Array.from(Store.contacts.keys())
+            .map(name => `<option value="${Common.escapeHtml(name)}">${Common.escapeHtml(name)}</option>`)
+            .join('');
+
+        const content = `
+            <div class="task-create-form">
+                <input type="text" class="task-create-input" placeholder="Task description…" autofocus>
+                <div class="task-create-fields">
+                    <label>Priority
+                        <select class="task-create-priority">
+                            <option value="">—</option>
+                            <option value="urgent">Urgent</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </label>
+                    <label>Assignee
+                        <select class="task-create-assignee">
+                            <option value="">—</option>
+                            ${assigneeOptions}
+                        </select>
+                    </label>
+                    <label>Due
+                        <input type="date" class="task-create-due">
+                    </label>
+                </div>
+                <div class="task-create-actions">
+                    <button class="modal-cancel-btn">Cancel</button>
+                    <button class="modal-confirm-btn">Create</button>
+                </div>
+            </div>
+        `;
+
+        const modal = Modal.create({
+            title: `New ${col.label} Task`,
+            content,
+            width: '420px',
+            onClose: () => {}
+        });
+
+        const input = modal.querySelector('.task-create-input');
+        const confirmBtn = modal.querySelector('.modal-confirm-btn');
+        const cancelBtn = modal.querySelector('.modal-cancel-btn');
+
+        const create = async () => {
+            const desc = input.value.trim();
+            if (!desc) { input.focus(); return; }
+
+            let taskLine = `- [${col.state}] ${desc}`;
+            const priority = modal.querySelector('.task-create-priority').value;
+            if (priority) taskLine += ` [priority:: ${priority}]`;
+            const assignee = modal.querySelector('.task-create-assignee').value;
+            if (assignee) taskLine += ` [assignee:: ${assignee}]`;
+            const due = modal.querySelector('.task-create-due').value;
+            if (due) taskLine += ` [due:: ${due}]`;
+
+            modal.close();
+            const newBlock = await Store.createBlock(taskLine);
+            TimelineView.invalidateCache();
+            SelectionManager.updateTagCounts();
+            await App.render();
+            const container = document.getElementById('viewContainer');
+            const newCard = container.querySelector(`.kanban-card[data-block-id="${newBlock.id}"]`);
+            if (newCard) KanbanView.highlightAndScrollToCard(newCard);
+        };
+
+        confirmBtn.addEventListener('click', create);
+        cancelBtn.addEventListener('click', () => modal.close());
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); create(); }
+            if (e.key === 'Escape') modal.close();
+        });
+        setTimeout(() => input.focus(), 10);
     },
 
     showMoveModal(data) {

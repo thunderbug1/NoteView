@@ -989,6 +989,77 @@ const App = {
                 HistoryView.openHistory(block.id);
             });
         });
+
+        // 3-dot overflow menu (pin, copy, history, delete)
+        modal.querySelectorAll('.block-menu-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const blockId = block.id;
+                const isPinned = block.pinned;
+
+                const menu = document.createElement('div');
+                menu.className = 'task-context-menu block-action-menu';
+                menu.innerHTML = `
+                    <div class="menu-item" data-action="pin">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z"/></svg>
+                        ${isPinned ? 'Unpin note' : 'Pin note'}
+                    </div>
+                    <div class="menu-item" data-action="copy">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy note text
+                    </div>
+                    <div class="menu-item" data-action="history">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        Revision history
+                    </div>
+                    <div class="menu-divider"></div>
+                    <div class="menu-item menu-item-danger" data-action="delete">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Delete note
+                    </div>
+                `;
+
+                const rect = btn.getBoundingClientRect();
+                menu.style.left = `${rect.right - 180}px`;
+                menu.style.top = `${rect.bottom + 4}px`;
+                document.body.appendChild(menu);
+
+                requestAnimationFrame(() => {
+                    const menuRect = menu.getBoundingClientRect();
+                    if (menuRect.bottom > window.innerHeight) {
+                        menu.style.top = `${rect.top - menuRect.height - 4}px`;
+                    }
+                });
+
+                const closeMenu = () => menu.remove();
+                const closeHandler = (evt) => {
+                    if (!menu.contains(evt.target) && evt.target !== btn) closeMenu();
+                };
+                document.addEventListener('click', closeHandler);
+
+                menu.addEventListener('click', (evt) => {
+                    const item = evt.target.closest('.menu-item');
+                    if (!item) return;
+                    const action = item.dataset.action;
+
+                    if (action === 'pin') {
+                        App.updateBlockProperty(blockId, 'pinned', !block.pinned);
+                    } else if (action === 'copy') {
+                        const editor = DocumentView.editors.get(blockId);
+                        const content = editor ? editor.state.doc.toString() : (block.content || '');
+                        navigator.clipboard.writeText(content);
+                    } else if (action === 'history') {
+                        HistoryView.openHistory(blockId);
+                    } else if (action === 'delete') {
+                        closeMenu();
+                        modal.close();
+                        App.deleteBlock(blockId);
+                        return;
+                    }
+                    closeMenu();
+                });
+            });
+        });
     },
 
     showTagModal(blockId) {
