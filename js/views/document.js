@@ -2519,35 +2519,35 @@ const DocumentView = {
                         const sel = update.state.selection.main;
                         const isExtract = !sel.empty && sel.from !== sel.to;
 
-                        const startBlock = update.view.lineBlockAt(sel.from);
-                        const endBlock = update.view.lineBlockAt(sel.to);
-
-                        const scroller = update.view.scrollDOM;
                         const blockEl = container.closest('.block');
 
                         if (blockEl) {
-                            const contentTop = scroller.getBoundingClientRect().top;
-                            const blockRectTop = blockEl.getBoundingClientRect().top;
+                            const blockRect = blockEl.getBoundingClientRect();
+                            const startCoords = update.view.coordsAtPos(sel.from);
+                            if (!startCoords) { marker.style.display = 'none'; return; }
 
-                            const relativeTopStart = contentTop - blockRectTop + startBlock.top - scroller.scrollTop;
+                            const startLineTop = startCoords.top - blockRect.top;
+                            const startLineHeight = startCoords.bottom - startCoords.top;
 
                             marker.style.display = 'flex';
 
                             const scissorSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>';
 
                             if (isExtract) {
-                                const relativeTopEnd = contentTop - blockRectTop + endBlock.top - scroller.scrollTop;
-                                const bottomEdge = relativeTopEnd + endBlock.height;
-                                const h = Math.max(18, bottomEdge - relativeTopStart + 18);
+                                const endCoords = update.view.coordsAtPos(sel.to);
+                                if (!endCoords) { marker.style.display = 'none'; return; }
 
-                                marker.style.top = `${relativeTopStart - 9}px`;
+                                const endLineBottom = endCoords.bottom - blockRect.top;
+                                const h = Math.max(18, endLineBottom - startLineTop + 18);
+
+                                marker.style.top = `${startLineTop - 9}px`;
                                 marker.style.height = `${h}px`;
                                 marker.style.flexDirection = 'column';
                                 marker.style.justifyContent = 'space-between';
                                 marker.innerHTML = scissorSvg + scissorSvg;
                                 marker.title = "Extract block";
                             } else {
-                                const iconTopStart = relativeTopStart + startBlock.height - 9;
+                                const iconTopStart = startLineTop + startLineHeight - 9;
                                 marker.style.top = `${iconTopStart}px`;
                                 marker.style.height = '18px';
                                 marker.style.flexDirection = 'row';
