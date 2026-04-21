@@ -1211,3 +1211,198 @@
     font-size: 0.85rem;
     text-align: center;
 }
+
+/* ============================================
+   Select Mode - Multi-select for bulk operations
+   ============================================ */
+
+/* Active mode: clickable blocks/cards with selection checkbox */
+.select-mode-active article.block:not([data-id="new"]),
+.select-mode-active .kanban-card {
+    cursor: pointer;
+    position: relative;
+}
+
+/* Hide collapse button in select mode (checkbox replaces it) */
+.select-mode-active article.block > .collapse-btn {
+    display: none !important;
+}
+
+/* Unchecked checkbox on blocks (document view) — same position as collapse button */
+.select-mode-active article.block:not([data-id="new"])::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -1.75rem;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg-primary);
+    transition: all 0.15s ease;
+    pointer-events: none;
+    z-index: 16;
+}
+
+/* Checked checkbox on blocks */
+.select-mode-active article.block.block-selected::before {
+    background: var(--accent);
+    border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px;
+}
+
+/* Unchecked checkbox on kanban cards */
+.select-mode-active .kanban-card::before {
+    content: '';
+    position: absolute;
+    top: 0.4rem;
+    left: 0.4rem;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg-primary);
+    transition: all 0.15s ease;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Checked checkbox on kanban cards */
+.select-mode-active .kanban-card.block-selected::before {
+    background: var(--accent);
+    border-color: var(--accent);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 10px;
+}
+
+/* Selected block/card highlight */
+.block-selected {
+    background: color-mix(in srgb, var(--accent) 8%, transparent) !important;
+    border-color: var(--accent) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Collapsed blocks: ensure metadata stays visible and checkbox aligned */
+.select-mode-active .block.block-collapsed .block-metadata {
+    opacity: 1 !important;
+    height: auto !important;
+}
+
+/* Floating action bar */
+.select-action-bar {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 8px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+    z-index: 200;
+    animation: selectBarSlideUp 0.2s ease;
+}
+
+@keyframes selectBarSlideUp {
+    from {
+        transform: translateX(-50%) translateY(0.75rem);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+.select-count {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-right: 0.4rem;
+    white-space: nowrap;
+}
+
+.select-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 4px);
+    background: var(--bg-primary);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.select-action-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--text-muted);
+}
+
+.select-action-btn svg {
+    flex-shrink: 0;
+}
+
+.select-action-delete {
+    color: var(--danger, #dc2626);
+    border-color: color-mix(in srgb, var(--danger, #dc2626) 30%, var(--border));
+}
+
+.select-action-delete:hover {
+    background: color-mix(in srgb, var(--danger, #dc2626) 10%, var(--bg-primary));
+    border-color: var(--danger, #dc2626);
+}
+
+.select-action-disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.select-action-done {
+    color: var(--text-muted);
+    border-color: transparent;
+}
+
+.select-action-done:hover {
+    color: var(--text);
+}
+
+.select-action-secondary {
+    color: var(--text-muted);
+    border-color: transparent;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.5rem;
+}
+
+.select-action-secondary:hover {
+    color: var(--text);
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+}
+
+.select-action-divider {
+    width: 1px;
+    height: 1.2rem;
+    background: var(--border);
+    margin: 0 0.15rem;
+    flex-shrink: 0;
+}
+
+/* Toolbar select button active state */
+#toolbarSelectBtn.active {
+    background: color-mix(in srgb, var(--accent) 15%, var(--bg-secondary));
+    color: var(--accent);
+    border-color: var(--accent);
+}

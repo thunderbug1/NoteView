@@ -538,6 +538,19 @@ const App = {
                     AIAssistant.openBatchOverlay();
                 }
             }
+
+            // Select mode toggle
+            if (currentCombo === 'Ctrl+Shift+S') {
+                e.preventDefault();
+                if (typeof BlockSelector !== 'undefined') BlockSelector.toggle();
+            }
+
+            // Escape exits select mode
+            if (e.key === 'Escape' && typeof BlockSelector !== 'undefined' && BlockSelector.active) {
+                e.preventDefault();
+                e.stopPropagation();
+                BlockSelector.deactivate();
+            }
         });
     },
 
@@ -557,6 +570,8 @@ const App = {
         });
 
         this.setupSearch();
+
+        if (typeof BlockSelector !== 'undefined') BlockSelector.init();
 
         SortManager.initToolbar(() => this.render());
         SortManager.updateToolbar();
@@ -758,6 +773,11 @@ const App = {
             case 'settings':
                 SettingsView.render(blocks);
                 break;
+        }
+
+        // Refresh selection UI if select mode is active
+        if (typeof BlockSelector !== 'undefined' && BlockSelector.active) {
+            BlockSelector.refreshSelectionUI();
         }
 
         // Hide FAB in kanban — columns have their own add-task buttons

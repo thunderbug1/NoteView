@@ -554,7 +554,7 @@ const AIAssistant = {
 
     // --- Batch AI ---
 
-    openBatchOverlay() {
+    openBatchOverlay(preselectedIds = null) {
         if (!this.isConfigured()) return;
 
         const blocks = Store.getFilteredBlocks();
@@ -577,8 +577,9 @@ const AIAssistant = {
 
         const noteItems = blocks.map(b => {
             const title = this._extractTitle(b);
+            const checked = preselectedIds ? preselectedIds.has(b.id) : true;
             return `<div class="ai-batch-note-item">
-                <input type="checkbox" checked data-block-id="${this._escHtml(b.id)}">
+                <input type="checkbox" ${checked ? 'checked' : ''} data-block-id="${this._escHtml(b.id)}">
                 <span class="ai-batch-note-title">${this._escHtml(title)}</span>
             </div>`;
         }).join('');
@@ -594,7 +595,7 @@ const AIAssistant = {
             ${presetChips ? `<div class="ai-preset-chips">${presetChips}</div>` : ''}
             <textarea class="ai-instruction-input" id="batchInstruction" placeholder="Tell the AI what to do with all selected notes..." rows="3"></textarea>
             <div class="ai-batch-note-list-header">
-                <span class="ai-batch-note-count" id="batchNoteCount">${blocks.length} notes selected</span>
+                <span class="ai-batch-note-count" id="batchNoteCount">${preselectedIds ? preselectedIds.size : blocks.length} notes selected</span>
                 <div class="ai-batch-select-actions">
                     <button class="ai-batch-select-action" id="batchSelectAll">Select All</button>
                     <button class="ai-batch-select-action" id="batchDeselectAll">Deselect All</button>
@@ -602,7 +603,7 @@ const AIAssistant = {
             </div>
             <div class="ai-batch-note-list" id="batchNoteList">${noteItems}</div>
             <div class="ai-action-row">
-                <button class="ai-send-btn" id="batchRunBtn">Run on ${blocks.length} notes</button>
+                <button class="ai-send-btn" id="batchRunBtn">Run on ${preselectedIds ? preselectedIds.size : blocks.length} notes</button>
                 <button class="ai-stop-btn" id="batchStopBtn">Stop</button>
             </div>
             <div class="ai-batch-progress-area" id="batchProgressArea" style="display:none">

@@ -677,5 +677,281 @@ const TagModal = {
             return `<span class="badge badge-hierarchical" data-tag="${tag}"><span class="badge-parent">${parentText}</span>${Common.formatTagDisplay(tag)}</span>`;
         }
         return `<span class="badge" data-tag="${tag}">${Common.capitalizeFirst(tag)}</span>`;
+    },
+
+    /**
+     * Bulk tag selection — opens tag modal without a block context.
+     * On close, calls onApply(Array of selected tag strings).
+     */
+    showBulk(onApply) {
+        const allTags = SelectionManager.getAllContextTags();
+        let selectedTags = new Set();
+
+        const treeData = Common.buildTagTree(allTags);
+
+        const content = `
+            <div class="tag-modal-input-row" style="position:relative;">
+                <input type="text" id="tagModalInput" placeholder="Search or create tag..." autocomplete="off" autofocus>
+                <div id="tagAutocomplete" class="tag-autocomplete" style="display:none;"></div>
+            </div>
+            <div id="tagModalList" class="tag-modal-list">
+                ${this._renderTree(treeData, selectedTags)}
+            </div>
+            <div id="tagModalCreatePrompt" style="display: none;" class="tag-modal-create">
+                <span class="create-text"></span>
+            </div>
+        `;
+
+        const modal = Modal.create({
+            title: 'Add Tags to Selected Notes',
+            content,
+            onClose: () => {
+                if (onApply && selectedTags.size > 0) {
+                    onApply(Array.from(selectedTags));
+                }
+            }
+        });
+
+        const input = document.getElementById('tagModalInput');
+        const promptBtn = document.getElementById('tagModalCreatePrompt');
+        const autocomplete = document.getElementById('tagAutocomplete');
+        let acSelectedIndex = -1;
+        let acItems = [];
+
+        setTimeout(() => input.focus(), 10);
+
+        const updateItemVisuals = () => {
+            modal.querySelectorAll('.tag-modal-item').forEach(item => {
+                const tag = item.dataset.tag;
+                item.classList.toggle('selected', selectedTags.has(tag));
+            });
+        };
+
+        const toggleTag = (tag) => {
+            if (selectedTags.has(tag)) {
+                selectedTags.delete(tag);
+            } else {
+                selectedTags.add(tag);
+            }
+            updateItemVisuals();
+        };
+
+        modal.querySelectorAll('.tag-modal-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.tag-rename-input')) return;
+                e.stopPropagation();
+                toggleTag(item.dataset.tag);
+                input.focus();
+            });
+        });
+
+        modal.querySelectorAll('.tag-modal-group-header').forEach(header => {
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const group = header.closest('.tag-modal-group');
+                const groupTags = Array.from(group.querySelectorAll(':scope > .tag-modal-group-items > .tag-modal-item'))
+                    .map(item => item.dataset.tag);
+                const allSelected = groupTags.every(t => selectedTags.has(t));
+
+                if (allSelected) {
+                    groupTags.forEach(t => selectedTags.delete(t));
+                } else {
+                    groupTags.forEach(t => selectedTags.add(t));
+                }
+
+                updateItemVisuals();
+                input.focus();
+            });
+        });
+
+        const createTag = (tagStr) => {
+            const tagsToAdd = tagStr.split(/[\s,]+/).map(t => t.trim().toLowerCase()).filter(t => t);
+            const computedTags = SelectionManager.getComputedContextTags().map(tag => tag.toLowerCase());
+
+            for (const tag of tagsToAdd) {
+                if (computedTags.includes(tag)) continue;
+                selectedTags.add(tag);
+                if (!allTags.includes(tag)) {
+                    allTags.push(tag);
+                    this._insertTagIntoList(modal, tag, toggleTag, input, selectedTags, updateItemVisuals, () => {});
+                }
+            }
+
+            updateItemVisuals();
+            input.value = '';
+            promptBtn.style.display = 'none';
+        };
+
+        promptBtn.addEventListener('click', () => {
+            createTag(input.value.trim().toLowerCase());
+        });
+
+        const showAutocomplete = (suggestions) => {
+            acItems = suggestions;
+            acSelectedIndex = -1;
+            if (suggestions.length === 0) {
+                autocomplete.style.display = 'none';
+                return;
+            }
+            autocomplete.innerHTML = suggestions.map((s, i) => {
+                const display = s.isGroup
+                    ? `<span class="ac-group-icon">&#9654;</span> ${Common.capitalizeFirst(s.text)}`
+                    : Common.capitalizeFirst(s.text);
+                const hint = s.isGroup ? ' <span class="ac-hint">group</span>' : '';
+                return `<div class="ac-item" data-index="${i}" data-completed="${s.completed}">${display}${hint}</div>`;
+            }).join('');
+            autocomplete.style.display = 'block';
+
+            autocomplete.querySelectorAll('.ac-item').forEach(el => {
+                el.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (el.dataset.completed.endsWith('.')) {
+                        input.value = el.dataset.completed.toLowerCase();
+                        input.focus();
+                        input.dispatchEvent(new Event('input'));
+                    } else {
+                        toggleTag(el.dataset.completed);
+                        input.value = '';
+                        input.focus();
+                        input.dispatchEvent(new Event('input'));
+                    }
+                });
+            });
+        };
+
+        const hideAutocomplete = () => {
+            autocomplete.style.display = 'none';
+            acItems = [];
+            acSelectedIndex = -1;
+        };
+
+        const computeSuggestions = (val) => {
+            if (!val) { hideAutocomplete(); return; }
+
+            const dotPos = val.indexOf('.');
+            const suggestions = [];
+
+            if (dotPos !== -1) {
+                const groupName = val.substring(0, dotPos).toLowerCase();
+                const partial = val.substring(dotPos + 1).toLowerCase();
+                const groupKey = Array.from(treeData.groups.keys()).find(k => k.toLowerCase() === groupName);
+                if (groupKey) {
+                    const groupTags = treeData.groups.get(groupKey);
+                    groupTags.forEach(tag => {
+                        const { leaf } = Common.parseHierarchicalTag(tag);
+                        if (leaf.toLowerCase().startsWith(partial)) {
+                            suggestions.push({ text: leaf, completed: tag, isGroup: false });
+                        }
+                    });
+                }
+            } else {
+                treeData.groups.forEach((_, groupName) => {
+                    if (groupName.toLowerCase().startsWith(val)) {
+                        suggestions.push({ text: groupName, completed: groupName + '.', isGroup: true });
+                    }
+                });
+                treeData.flat.forEach(tag => {
+                    if (tag.toLowerCase().startsWith(val)) {
+                        suggestions.push({ text: tag, completed: tag, isGroup: false });
+                    }
+                });
+            }
+
+            showAutocomplete(suggestions.slice(0, 8));
+        };
+
+        input.addEventListener('input', () => {
+            const val = input.value.trim().toLowerCase();
+            const lastDot = val.lastIndexOf('.');
+            let exactMatch = false;
+
+            if (lastDot !== -1) {
+                const groupName = val.substring(0, lastDot).toLowerCase();
+                const leafSearch = val.substring(lastDot + 1).toLowerCase();
+                modal.querySelectorAll('.tag-modal-item').forEach(item => {
+                    const tag = item.dataset.tag;
+                    const { segments, leaf } = Common.parseHierarchicalTag(tag);
+                    if (segments.length > 0 && segments[0].toLowerCase() === groupName) {
+                        item.style.display = (leaf.toLowerCase().includes(leafSearch) || leafSearch === '') ? '' : 'none';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                    if (tag === val) exactMatch = true;
+                });
+                modal.querySelectorAll('.tag-modal-group').forEach(group => this._updateGroupVisibility(group));
+                modal.querySelectorAll('.tag-modal-flat-item').forEach(item => { item.style.display = 'none'; });
+            } else {
+                modal.querySelectorAll('.tag-modal-item').forEach(item => {
+                    const tag = item.dataset.tag;
+                    const displayName = Common.formatTagDisplay(tag).toLowerCase();
+                    item.style.display = (tag.includes(val) || displayName.includes(val) || val === '') ? '' : 'none';
+                    if (tag === val) exactMatch = true;
+                });
+                modal.querySelectorAll('.tag-modal-group').forEach(group => this._updateGroupVisibility(group));
+            }
+
+            computeSuggestions(val);
+
+            const isComputedTag = SelectionManager.getComputedContextTags().some(tag => tag.toLowerCase() === val);
+            if (val && !exactMatch && !selectedTags.has(val) && !isComputedTag) {
+                promptBtn.style.display = 'flex';
+                promptBtn.querySelector('.create-text').textContent = `Create '${val}'`;
+            } else {
+                promptBtn.style.display = 'none';
+            }
+        });
+
+        input.addEventListener('keydown', (e) => {
+            const isAcOpen = autocomplete.style.display !== 'none' && acItems.length > 0;
+
+            if (e.key === 'ArrowDown' && isAcOpen) {
+                e.preventDefault();
+                acSelectedIndex = Math.min(acSelectedIndex + 1, acItems.length - 1);
+            } else if (e.key === 'ArrowUp' && isAcOpen) {
+                e.preventDefault();
+                acSelectedIndex = Math.max(acSelectedIndex - 1, 0);
+            } else if (e.key === 'Enter') {
+                if (isAcOpen && acSelectedIndex >= 0) {
+                    e.preventDefault();
+                    const item = acItems[acSelectedIndex];
+                    if (item.isGroup) {
+                        input.value = item.completed.toLowerCase();
+                        hideAutocomplete();
+                        input.dispatchEvent(new Event('input'));
+                    } else {
+                        toggleTag(item.completed);
+                        input.value = '';
+                        hideAutocomplete();
+                        input.dispatchEvent(new Event('input'));
+                    }
+                } else {
+                    hideAutocomplete();
+                    const val = input.value.trim().toLowerCase();
+                    if (val && !allTags.includes(val)) {
+                        createTag(val);
+                    } else if (val) {
+                        const exactTag = allTags.find(t => t.toLowerCase() === val);
+                        if (exactTag) toggleTag(exactTag);
+                        input.value = '';
+                        input.dispatchEvent(new Event('input'));
+                    } else {
+                        modal.close();
+                    }
+                }
+            } else if (e.key === 'Escape') {
+                if (isAcOpen) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideAutocomplete();
+                } else {
+                    modal.close();
+                }
+            }
+        });
+
+        input.addEventListener('blur', () => {
+            setTimeout(hideAutocomplete, 150);
+        });
     }
 };
