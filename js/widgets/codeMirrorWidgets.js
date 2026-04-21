@@ -118,12 +118,24 @@ function createCodeMirrorWidgets(documentView) {
 
             if (icon) wrap.innerHTML = icon;
 
+            wrap.ontouchstart = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const newState = (this.state === 'x' || this.state === 'X') ? ' ' : 'x';
+                view.dispatch({
+                    changes: { from: this.from, to: this.to, insert: `[${newState}]` },
+                    scrollIntoView: false
+                });
+            };
             wrap.onmousedown = (e) => {
                 if (e.button !== 0) return;
                 e.preventDefault();
                 e.stopPropagation();
                 const newState = (this.state === 'x' || this.state === 'X') ? ' ' : 'x';
-                view.dispatch({ changes: { from: this.from, to: this.to, insert: `[${newState}]` } });
+                view.dispatch({
+                    changes: { from: this.from, to: this.to, insert: `[${newState}]` },
+                    scrollIntoView: false
+                });
             };
             wrap.oncontextmenu = (e) => {
                 e.preventDefault();
