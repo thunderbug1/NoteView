@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v12';
+const CACHE_NAME = 'noteview-v13';
 
 const PRECACHE_URLS = [
   './',
@@ -32,6 +32,7 @@ const PRECACHE_URLS = [
   './js/modals/assigneeModal.js',
   './js/modals/vaultModal.js',
   './js/utils/cacheManager.js',
+  './js/utils/recentAccessTracker.js',
   './js/utils/common.js',
   './js/utils/contactHelper.js',
   './js/utils/modal.js',

@@ -545,6 +545,12 @@ const App = {
                 if (typeof BlockSelector !== 'undefined') BlockSelector.toggle();
             }
 
+            // Recent sort toggle
+            if (currentCombo === 'Alt+R') {
+                e.preventDefault();
+                this.toggleRecentSort();
+            }
+
             // Escape exits select mode
             if (e.key === 'Escape' && typeof BlockSelector !== 'undefined' && BlockSelector.active) {
                 e.preventDefault();
@@ -577,6 +583,16 @@ const App = {
         SortManager.updateToolbar();
         GroupManager.initToolbar(() => this.render());
         GroupManager.updateToolbar();
+
+        // Recent toggle button
+        const toolbarRecentBtn = document.getElementById('toolbarRecentBtn');
+        if (toolbarRecentBtn) {
+            toolbarRecentBtn.addEventListener('click', () => this.toggleRecentSort());
+            toolbarRecentBtn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showTrashPanel(toolbarRecentBtn);
+            });
+        }
 
         // Toolbar AI button
         const toolbarAiBtn = document.getElementById('toolbarAiBtn');
@@ -670,6 +686,11 @@ const App = {
 
         SelectionManager.updateSelectionUI();
         SortManager.updateToolbar();
+
+        // Update recent button visibility for new view
+        const recentBtn = document.getElementById('toolbarRecentBtn');
+        if (recentBtn) recentBtn.hidden = view !== 'document';
+
         this.render();
         console.log('[App] setView:done', {
             currentView: Store.currentView
@@ -749,6 +770,18 @@ const App = {
 
         SortManager.updateToolbar();
         GroupManager.updateToolbar();
+
+        // Update recent sort button state
+        const toolbarRecentBtn = document.getElementById('toolbarRecentBtn');
+        if (toolbarRecentBtn) {
+            const sortConfig = Store.getSortConfig('document');
+            const isRecentMode = sortConfig?.clauses?.[0]?.field === 'lastAccessed';
+            toolbarRecentBtn.classList.toggle('active', isRecentMode);
+            toolbarRecentBtn.title = isRecentMode
+                ? 'Exit recent sort (Alt+R)'
+                : 'Sort by recently viewed (Alt+R)';
+            toolbarRecentBtn.hidden = view !== 'document';
+        }
 
         // Update toolbar AI button state
         const toolbarAiBtn = document.getElementById('toolbarAiBtn');
@@ -856,6 +889,104 @@ const App = {
         }
 
         this.render();
+    },
+
+    toggleRecentSort() {
+        const view = Store.currentView;
+        if (view !== 'document') return;
+
+        const currentSort = Store.getSortConfig('document');
+        const isRecentMode = currentSort?.clauses?.[0]?.field === 'lastAccessed';
+
+        if (isRecentMode) {
+            if (this._preRecentSort) {
+                Store.updateSortConfig('document', { clauses: this._preRecentSort });
+                this._preRecentSort = null;
+            }
+        } else {
+            this._preRecentSort = currentSort?.clauses ? JSON.parse(JSON.stringify(currentSort.clauses)) : null;
+            Store.updateSortConfig('document', {
+                clauses: [{ field: 'lastAccessed', direction: 'desc' }]
+            });
+        }
+
+        this.render();
+    },
+
+    showTrashPanel(anchorEl) {
+        const trash = RecentAccessTracker.getTrashLog();
+        if (trash.length === 0) {
+            this._showTrashToast('No recently deleted notes');
+            return;
+        }
+
+        let listHtml = trash.map(entry => {
+            const title = Store.getBlockTitle(entry.blockData) || entry.id;
+            const time = this._formatRelativeTime(entry.timestamp);
+            return `
+                <div class="trash-entry" data-trash-id="${escapeHtml(entry.id)}">
+                    <div class="trash-entry-info">
+                        <div class="trash-entry-title">${escapeHtml(title)}</div>
+                        <div class="trash-entry-time">${escapeHtml(time)}</div>
+                    </div>
+                    <button class="trash-entry-restore" data-trash-restore="${escapeHtml(entry.id)}">Restore</button>
+                </div>
+            `;
+        }).join('');
+
+        const modal = Modal.create({
+            title: 'Recently Deleted',
+            modalClass: 'trash-modal',
+            content: `<div class="trash-list">${listHtml}</div>`
+        });
+
+        modal.element.addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-trash-restore]');
+            if (!btn) return;
+            const blockId = btn.dataset.trashRestore;
+            await this.restoreFromTrash(blockId);
+            modal.close();
+        });
+    },
+
+    async restoreFromTrash(blockId) {
+        const trash = RecentAccessTracker.getTrashLog();
+        const entry = trash.find(e => e.id === blockId);
+        if (!entry?.blockData) return;
+
+        const block = entry.blockData;
+        await Store.saveBlock(block, { commit: true, commitMessage: `Restore deleted note ${block.id}` });
+
+        if (!Store.blocks.some(b => b.id === block.id)) {
+            Store.blocks.push(block);
+        }
+
+        RecentAccessTracker.removeFromTrash(blockId);
+        RecentAccessTracker.touch(block.id);
+        Store._filteredBlocksCache.invalidate();
+        Store.extractContacts();
+        TimelineView.invalidateCache();
+        SelectionManager.updateTagCounts();
+        this.render();
+    },
+
+    _formatRelativeTime(timestamp) {
+        const diff = Date.now() - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        if (minutes < 1) return 'just now';
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        return `${days}d ago`;
+    },
+
+    _showTrashToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2500);
     },
 
     async editBlock(id) {

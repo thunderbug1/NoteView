@@ -401,6 +401,8 @@ const Store = {
                     await this.saveVault(savedHandle);
                     await GitStore.init(this.directoryHandle); // INIT GIT HERE
                     await this.loadBlocks();
+                    RecentAccessTracker.init(this.directoryHandle.name);
+                    RecentAccessTracker.prune(this.blocks.map(b => b.id));
                     return true;
                 } else {
                     const error = new Error('Permission required to access saved folder');
@@ -473,6 +475,8 @@ const Store = {
         await this.saveVault(handle);
         await GitStore.init(handle);
         await this.loadBlocks();
+        RecentAccessTracker.init(handle.name);
+        RecentAccessTracker.prune(this.blocks.map(b => b.id));
     },
 
     getDefaultViewPreferences() {
@@ -755,6 +759,8 @@ const Store = {
         await this.setLastActiveVault(handle.name);
         await GitStore.init(handle);
         await this.loadBlocks();
+        RecentAccessTracker.init(handle.name);
+        RecentAccessTracker.prune(this.blocks.map(b => b.id));
         await UndoRedoManager.clear();
         TimelineView.invalidateRawDataCache();
         TimelineView.invalidateCache();
@@ -795,6 +801,8 @@ const Store = {
                 blockData: { ...block }
             });
         }
+
+        RecentAccessTracker.recordDeletion(block);
 
         const fileName = block.filename || `${block.id}.md`;
 
@@ -846,6 +854,7 @@ const Store = {
         // Let's stick to commit: true for creation to ensure it exists in git history.
         await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: extraMetadata.skipUndo });
         this.blocks.push(block);
+        RecentAccessTracker.touch(block.id);
 
         // Record command AFTER creation
         if (!UndoRedoManager.isExecuting && !extraMetadata.skipUndo) {

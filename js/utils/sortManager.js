@@ -32,6 +32,18 @@ const SortManager = {
                         desc: 'Z to A'
                     },
                     compare: (a, b) => this.compareStrings(a?.id, b?.id)
+                },
+                {
+                    field: 'lastAccessed',
+                    label: 'Recently viewed',
+                    directions: {
+                        desc: 'Most recent first',
+                        asc: 'Oldest viewed first'
+                    },
+                    compare: (a, b) => this.compareDates(
+                        RecentAccessTracker.get(a?.id),
+                        RecentAccessTracker.get(b?.id)
+                    )
                 }
             ],
             kanban: [

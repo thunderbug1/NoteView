@@ -2585,6 +2585,7 @@ const DocumentView = {
                 const blockId = container.dataset.id;
                 if (blockId && blockId !== 'new') {
                     self._focusedBlockId = blockId;
+                    RecentAccessTracker.touch(blockId);
                 }
             },
             paste: (event, view) => {
@@ -3378,6 +3379,7 @@ const DocumentView = {
             this.openNoteModal(targetId);
             return;
         }
+        RecentAccessTracker.touch(block.id);
         const blockEl = document.querySelector(`.block[data-id="${CSS.escape(block.id)}"]`);
         if (blockEl) {
             blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' });

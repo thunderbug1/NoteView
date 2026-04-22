@@ -159,6 +159,9 @@
                     <button id="toolbarSortBtn" class="toolbar-btn" title="Sort">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5h10"></path><path d="M11 9h7"></path><path d="M11 13h4"></path><path d="m3 17 3 3 3-3"></path><path d="M6 18V4"></path></svg>
                     </button>
+                    <button id="toolbarRecentBtn" class="toolbar-btn" title="Sort by recently viewed (Alt+R)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </button>
                     <button id="toolbarGroupBtn" class="toolbar-btn" title="Group">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="4" rx="1"></rect><rect x="3" y="10" width="12" height="4" rx="1"></rect><rect x="3" y="17" width="7" height="4" rx="1"></rect></svg>
                     </button>
@@ -223,6 +226,7 @@
     <script src="js/utils/timeFilter.js"></script>
     <script src="js/utils/contactHelper.js"></script>
     <script src="js/utils/cacheManager.js"></script>
+    <script src="js/utils/recentAccessTracker.js"></script>
     <script src="js/utils/appSettings.js"></script>
 
     <script src="js/undoRedoManager.js"></script>
@@ -248,7 +252,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js?v=12');
+            navigator.serviceWorker.register('./sw.js?v=13');
         }
     </script>
 
