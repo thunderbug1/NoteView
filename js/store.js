@@ -391,7 +391,11 @@ const Store = {
         if (savedHandle) {
             try {
                 // Check if we still have permission
-                const permission = await savedHandle.queryPermission({ mode: 'readwrite' });
+                let permission = await savedHandle.queryPermission({ mode: 'readwrite' });
+                if (permission !== 'granted') {
+                    // Chrome auto-grants for installed PWAs even without user gesture
+                    permission = await savedHandle.requestPermission({ mode: 'readwrite' });
+                }
                 if (permission === 'granted') {
                     this.directoryHandle = savedHandle;
                     await this.saveVault(savedHandle);
