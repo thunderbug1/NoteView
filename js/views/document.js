@@ -479,7 +479,7 @@ const DocumentView = {
             newMetadata.querySelectorAll('.ai-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     if (btn.classList.contains('ai-btn-disabled')) {
-                        AIAssistant._showToast('Enable AI Features in Settings first');
+                        showToast('Enable AI Features in Settings first');
                         return;
                     }
                     const id = btn.dataset.id;
@@ -540,7 +540,7 @@ const DocumentView = {
         container.querySelectorAll('.ai-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (btn.classList.contains('ai-btn-disabled')) {
-                    AIAssistant._showToast('Enable AI Features in Settings first');
+                    showToast('Enable AI Features in Settings first');
                     return;
                 }
                 const blockId = btn.dataset.id;

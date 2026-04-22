@@ -26,7 +26,7 @@ const AppSettings = {
             const text = await file.text();
             this._cache = JSON.parse(text);
             return this._cache;
-        } catch {
+        } catch { /* File not found or invalid JSON */
             this._cache = {};
             return this._cache;
         }
@@ -65,7 +65,7 @@ const AppSettings = {
             const file = await handle.getFile();
             const text = await file.text();
             return JSON.parse(text);
-        } catch {
+        } catch { /* File not found or invalid JSON */
             return {};
         }
     },

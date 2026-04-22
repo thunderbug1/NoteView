@@ -270,7 +270,8 @@ function createCodeMirrorWidgets(documentView) {
                 const head = prefix.slice(0, 44);
                 const tail = suffix ? suffix.slice(-16) : this.text.slice(-16);
                 return `${head}...${tail}`;
-            } catch {
+            } catch (e) {
+                console.warn('URL truncation fallback:', e);
                 return `${this.text.slice(0, 56)}...${this.text.slice(-13)}`;
             }
         }

@@ -176,7 +176,7 @@ const AIAssistant = {
                 presets: ai.presets || [],
                 keys: keys || {}
             };
-        } catch {
+        } catch { /* Vault read failed */
             return null;
         } finally {
             Store.directoryHandle = originalHandle;
@@ -199,7 +199,7 @@ const AIAssistant = {
     openOverlay(blockId) {
         if (!this.enabled) return;
         if (this.profiles.length === 0) {
-            this._showToast('Add an AI model profile in Settings first');
+            showToast('Add an AI model profile in Settings first');
             return;
         }
 
@@ -213,11 +213,11 @@ const AIAssistant = {
         const filteredCount = Store.getFilteredBlocks().length;
 
         const profileOptions = this.profiles.map(p =>
-            `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${this._escHtml(p.name)} (${this._escHtml(p.model)})</option>`
+            `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.model)})</option>`
         ).join('');
 
         const presetChips = this.presets.map(p =>
-            `<button class="ai-preset-chip" data-preset-id="${p.id}" title="${this._escHtml(p.instruction)}">${this._escHtml(p.title)}</button>`
+            `<button class="ai-preset-chip" data-preset-id="${p.id}" title="${escapeHtml(p.instruction)}">${escapeHtml(p.title)}</button>`
         ).join('');
 
         const content = `
@@ -321,11 +321,11 @@ const AIAssistant = {
 
     _cleanup() {
         if (this._abortController) {
-            try { this._abortController.abort(); } catch {}
+            try { this._abortController.abort(); } catch { /* Intentional: abort() cannot meaningfully fail */ }
             this._abortController = null;
         }
         if (this._diffEditorView) {
-            try { this._diffEditorView.destroy(); } catch {}
+            try { this._diffEditorView.destroy(); } catch { /* Intentional: cleanup on teardown */ }
             this._diffEditorView = null;
         }
         this._streamingResponse = '';
@@ -423,7 +423,7 @@ const AIAssistant = {
             }
             const errorEl = modal.querySelector('#aiError');
             errorEl.style.display = '';
-            errorEl.innerHTML = `${this._escHtml(err.message)}<br><button class="ai-retry-btn">Retry</button>`;
+            errorEl.innerHTML = `${escapeHtml(err.message)}<br><button class="ai-retry-btn">Retry</button>`;
             errorEl.querySelector('.ai-retry-btn').addEventListener('click', () => {
                 errorEl.style.display = 'none';
                 modal.querySelector('#aiResponseArea').classList.remove('visible');
@@ -559,7 +559,7 @@ const AIAssistant = {
 
         const blocks = Store.getFilteredBlocks();
         if (blocks.length === 0) {
-            this._showToast('No notes in current view');
+            showToast('No notes in current view');
             return;
         }
 
@@ -568,19 +568,19 @@ const AIAssistant = {
             : this.profiles[0].id;
 
         const profileOptions = this.profiles.map(p =>
-            `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${this._escHtml(p.name)} (${this._escHtml(p.model)})</option>`
+            `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.model)})</option>`
         ).join('');
 
         const presetChips = this.presets.map(p =>
-            `<button class="ai-preset-chip" data-preset-id="${p.id}" title="${this._escHtml(p.instruction)}">${this._escHtml(p.title)}</button>`
+            `<button class="ai-preset-chip" data-preset-id="${p.id}" title="${escapeHtml(p.instruction)}">${escapeHtml(p.title)}</button>`
         ).join('');
 
         const noteItems = blocks.map(b => {
             const title = this._extractTitle(b);
             const checked = preselectedIds ? preselectedIds.has(b.id) : true;
             return `<div class="ai-batch-note-item">
-                <input type="checkbox" ${checked ? 'checked' : ''} data-block-id="${this._escHtml(b.id)}">
-                <span class="ai-batch-note-title">${this._escHtml(title)}</span>
+                <input type="checkbox" ${checked ? 'checked' : ''} data-block-id="${escapeHtml(b.id)}">
+                <span class="ai-batch-note-title">${escapeHtml(title)}</span>
             </div>`;
         }).join('');
 
@@ -749,7 +749,7 @@ const AIAssistant = {
 
         const apiKey = this._apiKeys[profileId] || '';
         if (!apiKey) {
-            this._showToast('No API key configured for this profile');
+            showToast('No API key configured for this profile');
             return;
         }
 
@@ -779,7 +779,7 @@ const AIAssistant = {
 
         // Modal was closed during processing — reopen for review
         if (!this._batchOverlay) {
-            this._showBatchToast(`Batch complete: ${this._batchResults.filter(r => r.status === 'pending').length} notes to review`);
+            showToast(`Batch complete: ${this._batchResults.filter(r => r.status === 'pending').length} notes to review`, { duration: 5000 });
             modal = this._reopenBatchModal();
             if (!modal) return;
         }
@@ -1053,7 +1053,7 @@ const AIAssistant = {
     _showBatchReview(modal) {
         const results = this._batchResults.filter(Boolean);
         if (results.length === 0) {
-            this._showToast('No notes were processed');
+            showToast('No notes were processed');
             this._closeBatchOverlay();
             return;
         }
@@ -1075,7 +1075,7 @@ const AIAssistant = {
             const prefix = r.isNew ? '<span class="ai-batch-new-badge">new</span>' : '';
             return `<div class="ai-batch-review-item ${statusClass}" data-index="${i}">
                 <span class="ai-batch-review-status">${statusIcon}</span>
-                ${prefix}<span class="ai-batch-review-title">${this._escHtml(r.title)}</span>
+                ${prefix}<span class="ai-batch-review-title">${escapeHtml(r.title)}</span>
             </div>`;
         }).join('');
 
@@ -1102,20 +1102,20 @@ const AIAssistant = {
 
         const result = this._batchResults.filter(Boolean)[index];
         if (!result || result.status === 'unchanged' || result.status === 'error') {
-            container.innerHTML = `<div class="ai-no-changes">${result?.status === 'error' ? this._escHtml(result.error) : 'No changes detected'}</div>`;
+            container.innerHTML = `<div class="ai-no-changes">${result?.status === 'error' ? escapeHtml(result.error) : 'No changes detected'}</div>`;
             return;
         }
 
         // New notes: show content directly (no diff possible)
         if (result.isNew) {
-            container.innerHTML = `<div class="ai-batch-new-preview"><pre>${this._escHtml(result.modified)}</pre></div>`;
+            container.innerHTML = `<div class="ai-batch-new-preview"><pre>${escapeHtml(result.modified)}</pre></div>`;
             return;
         }
 
         const createDiff = () => {
             const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
             if (this._diffEditorView) {
-                try { this._diffEditorView.destroy(); } catch {}
+                try { this._diffEditorView.destroy(); } catch { /* Intentional: cleanup on teardown */ }
                 this._diffEditorView = null;
             }
             this._diffEditorView = new EditorView({
@@ -1265,7 +1265,7 @@ const AIAssistant = {
 
     _closeBatchOverlay() {
         if (this._diffEditorView) {
-            try { this._diffEditorView.destroy(); } catch {}
+            try { this._diffEditorView.destroy(); } catch { /* Intentional: cleanup on teardown */ }
             this._diffEditorView = null;
         }
         if (this._batchOverlay) {
@@ -1274,14 +1274,6 @@ const AIAssistant = {
             overlay.close();
         }
         this._batchResults = [];
-    },
-
-    _showBatchToast(message) {
-        const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);padding:0.75rem 1.5rem;background:var(--accent);color:white;border-radius:var(--radius-sm);font-size:0.85rem;z-index:10001;box-shadow:var(--shadow-lg);cursor:pointer;transition:opacity 0.3s;opacity:1;';
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 5000);
     },
 
     _reopenBatchModal() {
@@ -1344,20 +1336,6 @@ const AIAssistant = {
 
     _stripCodeFences(text) {
         return text.replace(/^```[\w]*\n([\s\S]*?)\n```\s*$/, '$1');
-    },
-
-    _escHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    },
-
-    _showToast(message) {
-        const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);padding:0.75rem 1.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;z-index:10001;box-shadow:var(--shadow-lg);transition:opacity 0.3s;opacity:1;';
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
     }
 };
 

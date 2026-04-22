@@ -518,7 +518,7 @@ const App = {
             if (Store.shortcuts && currentCombo === Store.shortcuts.aiAssistant) {
                 e.preventDefault();
                 if (!AIAssistant.enabled) {
-                    AIAssistant._showToast('Enable AI Features in Settings first');
+                    showToast('Enable AI Features in Settings first');
                 } else {
                     const activeEditor = document.activeElement?.closest('.cm-editor');
                     const cmContainer = activeEditor?.closest('.codemirror-container');
@@ -533,7 +533,7 @@ const App = {
             if (currentCombo === 'Ctrl+Shift+B') {
                 e.preventDefault();
                 if (!AIAssistant.isConfigured()) {
-                    AIAssistant._showToast('Enable AI Features in Settings first');
+                    showToast('Enable AI Features in Settings first');
                 } else {
                     AIAssistant.openBatchOverlay();
                 }
@@ -599,7 +599,7 @@ const App = {
         if (toolbarAiBtn) {
             toolbarAiBtn.addEventListener('click', () => {
                 if (!AIAssistant.isConfigured()) {
-                    AIAssistant._showToast('Enable AI Features in Settings first');
+                    showToast('Enable AI Features in Settings first');
                     return;
                 }
                 AIAssistant.openBatchOverlay();
@@ -916,7 +916,7 @@ const App = {
     showTrashPanel(anchorEl) {
         const trash = RecentAccessTracker.getTrashLog();
         if (trash.length === 0) {
-            this._showTrashToast('No recently deleted notes');
+            showToast('No recently deleted notes', { duration: 2500 });
             return;
         }
 
@@ -979,14 +979,6 @@ const App = {
         if (hours < 24) return `${hours}h ago`;
         const days = Math.floor(hours / 24);
         return `${days}d ago`;
-    },
-
-    _showTrashToast(message) {
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2500);
     },
 
     async editBlock(id) {
@@ -1419,7 +1411,7 @@ const App = {
 
         this._aiRecognition.onend = () => {
             if (this._aiDictationActive && !this._isStoppingAIDictation) {
-                try { this._aiRecognition.start(); } catch(e) {}
+                try { this._aiRecognition.start(); } catch(e) { console.warn('Speech recognition restart failed:', e); }
             }
             // Don't cleanup here when stopAIDictation initiated the stop —
             // processDictationWithAI handles its own cleanup

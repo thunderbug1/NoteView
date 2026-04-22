@@ -1227,7 +1227,7 @@ const Store = {
             let fileHandle;
             try {
                 fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
-            } catch {
+            } catch { /* Retry once on intermittent FS error */
                 fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
             }
 
@@ -1358,7 +1358,7 @@ function parseFrontMatter(content) {
             if (!(key in data)) {
                 try {
                     data[key] = JSON.parse(valueStr);
-                } catch {
+                } catch { /* Not valid JSON, treat as plain string */
                     data[key] = valueStr;
                 }
             }
