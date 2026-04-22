@@ -1024,9 +1024,28 @@ const App = {
         // Pinned affects block ordering
         if (property === 'pinned') return false;
 
-        // Active filters may change block visibility
         const sel = SelectionManager.selections;
-        if ((sel?.context?.size > 0) || (sel?.excluded?.size > 0) || !!Store.searchQuery || !!sel?.time) return false;
+        const hasContext = sel?.context?.size > 0;
+        const hasExcluded = sel?.excluded?.size > 0;
+        const hasSearch = !!Store.searchQuery;
+        const hasTime = !!sel?.time;
+
+        // Tag additions cannot hide a visible block under AND-logic context filters.
+        // Exception: Status.untagged filter — adding a tag to an untagged block would hide it.
+        if (property === 'tags' && hasContext && !hasExcluded && !hasSearch && !hasTime) {
+            if (sel.context.has('Status.untagged')) {
+                const block = Store.blocks.find(b => b.id === blockId);
+                if (block && (!block.tags || block.tags.length === 0)) return false;
+            }
+            // Still check sort dependency
+            const sortConfig = Store.getSortConfig('document');
+            const sortFields = (sortConfig?.clauses || []).map(c => c.field);
+            if (sortFields.includes('tags')) return false;
+            return true;
+        }
+
+        // Active filters may change block visibility for other properties
+        if (hasContext || hasExcluded || hasSearch || hasTime) return false;
 
         // Check if sort order depends on this property
         const sortConfig = Store.getSortConfig('document');

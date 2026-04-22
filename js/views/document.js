@@ -47,6 +47,9 @@ const DocumentView = {
     },
 
     async render(blocks, options = {}) {
+        // Cancel pending auto-saves before DOM rebuild to prevent stale writes
+        this.cancelAllPendingSaves();
+
         // Stop any active speech recognition before re-rendering
         if (this._recordingBlockId) {
             this.stopSpeechRecognition();
@@ -1773,7 +1776,7 @@ const DocumentView = {
         });
     },
 
-    createMentionCompletionSource(container) {
+    createMentionCompletionSource(container, resolveBlockId) {
         return (context) => {
             const word = context.matchBefore(/@[a-zA-Z0-9_]*/);
             if (!word) return null;
@@ -1787,7 +1790,8 @@ const DocumentView = {
             if (word.from === word.to && !context.explicit) return null;
 
             const typedQuery = word.text.slice(1).toLowerCase();
-            const suggestions = this.getMentionSuggestions(container.dataset.id)
+            const blockId = resolveBlockId ? resolveBlockId() : container.dataset.id;
+            const suggestions = this.getMentionSuggestions(blockId)
                 .filter(contact => contact.toLowerCase().includes(typedQuery))
                 .map(contact => ({
                     label: `@${contact}`,
@@ -2582,7 +2586,7 @@ const DocumentView = {
         const self = this;
         return EditorView.domEventHandlers({
             focus: (event, view) => {
-                const blockId = container.dataset.id;
+                const blockId = view.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
                 if (blockId && blockId !== 'new') {
                     self._focusedBlockId = blockId;
                     RecentAccessTracker.touch(blockId);
@@ -2613,7 +2617,7 @@ const DocumentView = {
                 return true;
             },
             blur: (event, view) => {
-                const currentId = container.dataset.id;
+                const currentId = view.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
                 const content = view.state.doc.toString();
                 if (currentId !== 'new' && currentId !== 'new-modal') {
                     // Skip blur handling during undo/redo or AI streaming
@@ -2648,7 +2652,7 @@ const DocumentView = {
             {
                 key: 'Mod-Enter',
                 run: (target) => {
-                    const currentId = container.dataset.id;
+                    const currentId = target.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
                     if (currentId === 'new') {
                         const content = target.state.doc.toString();
                         if (content.trim()) {
@@ -2662,7 +2666,7 @@ const DocumentView = {
             {
                 key: 'Shift-Enter',
                 run: (target) => {
-                    const currentId = container.dataset.id;
+                    const currentId = target.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
                     if (currentId === 'new') {
                         const content = target.state.doc.toString();
                         if (content.trim()) {
@@ -2695,9 +2699,13 @@ const DocumentView = {
         const { EditorView, EditorState, basicSetup, markdown, languages, keymap, indentWithTab, placeholder, foldService } = window.CodeMirror;
 
         const self = this;
-        const handleContentChange = (content) => self.handleContentChange(container.dataset.id, content);
+        // Mutable reference — set after EditorView construction so the closure
+        // can resolve the blockId from the *live* DOM (handles editor reuse during re-renders).
+        let editorView = null;
+        const resolveBlockId = () => editorView?.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
+        const handleContentChange = (content) => self.handleContentChange(resolveBlockId(), content);
         const createNewBlock = () => self.createNewBlock();
-        const mentionCompletionSource = this.createMentionCompletionSource(container);
+        const mentionCompletionSource = this.createMentionCompletionSource(container, resolveBlockId);
         const wikilinkCompletionSource = this.createWikilinkCompletionSource(container);
 
         const view = new EditorView({
@@ -2740,6 +2748,7 @@ const DocumentView = {
             parent: container
         });
 
+        editorView = view;
         this.editors.set(blockId, view);
         this.originalContents.set(blockId, initialContent);
     },
@@ -3081,10 +3090,15 @@ const DocumentView = {
 
         // Handle new block
         if (blockId === 'new') {
+            // Guard: verify the 'new' placeholder exists in the live DOM.
+            // After a re-render, stale closures may resolve a detached container's
+            // old 'new' data-id, which would spuriously create notes.
+            const placeholder = document.querySelector('.block[data-id="new"]');
+            if (!placeholder || !placeholder.isConnected) return;
+
             this.newBlockContent = content;
-            const block = document.querySelector(`.block[data-id="new"]`);
             if (content.trim()) {
-                block?.classList.remove('empty');
+                placeholder.classList.remove('empty');
                 // Promote immediately when content is added
                 this.promotePlaceholder(content);
             }
@@ -3210,6 +3224,13 @@ const DocumentView = {
         } finally {
             this.isPromoting = false;
         }
+    },
+
+    cancelAllPendingSaves() {
+        for (const [, timeout] of this.saveTimeouts) {
+            clearTimeout(timeout);
+        }
+        this.saveTimeouts.clear();
     },
 
     scheduleSave(blockId, content) {
