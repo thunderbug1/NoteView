@@ -34,7 +34,7 @@ const VaultModal = {
             vaultList.forEach(v => {
                 const item = document.createElement('div');
                 item.className = 'vault-dropdown-item' + (v.name === currentName ? ' active' : '');
-                item.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</span>`;
+                item.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(v.name)}</span>`;
                 if (v.name !== currentName) {
                     item.addEventListener('click', () => {
                         menu.remove();
@@ -137,10 +137,10 @@ const VaultModal = {
         const dotsIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>`;
 
         const renderList = (vaults) => vaults.map(v => `
-            <div class="vault-manager-row${v.name === currentName ? ' active' : ''}" data-vault="${v.name}">
+            <div class="vault-manager-row${v.name === currentName ? ' active' : ''}" data-vault="${escapeHtml(v.name)}">
                 ${folderIcon}
-                <span class="vault-manager-name">${v.name}</span>
-                <button class="vault-manager-menu-btn" data-vault="${v.name}" title="Vault options">${dotsIcon}</button>
+                <span class="vault-manager-name">${escapeHtml(v.name)}</span>
+                <button class="vault-manager-menu-btn" data-vault="${escapeHtml(v.name)}" title="Vault options">${dotsIcon}</button>
             </div>
         `).join('');
 

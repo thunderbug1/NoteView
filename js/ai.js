@@ -1151,8 +1151,8 @@ const AIAssistant = {
     },
 
     async _acceptBatchNote(index, modal) {
-        const results = this._batchResults.filter(Boolean);
-        const result = results[index];
+        const result = this._batchResults[index];
+        if (!result) return;
         if (!result || result.status !== 'pending') return;
 
         if (result.isNew) {
@@ -1198,8 +1198,7 @@ const AIAssistant = {
     },
 
     _rejectBatchNote(index, modal) {
-        const results = this._batchResults.filter(Boolean);
-        const result = results[index];
+        const result = this._batchResults[index];
         if (!result) return;
 
         result.status = 'rejected';

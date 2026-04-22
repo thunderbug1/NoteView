@@ -597,8 +597,8 @@ const SelectionManager = {
                 const groupMatchClass = coveredByGroup ? 'group-match' : '';
                 const computedClass = isComputedSection ? 'computed' : '';
 
-                html += `<div class="tag-radio-option ${selClass} ${exclClass} ${groupMatchClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
-                html += `<span class="tag-badge">${this.getTagDisplayName(tag)}</span>`;
+                html += `<div class="tag-radio-option ${selClass} ${exclClass} ${groupMatchClass} ${computedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
+                html += `<span class="tag-badge">${escapeHtml(this.getTagDisplayName(tag))}</span>`;
                 html += `</div>`;
             });
 
@@ -613,8 +613,8 @@ const SelectionManager = {
             const exclClass = isExcluded ? 'excluded' : '';
             const computedClass = isComputedSection ? 'computed' : '';
 
-            html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass}" data-group="context" data-tag="${tag}">`;
-            html += `<span class="tag-badge">${this.getTagDisplayName(tag)}</span>`;
+            html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
+            html += `<span class="tag-badge">${escapeHtml(this.getTagDisplayName(tag))}</span>`;
             html += `</div>`;
         });
 
@@ -909,8 +909,8 @@ const SelectionManager = {
             const selClass = isSelected ? 'selected' : '';
 
             html += `
-                <div class="tag-radio-option ${selClass}" data-group="contact" data-tag="${contact}" style="opacity: ${opacity}">
-                    <span class="tag-badge">@${contact}</span>
+                <div class="tag-radio-option ${selClass}" data-group="contact" data-tag="${escapeHtml(contact)}" style="opacity: ${opacity}">
+                    <span class="tag-badge">@${escapeHtml(contact)}</span>
                 </div>
             `;
         });

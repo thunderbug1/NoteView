@@ -12,7 +12,7 @@ mkdir -p vendor
 npm run vendor
 
 echo "Downloading marked.js..."
-curl -sL https://cdn.jsdelivr.net/npm/marked/marked.min.js -o vendor/marked.js
+curl -sL https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js -o vendor/marked.js
 
 echo "Downloading isomorphic-git..."
 curl -sL https://unpkg.com/isomorphic-git@1.24.5/index.umd.min.js -o vendor/isomorphic-git.js

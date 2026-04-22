@@ -164,7 +164,10 @@ function createCodeMirrorWidgets(documentView) {
             wrap.className = `md-task-badge badge-${this.type}`;
 
             if (this.type === 'due') {
-                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span> ${this.value}`;
+                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span> `;
+                const valSpan = document.createElement('span');
+                valSpan.textContent = this.value;
+                wrap.appendChild(valSpan);
                 // Set urgency data attribute for overdue/upcoming styling
                 try {
                     const line = view.state.doc.lineAt(this.from);
@@ -180,14 +183,23 @@ function createCodeMirrorWidgets(documentView) {
                 } catch (_) { /* ignore line lookup errors */ }
                 wrap.title = 'Tap to edit';
             } else if (this.type === 'assignee') {
-                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span> ${this.value}`;
+                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span> `;
+                const valSpan = document.createElement('span');
+                valSpan.textContent = this.value;
+                wrap.appendChild(valSpan);
             } else if (this.type === 'priority') {
                 const colors = { 'urgent': '#ef4444', 'high': '#f97316', 'medium': '#3b82f6', 'low': '#94a3b8' };
                 const color = colors[this.value.toLowerCase()] || 'currentColor';
                 wrap.dataset.priority = this.value.toLowerCase();
-                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="3" style="margin-right:2px; vertical-align:text-top;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg></span> ${this.value}`;
+                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="3" style="margin-right:2px; vertical-align:text-top;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg></span> `;
+                const valSpan = document.createElement('span');
+                valSpan.textContent = this.value;
+                wrap.appendChild(valSpan);
             } else if (this.type === 'id') {
-                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span> ${this.value}`;
+                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span> `;
+                const valSpan = document.createElement('span');
+                valSpan.textContent = this.value;
+                wrap.appendChild(valSpan);
             }
 
             const handleBadgeClick = (e) => {

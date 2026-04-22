@@ -2620,13 +2620,11 @@ const DocumentView = {
                         return;
                     }
                      if (content.trim() === '') {
-                        console.log('Deleting empty block on blur:', currentId);
                         App.deleteBlock(currentId);
                     } else {
                         // Only commit if content changed
                         const originalContent = self.originalContents.get(currentId);
                         if (content !== originalContent) {
-                            console.log('Committing block on blur:', currentId);
                             App.saveBlockContent(currentId, content, { commit: true });
                             self.originalContents.set(currentId, content);
                         }
@@ -2653,7 +2651,6 @@ const DocumentView = {
                     if (currentId === 'new') {
                         const content = target.state.doc.toString();
                         if (content.trim()) {
-                            console.log('Creating block via Mod+Enter', { currentId, content: content.substring(0, 50) });
                             createNewBlock();
                             return true;
                         }
@@ -2668,7 +2665,6 @@ const DocumentView = {
                     if (currentId === 'new') {
                         const content = target.state.doc.toString();
                         if (content.trim()) {
-                            console.log('Creating block via Shift+Enter', { currentId, content: content.substring(0, 50) });
                             createNewBlock();
                             return true;
                         }
@@ -2813,24 +2809,18 @@ const DocumentView = {
         const line = view.state.doc.lineAt(pos);
         const scroller = view.scrollDOM;
 
-        console.log('[scroll] line:', line.number, '/', view.state.doc.lines, 'matchIndex:', matchIndex, 'pos:', pos);
-
         // Dispatch to trigger StateField update (highlight decoration)
         view.dispatch({
             selection: { anchor: line.from },
             scrollIntoView: true
         });
 
-        console.log('[scroll] after dispatch scrollHeight:', scroller.scrollHeight, 'clientHeight:', scroller.clientHeight, 'scrollTop:', scroller.scrollTop);
-
         // Refine scroll position using actual coordinates
         const refineScroll = (label) => {
             const coords = view.coordsAtPos(line.from);
-            console.log('[scroll] refine', label, 'coords:', coords);
             if (coords) {
                 const editorRect = scroller.getBoundingClientRect();
                 const lineY = coords.top - editorRect.top + scroller.scrollTop;
-                console.log('[scroll] centering to:', Math.max(0, lineY - scroller.clientHeight / 2));
                 scroller.scrollTop = Math.max(0, lineY - scroller.clientHeight / 2);
                 return true;
             }
@@ -2844,7 +2834,6 @@ const DocumentView = {
         if (totalLines > 1 && scroller.scrollHeight > scroller.clientHeight) {
             const ratio = (line.number - 1) / (totalLines - 1);
             const estimated = ratio * scroller.scrollHeight - scroller.clientHeight / 2;
-            console.log('[scroll] estimating: ratio:', ratio, 'scrollHeight:', scroller.scrollHeight, 'target:', Math.max(0, estimated));
             scroller.scrollTop = Math.max(0, estimated);
         }
 
@@ -3089,15 +3078,6 @@ const DocumentView = {
         // Skip recording during undo/redo execution
         if (UndoRedoManager.isExecuting) return;
 
-        // Debug logging
-        if (blockId === 'new') {
-            console.log('New block content changed:', {
-                blockId,
-                contentLength: content.length,
-                content: content.substring(0, 50)
-            });
-        }
-
         // Handle new block
         if (blockId === 'new') {
             this.newBlockContent = content;
@@ -3274,8 +3254,6 @@ const DocumentView = {
         const content = this.newBlockContent.trim();
         if (!content) return;
 
-        console.log('Creating new block with content:', content);
-
         await Store.createBlock(content);
         this.newBlockContent = '';
 
@@ -3439,7 +3417,7 @@ const DocumentView = {
         let renderedContent;
         const rawContent = block.content || '';
         if (window.marked && typeof window.marked.parse === 'function') {
-            renderedContent = marked.parse(rawContent);
+            renderedContent = Common.sanitizeHtml(marked.parse(rawContent));
         } else {
             renderedContent = `<pre class="note-modal-raw">${Common.escapeHtml(rawContent)}</pre>`;
         }

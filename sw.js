@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v11';
+const CACHE_NAME = 'noteview-v12';
 
 const PRECACHE_URLS = [
   './',
@@ -14,6 +14,8 @@ const PRECACHE_URLS = [
   './css/views/kanban.css',
   './css/views/history.css',
   './css/views/settings.css',
+  './css/views/deadline.css',
+  './css/views/ai.css',
   './vendor/marked.js',
   './vendor/isomorphic-git.js',
   './vendor/codemirror.js',
@@ -24,6 +26,11 @@ const PRECACHE_URLS = [
   './js/undoRedoManager.js',
   './js/store.js',
   './js/selectionManager.js',
+  './js/ai.js',
+  './js/blockSelector.js',
+  './js/modals/tagModal.js',
+  './js/modals/assigneeModal.js',
+  './js/modals/vaultModal.js',
   './js/utils/cacheManager.js',
   './js/utils/common.js',
   './js/utils/contactHelper.js',
@@ -32,6 +39,10 @@ const PRECACHE_URLS = [
   './js/utils/taskParser.js',
   './js/utils/timeFilter.js',
   './js/utils/sortManager.js',
+  './js/utils/appSettings.js',
+  './js/utils/deadlinePanel.js',
+  './js/utils/backlinksPanel.js',
+  './js/utils/groupManager.js',
   './js/widgets/codeMirrorWidgets.js',
   './js/menus/taskMenus.js',
   './js/views/history.js',
@@ -62,9 +73,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {

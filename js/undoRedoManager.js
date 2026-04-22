@@ -191,11 +191,7 @@ const UndoRedoManager = {
     async undoCreate(command) {
         const block = Store.blocks.find(b => b.id === command.blockId);
         if (block) {
-            // Remove from Store.blocks
-            const index = Store.blocks.findIndex(b => b.id === command.blockId);
-            Store.blocks.splice(index, 1);
-
-            // Delete file
+            // Delete file first
             const fileName = block.filename || `${block.id}.md`;
             try {
                 await Store.directoryHandle.removeEntry(fileName);
@@ -203,6 +199,10 @@ const UndoRedoManager = {
                 console.error('Failed to delete file during undo:', e);
                 return;
             }
+
+            // Remove from memory only after successful file deletion
+            const index = Store.blocks.findIndex(b => b.id === command.blockId);
+            Store.blocks.splice(index, 1);
             try {
                 await GitStore.commitBlock(fileName, `Undo: remove ${fileName}`);
             } catch (e) {
@@ -243,7 +243,10 @@ const UndoRedoManager = {
     async undoUpdate(command) {
         const block = Store.blocks.find(b => b.id === command.blockId);
         if (block && command.before) {
-            // Revert to before state
+            // Revert to before state, removing any properties added after the snapshot
+            Object.keys(block).forEach(key => {
+                if (!(key in command.before)) delete block[key];
+            });
             Object.assign(block, command.before);
             block.lastUpdated = new Date().toISOString();
 
@@ -336,10 +339,19 @@ const UndoRedoManager = {
     async undoBatch(command) {
         for (let i = command.commands.length - 1; i >= 0; i--) {
             const sub = command.commands[i];
+            // Normalize batch sub-commands to expected format
+            const normalized = { ...sub };
+            if (sub.type === 'create' && sub.after && !sub.blockData) {
+                normalized.blockData = sub.after;
+                normalized.blockId = sub.after.id;
+            } else if (sub.type === 'delete' && sub.before && !sub.blockData) {
+                normalized.blockData = sub.before;
+                normalized.blockId = sub.before.id;
+            }
             switch (sub.type) {
-                case 'create': await this.undoCreate(sub); break;
-                case 'update': await this.undoUpdate(sub); break;
-                case 'delete': await this.undoDelete(sub); break;
+                case 'create': await this.undoCreate(normalized); break;
+                case 'update': await this.undoUpdate(normalized); break;
+                case 'delete': await this.undoDelete(normalized); break;
             }
         }
     },
@@ -350,10 +362,18 @@ const UndoRedoManager = {
     async redoBatch(command) {
         for (let i = 0; i < command.commands.length; i++) {
             const sub = command.commands[i];
+            const normalized = { ...sub };
+            if (sub.type === 'create' && sub.after && !sub.blockData) {
+                normalized.blockData = sub.after;
+                normalized.blockId = sub.after.id;
+            } else if (sub.type === 'delete' && sub.before && !sub.blockData) {
+                normalized.blockData = sub.before;
+                normalized.blockId = sub.before.id;
+            }
             switch (sub.type) {
-                case 'create': await this.redoCreate(sub); break;
-                case 'update': await this.redoUpdate(sub); break;
-                case 'delete': await this.redoDelete(sub); break;
+                case 'create': await this.redoCreate(normalized); break;
+                case 'update': await this.redoUpdate(normalized); break;
+                case 'delete': await this.redoDelete(normalized); break;
             }
         }
     },

@@ -143,8 +143,7 @@ const HistoryView = {
         });
         if (!confirmed) return;
 
-        await App.updateBlockProperty(this.currentBlockId, 'content', this.selectedOldContent);
-        await App.saveBlockContent(this.currentBlockId, this.selectedOldContent);
+        await App.updateBlockProperty(this.currentBlockId, 'content', this.selectedOldContent, 'Restore version');
         this.closeHistory();
         App.render();
     },

@@ -1051,7 +1051,10 @@ const App = {
                     }
                 });
 
-                const closeMenu = () => menu.remove();
+                const closeMenu = () => {
+                    menu.remove();
+                    document.removeEventListener('click', closeHandler);
+                };
                 const closeHandler = (evt) => {
                     if (!menu.contains(evt.target) && evt.target !== btn) closeMenu();
                 };
@@ -1869,9 +1872,9 @@ const ThemeManager = {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => App.init());
 
-// Close IndexedDB connection when page is hidden/unloaded to prevent blocking
+// Close IndexedDB connection when page is unloaded to prevent blocking upgrades
 window.addEventListener('beforeunload', () => {
-    if (Store.db) {
+    if (Store.db && !Store._saveQueue?.size) {
         try {
             Store.db.close();
             Store.db = null;

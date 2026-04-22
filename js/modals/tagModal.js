@@ -431,14 +431,14 @@ const TagModal = {
             const allSelected = groupTags.every(t => selectedTags.has(t));
             const selClass = allSelected ? 'group-selected' : '';
 
-            html += `<div class="tag-modal-group ${selClass}" data-group-path="${groupName}">`;
+            html += `<div class="tag-modal-group ${selClass}" data-group-path="${escapeHtml(groupName)}">`;
             html += `<div class="tag-modal-group-header">${Common.capitalizeFirst(groupName)}</div>`;
             html += `<div class="tag-modal-group-items">`;
 
             groupTags.forEach(tag => {
                 const { leaf } = Common.parseHierarchicalTag(tag);
                 const selClass = selectedTags.has(tag) ? ' selected' : '';
-                html += `<div class="tag-modal-item${selClass}" data-tag="${tag}">`;
+                html += `<div class="tag-modal-item${selClass}" data-tag="${escapeHtml(tag)}">`;
                 html += `<span class="tag-badge">${Common.capitalizeFirst(leaf)}</span>`;
                 html += `</div>`;
             });
@@ -449,7 +449,7 @@ const TagModal = {
         // Render flat tags
         flat.forEach(tag => {
             const selClass = selectedTags.has(tag) ? ' selected' : '';
-            html += `<div class="tag-modal-item tag-modal-flat-item${selClass}" data-tag="${tag}">`;
+            html += `<div class="tag-modal-item tag-modal-flat-item${selClass}" data-tag="${escapeHtml(tag)}">`;
             html += `<span class="tag-badge">${SelectionManager.getTagDisplayName(tag)}</span>`;
             html += `</div>`;
         });
@@ -585,8 +585,9 @@ const TagModal = {
 
         const originalHtml = item.innerHTML;
 
-        item.innerHTML = `<input class="tag-rename-input" type="text" value="${oldTag}">`;
+        item.innerHTML = `<input class="tag-rename-input" type="text" value="">`;
         const renameInput = item.querySelector('.tag-rename-input');
+        renameInput.value = oldTag;
         renameInput.focus();
         renameInput.select();
 
@@ -674,9 +675,9 @@ const TagModal = {
         const { segments, leaf } = Common.parseHierarchicalTag(tag);
         if (segments.length > 0) {
             const parentText = Common.capitalizeFirst(segments[0]);
-            return `<span class="badge badge-hierarchical" data-tag="${tag}"><span class="badge-parent">${parentText}</span>${Common.formatTagDisplay(tag)}</span>`;
+            return `<span class="badge badge-hierarchical" data-tag="${escapeHtml(tag)}"><span class="badge-parent">${escapeHtml(parentText)}</span>${escapeHtml(Common.formatTagDisplay(tag))}</span>`;
         }
-        return `<span class="badge" data-tag="${tag}">${Common.capitalizeFirst(tag)}</span>`;
+        return `<span class="badge" data-tag="${escapeHtml(tag)}">${escapeHtml(Common.capitalizeFirst(tag))}</span>`;
     },
 
     /**

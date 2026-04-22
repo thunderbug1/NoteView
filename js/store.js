@@ -800,6 +800,7 @@ const Store = {
             console.error('Failed to delete file', e);
         }
 
+        // Remove from memory only after file deletion attempt
         this.blocks.splice(index, 1);
         this.extractContacts();
         this._filteredBlocksCache.invalidate();
@@ -1183,62 +1184,87 @@ const Store = {
     async saveBlock(block, options = {}) {
         const { commit = false, commitMessage = null, skipUndo = false, ...updates } = options;
 
-        // Capture state before save for undo/redo
-        const existingBlock = this.blocks.find(b => b.id === block.id);
-        const isUpdate = !!existingBlock && !UndoRedoManager.isExecuting && !skipUndo;
-        
-        // Take a deep copy of the block BEFORE applying updates
-        const beforeState = isUpdate ? JSON.parse(JSON.stringify(existingBlock)) : null;
-
-        // Apply any updates provided in options
-        if (Object.keys(updates).length > 0) {
-            Object.assign(block, updates);
+        // Serialize concurrent saves for the same block
+        const saveKey = block.id;
+        if (!this._saveQueue) this._saveQueue = new Map();
+        while (this._saveQueue.has(saveKey)) {
+            await this._saveQueue.get(saveKey);
         }
+        let resolveSave;
+        this._saveQueue.set(saveKey, new Promise(r => { resolveSave = r; }));
 
-        block.lastUpdated = new Date().toISOString();
-        const content = serializeBlock(block);
-        const fileName = block.filename || `${block.id}.md`;
-
-        // Create or update file
-        let fileHandle;
         try {
-            fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
-        } catch {
-            fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
-        }
+            // Capture state before save for undo/redo
+            const existingBlock = this.blocks.find(b => b.id === block.id);
+            const isUpdate = !!existingBlock && !UndoRedoManager.isExecuting && !skipUndo;
 
-        const writable = await fileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
+            // Take a deep copy of the block BEFORE applying updates
+            const beforeState = isUpdate ? JSON.parse(JSON.stringify(existingBlock)) : null;
 
-        block.filename = fileName;
-
-        // Update contacts
-        this.extractContacts();
-
-        // Invalidate cache
-        this._filteredBlocksCache.invalidate();
-
-        // Record update command AFTER save (using the captured beforeState)
-        if (isUpdate && beforeState) {
-            const diff = UndoRedoManager.createDiff(beforeState, block);
-            // Only record if something actually changed (beyond just lastUpdated)
-            const changedFields = Object.keys(diff.before);
-            if (changedFields.length > 0 && !(changedFields.length === 1 && changedFields[0] === 'lastUpdated')) {
-                await UndoRedoManager.executeCommand({
-                    type: 'update',
-                    blockId: block.id,
-                    before: diff.before,
-                    after: diff.after
-                });
+            // Apply any updates provided in options
+            if (Object.keys(updates).length > 0) {
+                Object.assign(block, updates);
             }
-        }
 
-        // Commit block to git ONLY if requested
-        if (commit) {
-            const message = commitMessage || `Update ${fileName}`;
-            await GitStore.commitBlock(fileName, message);
-            if (window.SyncManager) SyncManager.onCommit();
+            block.lastUpdated = new Date().toISOString();
+            const content = serializeBlock(block);
+            const fileName = block.filename || `${block.id}.md`;
+
+            // Create or update file
+            let fileHandle;
+            try {
+                fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
+            } catch {
+                fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
+            }
+
+            let writable;
+            try {
+                writable = await fileHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+            } catch (writeError) {
+                // Roll back in-memory changes on write failure
+                if (beforeState) {
+                    Object.keys(beforeState).forEach(key => {
+                        if (key in beforeState) block[key] = beforeState[key];
+                    });
+                }
+                throw writeError;
+            }
+
+            block.filename = fileName;
+
+            // Update contacts
+            this.extractContacts();
+
+            // Invalidate cache
+            this._filteredBlocksCache.invalidate();
+
+            // Record update command AFTER save (using the captured beforeState)
+            if (isUpdate && beforeState) {
+                const diff = UndoRedoManager.createDiff(beforeState, block);
+                // Only record if something actually changed (beyond just lastUpdated)
+                const changedFields = Object.keys(diff.before);
+                if (changedFields.length > 0 && !(changedFields.length === 1 && changedFields[0] === 'lastUpdated')) {
+                    await UndoRedoManager.executeCommand({
+                        type: 'update',
+                        blockId: block.id,
+                        before: diff.before,
+                        after: diff.after
+                    });
+                }
+            }
+
+            // Commit block to git ONLY if requested
+            if (commit) {
+                const message = commitMessage || `Update ${fileName}`;
+                await GitStore.commitBlock(fileName, message);
+                if (window.SyncManager) SyncManager.onCommit();
+            }
+        } finally {
+            this._saveQueue.delete(saveKey);
+            resolveSave();
         }
     },
 

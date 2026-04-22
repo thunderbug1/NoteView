@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Always update documentation** (`docs/` directory and this file) when making changes that affect documented behavior, architecture, or data flow. Documentation should stay in sync with the code.
 
+## Coding Rules
+
+- **Escape all user-controlled values in HTML.** Any value from blocks, tags, contacts, vault names, or AI output that gets inserted into `innerHTML` or HTML attributes must go through `escapeHtml()`. This includes `data-*` attributes, `value=""` attributes, and visible text inside template literals. The `Modal.create({title, content})` `content` parameter is raw HTML — callers are responsible for escaping dynamic parts.
+- **Sanitize markdown-to-HTML output.** When rendering `marked.parse()` output into the DOM, pass it through `sanitizeHtml()` (strips `<script>`, `on*` attributes, `javascript:` URLs). Never insert raw `marked.parse()` output directly.
+- **Clean up document-level event listeners.** Any `document.addEventListener('click', handler)` added for menus or popovers must be removed with `removeEventListener` in the close/dismiss handler. Otherwise listeners accumulate on every open.
+- **Mutate in-memory state only after file operations succeed.** Don't `splice` arrays or modify block state before `removeEntry`/`createWritable` completes. If a file write fails, in-memory state should still reflect what's on disk.
+- **When adding new `<script>` or `<link>` tags to `index.html`, also add them to `sw.js` `PRECACHE_URLS`.** The service worker precache must mirror all app resources for offline support. Bump `CACHE_NAME` and the `?v=` param together.
+- **When rendering into the right sidebar (`#sidebarRight .sidebar-scroll`), coexist with other panels.** Use `insertAdjacentHTML` or targeted `outerHTML` replacement on your own container element. Never replace the entire `container.innerHTML` — it destroys other panels (backlinks, deadlines).
+- **Don't export regex literals with the `g` flag on window globals.** The `lastIndex` property is mutable and shared across all callers. Use a getter that returns a fresh regex instead: `get MY_REGEX() { return /pattern/g; }`.
+
 ## Project Overview
 
 NoteView is a browser-based markdown note-taking and task management app with built-in git version control. It runs entirely client-side — no server, no build step, no framework. Data lives as plain `.md` files on the user's local filesystem via the File System Access API.

@@ -14,6 +14,27 @@ function escapeHtml(text) {
 }
 
 /**
+ * Sanitize HTML to prevent XSS while preserving formatting.
+ * Strips <script>, <iframe>, <object>, <embed>, <form> elements
+ * and removes on* event handler attributes and javascript: URLs.
+ * @param {string} html - HTML string to sanitize
+ * @returns {string} Sanitized HTML
+ */
+function sanitizeHtml(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const remove = doc.querySelectorAll('script, iframe, object, embed, form, base, meta');
+    remove.forEach(el => el.remove());
+    doc.querySelectorAll('*').forEach(el => {
+        for (const attr of Array.from(el.attributes)) {
+            if (attr.name.startsWith('on') || attr.value.trim().toLowerCase().startsWith('javascript:')) {
+                el.removeAttribute(attr.name);
+            }
+        }
+    });
+    return doc.body.innerHTML;
+}
+
+/**
  * Format a date string to a readable format
  * @param {string|Date} dateStr - Date string or Date object
  * @param {boolean} includeTime - Whether to include time

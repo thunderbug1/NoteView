@@ -46,14 +46,22 @@ const DeadlinePanel = {
 
         const items = TaskParser.getTasksWithUrgency(blocks);
 
+        // Remove only our own panel, not the entire sidebar content
+        const existing = container.querySelector('.deadline-panel');
+
         if (items.length === 0) {
-            container.innerHTML = `
+            const html = `
                 <div class="deadline-panel">
                     <div class="sidebar-section">
                         <div class="section-header"><h3>Deadlines</h3></div>
                         <div class="deadline-empty">No upcoming deadlines</div>
                     </div>
                 </div>`;
+            if (existing) {
+                existing.outerHTML = html;
+            } else {
+                container.insertAdjacentHTML('afterbegin', html);
+            }
             return;
         }
 
@@ -79,7 +87,11 @@ const DeadlinePanel = {
         }
 
         html += '</div></div>';
-        container.innerHTML = html;
+        if (existing) {
+            existing.outerHTML = html;
+        } else {
+            container.insertAdjacentHTML('afterbegin', html);
+        }
     },
 
     renderDeadlineItem(task, urgency) {

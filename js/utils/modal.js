@@ -35,7 +35,7 @@ function createModal(options) {
         ? headerContent
         : `
             <div class="tag-modal-header">
-                <h3>${title}</h3>
+                <h3>${escapeHtml(title)}</h3>
                 <button class="close-modal">&times;</button>
             </div>
         `;
@@ -96,10 +96,10 @@ function createConfirm(options) {
         const modal = createModal({
             title,
             content: `
-                <p style="margin-bottom: 20px;">${message}</p>
+                <p style="margin-bottom: 20px;">${escapeHtml(message)}</p>
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button class="modal-cancel-btn" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">${cancelText}</button>
-                    <button class="modal-confirm-btn" style="padding: 8px 16px; background: var(--accent, #3b82f6); color: white; border: none; border-radius: 4px; cursor: pointer;">${confirmText}</button>
+                    <button class="modal-cancel-btn" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">${escapeHtml(cancelText)}</button>
+                    <button class="modal-confirm-btn" style="padding: 8px 16px; background: var(--accent, #3b82f6); color: white; border: none; border-radius: 4px; cursor: pointer;">${escapeHtml(confirmText)}</button>
                 </div>
             `,
             onClose: () => resolve(false)
@@ -138,8 +138,8 @@ function createPrompt(options) {
         const modal = createModal({
             title,
             content: `
-                <p style="margin-bottom: 10px;">${message}</p>
-                <input type="text" class="modal-prompt-input" placeholder="${placeholder}" value="${defaultValue}" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 15px;">
+                <p style="margin-bottom: 10px;">${escapeHtml(message)}</p>
+                <input type="text" class="modal-prompt-input" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 15px;">
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
                     <button class="modal-cancel-btn" style="padding: 8px 16px; background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">Cancel</button>
                     <button class="modal-confirm-btn" style="padding: 8px 16px; background: var(--accent, #3b82f6); color: white; border: none; border-radius: 4px; cursor: pointer;">OK</button>

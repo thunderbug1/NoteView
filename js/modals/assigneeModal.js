@@ -19,8 +19,8 @@ const AssigneeModal = {
         if (referenceContext.size > 0) {
             // Sort by matching context tags (higher match first), then alphabetically
             suggestedContacts.sort((a, b) => {
-                const aTags = Store.contacts.get(a);
-                const bTags = Store.contacts.get(b);
+                const aTags = Store.contacts.get(a) || new Set();
+                const bTags = Store.contacts.get(b) || new Set();
                 const aMatchCount = Array.from(referenceContext).filter(t => aTags.has(t)).length;
                 const bMatchCount = Array.from(referenceContext).filter(t => bTags.has(t)).length;
 
@@ -34,10 +34,10 @@ const AssigneeModal = {
             <div class="tag-modal-list">
                 <div class="assignee-clear" data-action="clear">✕ Clear assignee</div>
                 ${suggestedContacts.map(contact => {
-                    const contactTags = Store.contacts.get(contact);
+                    const contactTags = Store.contacts.get(contact) || new Set();
                     const hasMatch = referenceContext.size === 0 || Array.from(referenceContext).some(t => contactTags.has(t));
                     const matchClass = hasMatch ? '' : 'non-matching-context';
-                    return `<div class="tag-modal-item ${matchClass}" data-contact="${contact}">@${contact}</div>`;
+                    return `<div class="tag-modal-item ${matchClass}" data-contact="${escapeHtml(contact)}">@${escapeHtml(contact)}</div>`;
                 }).join('')}
             </div>
             <div id="assigneeModalCreatePrompt" style="display: none;" class="tag-modal-create">
