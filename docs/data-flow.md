@@ -109,9 +109,35 @@ This pattern appears in `App.saveBlockContent()`, `App.deleteBlock()`, and `App.
 
 1. Finds block index in `Store.blocks`
 2. Records undo command (type: `'delete'`) with full block data
-3. Removes file via `directoryHandle.removeEntry(fileName)`
-4. Splices block from `blocks` array
-5. Re-extracts contacts and invalidates cache
+3. Records deletion in `RecentAccessTracker.recordDeletion()` (persistent trash log)
+4. Removes file via `directoryHandle.removeEntry(fileName)`
+5. Splices block from `blocks` array
+6. Re-extracts contacts and invalidates cache
+
+---
+
+## Recent Access Tracking
+
+`RecentAccessTracker` (`js/utils/recentAccessTracker.js`) tracks when blocks are viewed and deleted, stored per-vault in localStorage (separate from .md files and git).
+
+### Access tracking
+
+`touch(blockId)` records a timestamp when a block is viewed. Tracked at:
+- Editor focus (`DocumentView.createDomEventHandlers()` focus handler)
+- Wikilink navigation (`DocumentView.navigateToBlock()`)
+- Block creation (`Store.createBlock()`)
+
+Access timestamps feed the `lastAccessed` sort field in SortManager.
+
+### Trash log
+
+`recordDeletion(block)` stores the full block object when deleted. Capped at 50 entries, auto-pruned by age. Survives page reloads.
+
+The trash panel is accessible via right-click on the recent toolbar button. Each entry shows the note title and relative time with a "Restore" button that recreates the .md file via `Store.saveBlock()`.
+
+### Persistence
+
+Data stored in localStorage under `noteview-recent-access::<vaultName>` as `{ access: { blockId: timestamp }, trash: [...] }`. Initialized on vault load, pruned of stale entries after `loadBlocks()`.
 
 ---
 
@@ -121,12 +147,16 @@ This pattern appears in `App.saveBlockContent()`, `App.deleteBlock()`, and `App.
 
 ```
 All blocks
+  → Separate pinned blocks (always shown, bypass all filters)
   → Time filter (if SelectionManager.selections.time is set)
   → Context tag filter (AND logic for all selected tags)
-  → Computed tag filter (allTodos, openTodos, etc.)
+    → Includes path: group selections (block must have ANY tag in that group)
+    → Includes computed tags (Todo.*, Status.*) checked against task content
+  → Excluded tag filter (NOT logic — block must NOT have any excluded tag)
   → Contact filter (if SelectionManager.selections.contact is set)
   → Search filter (content + tags substring match)
-  → Return filtered array
+  → Combine: pinned blocks first (unfiltered), then filtered unpinned blocks
+  → Return combined array
 ```
 
 ### Caching
@@ -134,13 +164,14 @@ All blocks
 The result is cached using `CacheManager.createCache()` (`js/utils/cacheManager.js`). The cache key is a composite string:
 
 ```js
-`${timeSelection}|${contextSelection}|${contactSelection}|${searchQuery}|${timeProperty}|${blocksHash}`
+`${timeSelection}|${contextSelection}|${excludedSelection}|${contactSelection}|${searchQuery}|${timeProperty}|${blocksHash}`
 ```
 
 Where `blocksHash` is all block IDs joined with commas. This means the cache automatically invalidates when:
 - Any filter selection changes (different key)
 - A block is added or removed (different block IDs)
 - The search query changes
+- The excluded set changes
 
 The cache is also explicitly invalidated (`_filteredBlocksCache.invalidate()`) on every `saveBlock()`, `deleteBlock()`, and `loadBlocks()` call.
 
@@ -150,10 +181,17 @@ When multiple context tags are selected, a block must match **all** of them:
 
 ```js
 const requiredTags = Array.from(contextSelection).filter(t => !SelectionManager.isComputedContextTag(t));
-const hasAllTags = requiredTags.every(tag => block.tags?.includes(tag));
 ```
 
-Computed tags (allTodos, openTodos, etc.) are checked separately with their own logic.
+Individual tags use `block.tags.includes(tag)`. `path:` prefixed selections check if the block has ANY tag in that group via `Common.parseHierarchicalTag()`. Computed tags (`Todo.*`, `Status.*`) are checked separately — the block must have at least one task satisfying all selected computed tag conditions.
+
+### Excluded tag NOT logic
+
+Tags can be excluded (right-click in sidebar) via `SelectionManager.selections.excluded`. A block matching any excluded tag is filtered out. Excluded tags also support `path:` prefixes and computed tags (e.g., excluding `Todo.done` removes blocks with completed tasks).
+
+### Pinned blocks
+
+Blocks with `block.pinned === true` bypass all filters and always appear at the top of the result list.
 
 ---
 
@@ -177,7 +215,7 @@ Each clause has a `field` and `direction`. Fields are defined per view in `SortM
 
 ### Available fields by view
 
-**Document view**: `lastUpdated`, `creationDate`, `id`
+**Document view**: `lastUpdated`, `creationDate`, `id`, `lastAccessed`
 **Kanban view**: `priority`, `deadline`, `assignee`, `text`, `sourceOrder`
 
 ### Sorting flow

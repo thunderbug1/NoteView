@@ -20,7 +20,7 @@ Store (block save/delete)
 
 | Module | File | Responsibility |
 |--------|------|----------------|
-| `GitStore` | `js/gitStore.js` | High-level git operations (init, commit, log, diff, restore) |
+| `GitStore` | `js/gitStore.js` | High-level git operations (init, commit, log, diff) |
 | `GitFSAdapter` | `js/gitFs.js` | Filesystem adapter implementing `fs.promises` for isomorphic-git |
 | `GitRemote` | `js/gitRemote.js` | Push/pull to remote repositories |
 | `Store` | `js/store.js` | Orchestrates git via GitStore during block mutations |
@@ -172,10 +172,9 @@ const commits = await git.log({ fs, dir, depth: maxCount });
 
 `HistoryView.restoreVersion()` (`js/views/history.js`):
 
-1. Confirms with the user
-2. Calls `App.updateBlockProperty(blockId, 'content', selectedOldContent)` — this saves and commits
-3. Calls `App.saveBlockContent(blockId, selectedOldContent)` for additional safety
-4. Closes the history modal and re-renders
+1. Confirms with the user via `Modal.confirm()`
+2. Calls `App.updateBlockProperty(blockId, 'content', selectedOldContent, 'Restore version')` — this saves and commits
+3. Closes the history modal and re-renders
 
 This creates a new commit that restores the old content, preserving the full history.
 

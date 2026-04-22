@@ -30,15 +30,15 @@ State characters are case-insensitive (`[X]` and `[B]` normalize to `[x]` and `[
 
 ### Metadata Fields (Badges)
 
-Badges use the syntax `[key:: value]` and can appear in any order after the task text:
+Badges use the syntax `[key:: value]` and can appear in any order after the task text. Only the following keys are extracted by the parser:
 
 | Field | Example | Purpose |
 |-------|---------|---------|
 | `due` | `[due:: 2026-04-15]` | Deadline date |
 | `assignee` | `[assignee:: alice]` | Person responsible |
 | `priority` | `[priority:: high]` | Priority level |
-| `completed` | `[completed:: 2026-04-09]` | Completion date |
-| `id` | `[id:: ^task-123]` | Explicit task ID |
+
+Other badge-like syntax (e.g., `[completed:: ...]`, `[id:: ...]`) remains in the text but is not parsed or rendered as interactive badges.
 
 Priority values (with sort rank): `urgent` (0), `high` (1), `medium` (2), `low` (4). Unknown priorities rank at 3.
 
@@ -206,18 +206,21 @@ The task menu appears on right-click of a `CheckboxWidget` and offers:
 
 ## Computed Tags
 
-These sidebar filter options are computed at runtime from block content:
+These sidebar filter options are computed at runtime from block content. They use namespace prefixes (`Todo.*`, `Status.*`):
 
 | Tag | Filter logic | Used in |
 |-----|-------------|---------|
-| `allTodos` | Block content matches `/\[[ xX\/bB\-]\]/` | Block filtering, Kanban |
-| `openTodos` | Block content matches `/\[[ \/]\]/` | Block filtering, Kanban |
-| `blockedTodos` | `TaskParser.isBlockedTask()` for any task | Block filtering, Kanban |
-| `unblockedTodos` | `TaskParser.isUnblockedTask()` for any task | Block filtering, Kanban |
-| `unassigned` | `TaskParser.hasUnassignedTasks(..., { onlyActive: true })` for block tasks, plus task-level matching in Kanban/Timeline | Block filtering, Kanban, Timeline |
-| `untagged` | `block.tags` is empty or absent | Block filtering |
+| `Todo.all` | Block content matches `/\[[ xX\/bB\-]\]/` | Block filtering, Kanban |
+| `Todo.open` | `TaskParser.isOpenTask()` — states `[ ]` or `[/]` | Block filtering, Kanban |
+| `Todo.inProgress` | `TaskParser.isInProgressTask()` — state `[/]` | Block filtering, Kanban |
+| `Todo.done` | `TaskParser.isDoneTask()` — state `[x]` | Block filtering, Kanban |
+| `Todo.blocked` | `TaskParser.isBlockedTask()` — state `[b]` | Block filtering, Kanban |
+| `Todo.canceled` | `TaskParser.isCanceledTask()` — state `[-]` | Block filtering, Kanban |
+| `Todo.unblocked` | `TaskParser.isUnblockedTask()` — open tasks (not blocked) | Block filtering, Kanban |
+| `Status.untagged` | `block.tags` is empty or absent | Block filtering |
+| `Status.unassigned` | `TaskParser.hasUnassignedTasks(..., { onlyActive: true })` | Block filtering, Kanban, Timeline |
 
-In `Store.getFilteredBlocks()`, computed tags are checked after regular tag matching. A block must pass ALL selected filters (AND logic).
+`Todo.*` tags form an exclusion group — selecting one deselects the others (since they're mutually exclusive states). In `Store.getFilteredBlocks()`, computed tags are checked after regular tag matching. A block must pass ALL selected filters (AND logic).
 
 ---
 

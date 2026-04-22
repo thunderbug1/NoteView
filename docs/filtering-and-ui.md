@@ -14,13 +14,14 @@ This document covers how NoteView manages filter state, renders sidebar controls
 selections: {
     time: '',              // '' | 'today' | 'thisWeek' | 'thisMonth'
     context: new Set(),    // multi-select: user tags + computed tags
+    excluded: new Set(),   // multi-select: tags to exclude (NOT filter)
     contact: ''            // single-select: username string
 }
 ```
 
 ### Persistence
 
-Only `context` selections persist — stored as a JSON array in `localStorage` under `noteview-selection-state`. Time and contact selections reset on reload.
+Only `context` and `excluded` selections persist — stored as a JSON object in `localStorage` under `noteview-selection-state`. Time and contact selections reset on reload.
 
 On `init()`:
 1. `loadSelectionState()` — reads from localStorage, filters out non-string/empty entries
@@ -29,13 +30,17 @@ On `init()`:
 
 ### Update propagation
 
-Every mutation method (`setTimeSelection`, `setContactSelection`, `addContextTag`, `removeContextTag`, `toggleContextTag`) follows the same pattern:
+Every mutation method (`setTimeSelection`, `setContactSelection`, `addContextTag`, `removeContextTag`, `toggleContextTag`, `addExcludedTag`, `removeExcludedTag`, `toggleExcluded`) follows the same pattern:
 
 1. Mutate `this.selections`
 2. `saveSelectionState()` (context only)
 3. `updateSelectionUI()` — iterates all `.tag-radio-option` DOM elements, compares `data-group`/`data-tag` against selections, toggles `.selected` CSS class
 
 After the mutation, the caller (event handlers in `App.setupSidebarTagListeners()`) invokes `App.render()`.
+
+### Context navigation history
+
+SelectionManager tracks a `_historyStack` (max 50 entries) of context selection snapshots, enabling Alt+Left/Alt+Right navigation through past filter states. Navigation is debounced (500ms) to avoid recording intermediate states.
 
 ---
 
@@ -62,8 +67,9 @@ The sidebar exposes four filter groups with different selection semantics:
 
 - **Container**: `#computedTags` in `index.html`
 - **`data-group="context"`** — shares the `selections.context` Set with user tags
-- **Fixed options**: `allTodos`, `openTodos`, `blockedTodos`, `unblockedTodos`, `untagged`, `unassigned`
-- **Filter logic**: Handled separately in `Store.getFilteredBlocks()` and per-view task/event filters. `unassigned` matches tasks without an assignee badge regardless of state. For nested checklists, child tasks inherit assignee context from assigned parent tasks.
+- **Fixed options** (namespaced): `Todo.all`, `Todo.open`, `Todo.inProgress`, `Todo.done`, `Todo.blocked`, `Todo.canceled`, `Todo.unblocked`, `Status.untagged`, `Status.unassigned`
+- **Exclusion groups**: Selecting a tag in `computedExclusionGroups` removes all others in that group (e.g., selecting `Todo.open` removes `Todo.done`). The exclusion group contains all `Todo.*` tags.
+- **Filter logic**: Handled separately in `Store.getFilteredBlocks()` and per-view task/event filters. `Status.unassigned` matches tasks without an assignee badge (for nested checklists, child tasks inherit assignee context from assigned parent tasks).
 
 ### People (radio)
 
@@ -71,6 +77,25 @@ The sidebar exposes four filter groups with different selection semantics:
 - **`data-group="contact"`**
 - **Behavior**: Single-select. Click to select, click again to deselect.
 - **Event handler**: `App.setupSidebarTagListeners()`
+
+### Excluded tags (negative filter)
+
+Tags can be excluded via right-click in the sidebar. Excluded tags are stored in `SelectionManager.selections.excluded` (a `Set`). A block matching any excluded tag is filtered out in `Store.getFilteredBlocks()`. Excluded tags also support `path:` prefixes and computed tags.
+
+Both context and excluded selections persist to `localStorage` under `noteview-selection-state`.
+
+---
+
+## Hierarchical Tags
+
+Tags containing a dot (e.g., `project.ui`) are parsed as hierarchical by `Common.parseHierarchicalTag()`:
+
+- `parseHierarchicalTag("project.ui")` → `{ segments: ["project"], leaf: "ui", full: "project.ui" }`
+- Multi-dot tags are normalized to single-level: `"A.B.C"` → group `"A"`, leaf `"C"`
+
+`GroupManager` (`js/utils/groupManager.js`) groups blocks by tag namespace. The sidebar renders tags in groups with collapsible sections.
+
+In the filtering pipeline, `path:` prefixed selections (e.g., `path:project`) match blocks that have ANY tag in that group — not a specific tag.
 
 ---
 
@@ -264,7 +289,7 @@ The search input uses a 300ms debounce (from `js/utils/common.js`). Empty search
 
 ## Theme System
 
-`ThemeManager` (defined in `js/main.js` line 957):
+`ThemeManager` (defined in `js/main.js`):
 
 ### Initialization
 
@@ -318,3 +343,17 @@ Implemented in `App.setupSidebarListeners()`. Both sidebars share one overlay an
 - Right-swipe while open closes it
 
 Both gestures require minimum 50px horizontal distance and max 30px vertical variance. Overlay click closes whichever sidebar is open.
+
+---
+
+## Right Sidebar Panels
+
+The right sidebar (`#sidebarRight`) hosts multiple panels that coexist. Panels must use `insertAdjacentHTML` or targeted DOM replacement — never replace the entire `container.innerHTML`.
+
+### BacklinksPanel
+
+`BacklinksPanel` (`js/utils/backlinksPanel.js`) renders backlinks (notes referencing the focused note) into the right sidebar. Called by `DocumentView` when a block receives focus.
+
+### DeadlinePanel
+
+`DeadlinePanel` (`js/utils/deadlinePanel.js`) renders upcoming and overdue deadline alerts into the right sidebar. Shows tasks with `[due:: ...]` badges that are due soon or past due.

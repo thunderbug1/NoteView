@@ -50,12 +50,18 @@ All core modules are plain objects on `window` — there are no ES module import
 
 - **`App`** (`js/main.js`) — Top-level controller. Initializes the app, handles routing between views, manages event listeners. Also contains `ThemeManager`. Delegates modal logic to dedicated modules.
 - **`Store`** (`js/store.js`) — Central state and file I/O. Manages `blocks` array, IndexedDB persistence, directory handle, file read/write, git commit on save, contact/mention tracking. Filtering logic lives in `Store.getFilteredBlocks()`.
-- **`GitStore`** (`js/gitStore.js`) — Git operations abstraction over isomorphic-git. Init, commit, log, diff, restore.
-- **`GitFs`** (`js/gitFs.js`) — Filesystem adapter that bridges the browser File System Access API with isomorphic-git's expected fs interface.
+- **`GitStore`** (`js/gitStore.js`) — Git operations abstraction over isomorphic-git. Init, commit, log, diff.
+- **`GitFSAdapter`** (`js/gitFs.js`) — Class exported as `window.GitFSAdapter`. Filesystem adapter that bridges the browser File System Access API with isomorphic-git's expected `fs.promises` interface.
 - **`GitRemote`** (`js/gitRemote.js`) — Push/pull to remote git repositories.
-- **`SelectionManager`** (`js/selectionManager.js`) — Manages sidebar filter state: time selection, context tags (multi-select), contact filter (single-select). Updates tag counts and UI.
-- **`UndoRedoManager`** (`js/undoRedoManager.js`) — Command-pattern undo/redo for block operations.
+- **`SyncManager`** (`js/syncManager.js`) — Orchestrates automatic git remote syncing. Handles triggers (interval, idle, commit threshold), network status tracking, and toolbar indicator. Delegates push/pull to `GitRemote`.
+- **`AIAssistant`** (`js/ai.js`) — OpenAI-compatible LLM integration for note transformation. Supports multiple model profiles, configurable presets, streaming responses, diff-based apply, and batch operations. API keys stored separately in `.noteview/keys.json`.
+- **`BlockSelector`** (`js/blockSelector.js`) — Multi-select mode for bulk operations. Document view selects entire blocks; kanban view selects individual tasks.
+- **`SelectionManager`** (`js/selectionManager.js`) — Manages sidebar filter state: time selection, context tags (multi-select with exclusion), contact filter (single-select), and context navigation history. Updates tag counts and UI.
+- **`UndoRedoManager`** (`js/undoRedoManager.js`) — Command-pattern undo/redo for block operations, including batch commands. State persisted to IndexedDB per session.
 - **`SortManager`** (`js/utils/sortManager.js`) — Per-view sort configuration with multi-clause sorting.
+- **`RecentAccessTracker`** (`js/utils/recentAccessTracker.js`) — Tracks per-block last-accessed timestamps and recently deleted blocks in localStorage. Provides `lastAccessed` sort field and trash log for selective undelete.
+- **`AppSettings`** (`js/utils/appSettings.js`) — File-based settings persistence in `.noteview/settings.json` (shareable config) and `.noteview/keys.json` (API keys, auto-excluded from git).
+- **`GroupManager`** (`js/utils/groupManager.js`) — Groups blocks by tag namespace for hierarchical tag display.
 - **`TagModal`** (`js/modals/tagModal.js`) — Tag selection and creation modal for blocks.
 - **`AssigneeModal`** (`js/modals/assigneeModal.js`) — Contact selection modal for task assignment.
 - **`VaultModal`** (`js/modals/vaultModal.js`) — Vault management: dropdown switcher, manager modal, vault switching.
@@ -68,7 +74,7 @@ Each view is a global object with a `render(blocks)` method called by `App.rende
 - **`KanbanView`** (`js/views/kanban.js`) — Drag-and-drop task board. Columns map to task states (`[ ]`, `[/]`, `[x]`, `[b]`, `[-]`). Event handling split into `setupCardDragDrop()`, `setupCardClickHandlers()`, `setupMobileInteractions()`, `setupColumnDropTargets()`.
 - **`TimelineView`** (`js/views/timeline.js`) — Git-history-based task timeline. Has its own cache that's invalidated on save/delete.
 - **`HistoryView`** (`js/views/history.js`) — Version browser with side-by-side diff using CodeMirror's merge view.
-- **`SettingsView`** (`js/views/settings.js`) — App configuration and keyboard shortcut customization.
+- **`SettingsView`** (`js/views/settings.js`) — App configuration: vault info, sync settings, AI model profiles, keyboard shortcut customization.
 
 ### Data model
 
@@ -76,22 +82,22 @@ A **block** is a single markdown note with:
 - `id` — Filename without `.md` extension
 - `content` — Raw markdown text
 - `tags` — Array of tag strings (from frontmatter)
-- `lastUpdated`, `createdAt` — Timestamps from git
+- `lastUpdated`, `creationDate` — Timestamps
 - Tasks parsed inline from markdown checkboxes with metadata (`[due:: ...]`, `[priority:: ...]`, `[assignee:: ...]`)
 
-Blocks are stored as individual `.md` files in the user's chosen directory. Frontmatter (`---` block at top of file) holds tags. Every save triggers a git commit.
+Blocks are stored as individual `.md` files in the user's chosen directory. Frontmatter (`---` block at top of file) holds tags and metadata. Only saves with `commit: true` (explicit saves, property changes, block creation) trigger git commits; auto-saves from editor debounce do not.
 
 ### CodeMirror integration
 
-CodeMirror 6 modules load as ES modules via esm.sh in `index.html`, then are exported to `window.CodeMirror`. Views must wait for `window.CodeMirrorReady` event (see `DocumentView.waitForCodeMirror()`). Custom widgets (task checkboxes, metadata decorations) live in `js/widgets/codeMirrorWidgets.js`.
+CodeMirror 6 is loaded as a vendored bundle from `vendor/codemirror.js`, which sets `window.CodeMirror` (all CM6 exports) and `window.CodeMirrorReady = true`, then dispatches the `CodeMirrorReady` event. Views must wait for this event (see `DocumentView.waitForCodeMirror()`). Custom widgets (task checkboxes, metadata decorations) live in `js/widgets/codeMirrorWidgets.js`.
 
 ### Key patterns
 
 - **`Store.saveBlock(block, options)`** — Central write path. Accepts options for content changes, property updates, commit messages. Captures before/after state for undo/redo.
 - **`App.updateBlockProperty(id, property, value)`** — Convenience method that calls `Store.saveBlock`, then invalidates timeline cache, updates tag counts, and re-renders.
 - **After any mutation** (save, delete), call `TimelineView.invalidateCache()` and `SelectionManager.updateTagCounts()` before re-rendering.
-- **`Modal.create({title, content, modalClass, onClose})`** — Factory for modal dialogs. Returns the modal element with a `.close()` method.
-- **Filtering pipeline**: `Store.getFilteredBlocks()` applies search → time filter → context tags → contact filter, with caching via `CacheManager`.
+- **`Modal.create({title, content, modalClass, onClose})`** — Factory for modal dialogs. Returns an object with `{ element, close(), querySelector(), querySelectorAll() }`.
+- **Filtering pipeline**: `Store.getFilteredBlocks()` applies: pinned blocks (always shown) → time filter → context tags (AND logic, includes `path:` group selections) → excluded tags (NOT logic) → contact filter → search filter, with caching via `CacheManager`.
 
 ### Browser APIs used
 
@@ -104,6 +110,6 @@ CodeMirror 6 modules load as ES modules via esm.sh in `index.html`, then are exp
 
 - [Data Flow & State Management](docs/data-flow.md) — State ownership, render cycle, block lifecycle, filtering pipeline, caching, undo/redo, persistence
 - [CodeMirror Editor System](docs/codemirror-editor.md) — CM6 loading, editor lifecycle, custom widgets, auto-save, focus management, merge view, autocomplete
-- [Git Integration](docs/git-integration.md) — GitFSAdapter, init/commit/history/diff/restore flow, remote operations, timeline data extraction
+- [Git Integration](docs/git-integration.md) — GitFSAdapter, init/commit/history/diff flow, remote operations, timeline data extraction
 - [Task System](docs/task-system.md) — Task syntax and states, parsing, kanban drag-and-drop, timeline, context menus, computed tags, dependencies
 - [Filtering & UI](docs/filtering-and-ui.md) — SelectionManager, filter groups, tag system, contacts, time filtering, modal factory, sidebar, theming, mobile

@@ -1,29 +1,32 @@
 # CodeMirror 6 Editor System
 
-This document covers how NoteView integrates CodeMirror 6 for markdown editing — from CDN loading to custom widgets, auto-save, and diff views.
+This document covers how NoteView integrates CodeMirror 6 for markdown editing — from bundle loading to custom widgets, auto-save, and diff views.
 
 ---
 
 ## Loading & Initialization
 
-### CDN Loading
+### Vendored bundle loading
 
-CodeMirror modules load as ES modules in `index.html` (line 188):
+CodeMirror 6 is loaded as a pre-bundled script in `index.html`:
 
 ```html
-<script type="module">
-    import {EditorView, basicSetup} from "https://esm.sh/codemirror";
-    import {markdown} from "https://esm.sh/@codemirror/lang-markdown";
-    import {languages} from "https://esm.sh/@codemirror/language-data";
-    // ... more imports ...
-
-    window.CodeMirror = { EditorView, basicSetup, Prec, keymap, markdown, ... };
-    window.CodeMirrorReady = true;
-    window.dispatchEvent(new Event('CodeMirrorReady'));
-</script>
+<script src="vendor/codemirror.js"></script>
 ```
 
-All CM6 modules are exported to `window.CodeMirror` for use by regular (non-module) scripts. The `CodeMirrorReady` event signals that the editor API is available.
+The bundle is built by `scripts/vendor.sh` (which uses esbuild to bundle CM6 modules from npm). At the end of the bundle, all CM6 exports are attached to `window.CodeMirror`:
+
+```js
+window.CodeMirror = {
+    EditorView, basicSetup, Prec, keymap, markdown, languages,
+    ViewPlugin, Decoration, WidgetType, StateField,
+    unifiedMergeView, indentWithTab, autocompletion, ...
+};
+window.CodeMirrorReady = true;
+window.dispatchEvent(new Event('CodeMirrorReady'));
+```
+
+All CM6 modules are available via `window.CodeMirror` for use by regular (non-module) scripts. The `CodeMirrorReady` event signals that the editor API is available.
 
 ### Ready Gate
 
