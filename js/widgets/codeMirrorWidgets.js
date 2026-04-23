@@ -208,7 +208,10 @@ function createCodeMirrorWidgets(documentView) {
                 });
             };
             wrap.onmousedown = (e) => {
-                if (e.button !== 0) return;
+                if (e.button !== 0) {
+                    e.stopPropagation();
+                    return;
+                }
                 e.preventDefault();
                 e.stopPropagation();
                 const newState = (this.state === 'x' || this.state === 'X') ? ' ' : 'x';
