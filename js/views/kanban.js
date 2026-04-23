@@ -480,6 +480,10 @@ const KanbanView = {
         // Card click opens document
         card.addEventListener('click', (e) => {
             if (dragState.inProgress) return;
+            if (dragState.longPressTriggered) {
+                dragState.longPressTriggered = false;
+                return;
+            }
             if (e.target.closest('.kanban-badge')) return;
             if (e.target.closest('.kanban-action-btn')) return;
             App.showBlockContentModal(card.dataset.blockId, {
@@ -514,14 +518,13 @@ const KanbanView = {
         });
     },
 
-    setupMobileInteractions(card) {
+    setupMobileInteractions(card, dragState) {
         let longPressTimer = null;
-        let longPressTriggered = false;
 
         card.addEventListener('touchstart', (e) => {
-            longPressTriggered = false;
+            dragState.longPressTriggered = false;
             longPressTimer = setTimeout(() => {
-                longPressTriggered = true;
+                dragState.longPressTriggered = true;
                 const payload = KanbanView.buildDragPayload(card);
                 KanbanView.showMoveModal(JSON.parse(payload));
             }, 500);
@@ -636,7 +639,7 @@ const KanbanView = {
             KanbanView.setupCardDragDrop(card, dragState);
             KanbanView.setupCardClickHandlers(card, dragState);
             if (isMobile) {
-                KanbanView.setupMobileInteractions(card);
+                KanbanView.setupMobileInteractions(card, dragState);
             }
         });
 
