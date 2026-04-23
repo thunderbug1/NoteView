@@ -1180,13 +1180,13 @@ const AIAssistant = {
         }
 
         // Advance to next pending
-        const nextPending = results.findIndex((r, i) => i > index && r.status === 'pending');
+        const nextPending = this._batchResults.findIndex((r, i) => i > index && r.status === 'pending');
         if (nextPending !== -1) {
             const nextItem = modal.querySelector(`[data-index="${nextPending}"]`);
             if (nextItem) nextItem.click();
         } else {
             // Check if any remain
-            const remaining = results.filter(r => r.status === 'pending');
+            const remaining = this._batchResults.filter(r => r.status === 'pending');
             if (remaining.length === 0) {
                 this._finalizeBatch();
                 this._closeBatchOverlay();
@@ -1211,7 +1211,7 @@ const AIAssistant = {
         }
 
         // Advance to next pending
-        const nextPending = results.findIndex((r, i) => i > index && r.status === 'pending');
+        const nextPending = this._batchResults.findIndex((r, i) => i > index && r.status === 'pending');
         if (nextPending !== -1) {
             const nextItem = modal.querySelector(`[data-index="${nextPending}"]`);
             if (nextItem) nextItem.click();

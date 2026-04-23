@@ -810,6 +810,7 @@ const Store = {
             await this.directoryHandle.removeEntry(fileName);
         } catch (e) {
             console.error('Failed to delete file', e);
+            throw e;
         }
 
         // Remove from memory only after file deletion attempt
@@ -1213,6 +1214,7 @@ const Store = {
 
             // Take a deep copy of the block BEFORE applying updates
             const beforeState = isUpdate ? JSON.parse(JSON.stringify(existingBlock)) : null;
+            const keysBefore = isUpdate ? Object.keys(existingBlock) : null;
 
             // Apply any updates provided in options
             if (Object.keys(updates).length > 0) {
@@ -1239,9 +1241,10 @@ const Store = {
             } catch (writeError) {
                 // Roll back in-memory changes on write failure
                 if (beforeState) {
-                    Object.keys(beforeState).forEach(key => {
-                        if (key in beforeState) block[key] = beforeState[key];
+                    Object.keys(block).forEach(key => {
+                        if (keysBefore && !keysBefore.includes(key)) delete block[key];
                     });
+                    Object.assign(block, beforeState);
                 }
                 throw writeError;
             }

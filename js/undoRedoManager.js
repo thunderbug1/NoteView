@@ -220,7 +220,7 @@ const UndoRedoManager = {
      * Redo a create command - recreates the block
      */
     async redoCreate(command) {
-        const block = command.blockData;
+        const block = JSON.parse(JSON.stringify(command.blockData));
         if (block) {
             // Create file
             await Store.saveBlock(block, { commit: true, commitMessage: `Redo: recreate ${block.id}` });
@@ -243,10 +243,7 @@ const UndoRedoManager = {
     async undoUpdate(command) {
         const block = Store.blocks.find(b => b.id === command.blockId);
         if (block && command.before) {
-            // Revert to before state, removing any properties added after the snapshot
-            Object.keys(block).forEach(key => {
-                if (!(key in command.before)) delete block[key];
-            });
+            // Revert only the fields that changed
             Object.assign(block, command.before);
             block.lastUpdated = new Date().toISOString();
 
@@ -282,7 +279,7 @@ const UndoRedoManager = {
      * Undo a delete command - restores the block
      */
     async undoDelete(command) {
-        const block = command.blockData;
+        const block = JSON.parse(JSON.stringify(command.blockData));
         if (block) {
             // Create file
             await Store.saveBlock(block, { commit: true, commitMessage: `Undo: restore ${block.id}` });
@@ -308,18 +305,20 @@ const UndoRedoManager = {
     async redoDelete(command) {
         const block = Store.blocks.find(b => b.id === command.blockId);
         if (block) {
-            // Remove from Store.blocks
-            const index = Store.blocks.findIndex(b => b.id === command.blockId);
-            Store.blocks.splice(index, 1);
-
-            // Delete file
             const fileName = block.filename || `${block.id}.md`;
+
+            // Delete file FIRST
             try {
                 await Store.directoryHandle.removeEntry(fileName);
             } catch (e) {
                 console.error('Failed to delete file during redo delete:', e);
                 return;
             }
+
+            // THEN remove from memory
+            const index = Store.blocks.findIndex(b => b.id === command.blockId);
+            Store.blocks.splice(index, 1);
+
             try {
                 await GitStore.commitBlock(fileName, `Redo: remove ${fileName}`);
             } catch (e) {

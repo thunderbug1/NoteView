@@ -563,7 +563,7 @@ const TimelineView = {
         const noteName = event.blockId;
         
         return `
-            <div class="tl-event" data-block-id="${event.blockId}" data-oid="${event.oid}" data-filename="${event.filename}" data-parents="${(event.parents || []).join(',')}">
+            <div class="tl-event" data-block-id="${escapeHtml(event.blockId)}" data-oid="${escapeHtml(event.oid)}" data-filename="${escapeHtml(event.filename)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
                 <div class="tl-dot-wrapper">
                     <div class="tl-dot tl-${stateClass}"></div>
                 </div>
@@ -590,7 +590,7 @@ const TimelineView = {
         const { label, cls } = typeConfig[event.type] || { label: 'Note changed', cls: '' };
 
         return `
-            <div class="tl-event" data-block-id="${event.blockId}" data-oid="${event.oid}" data-filename="${event.filename}" data-parents="${(event.parents || []).join(',')}">
+            <div class="tl-event" data-block-id="${escapeHtml(event.blockId)}" data-oid="${escapeHtml(event.oid)}" data-filename="${escapeHtml(event.filename)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
                 <div class="tl-dot-wrapper">
                     <div class="tl-dot tl-dot-note ${cls}"></div>
                 </div>
@@ -908,7 +908,7 @@ const TimelineView = {
                 }
             } catch (err) {
                 console.error('Failed to render diff:', err);
-                container.innerHTML = `<div class="tl-error">Failed to load commit content: ${err.message}</div>`;
+                container.innerHTML = `<div class="tl-error">Failed to load commit content: ${escapeHtml(err.message)}</div>`;
             }
         };
         

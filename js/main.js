@@ -954,7 +954,7 @@ const App = {
         const entry = trash.find(e => e.id === blockId);
         if (!entry?.blockData) return;
 
-        const block = entry.blockData;
+        const block = JSON.parse(JSON.stringify(entry.blockData));
         await Store.saveBlock(block, { commit: true, commitMessage: `Restore deleted note ${block.id}` });
 
         if (!Store.blocks.some(b => b.id === block.id)) {
@@ -2029,8 +2029,8 @@ window.addEventListener('beforeunload', () => {
 // Also close when page becomes hidden (user switches tabs)
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-        if (window.SyncManager) SyncManager.onTabHidden();
-    } else if (window.SyncManager) {
+        if (window.SyncManager && typeof SyncManager.onTabHidden === 'function') SyncManager.onTabHidden();
+    } else if (window.SyncManager && typeof SyncManager.onTabVisible === 'function') {
         SyncManager.onTabVisible();
     }
 });

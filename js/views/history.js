@@ -12,11 +12,12 @@ const HistoryView = {
     async openHistory(blockId) {
         const block = Store.blocks.find(b => b.id === blockId);
         if (!block) return;
-        
+
         this.currentBlockId = blockId;
         this.currentFilename = block.filename;
-        this.currentContent = block.content || ''; 
-        
+        this.currentContent = block.content || '';
+
+        try {
         const rawCommits = await GitStore.getHistory(this.currentFilename);
         
         // Group commits together that occur within 10 minutes of each other
@@ -35,6 +36,10 @@ const HistoryView = {
         }
         
         this.renderModal();
+        } catch (e) {
+            console.error('Failed to load history:', e);
+            Common.toast('Failed to load version history', 'error');
+        }
     },
     
     renderModal() {
@@ -98,18 +103,19 @@ const HistoryView = {
     
     async loadDiff(oid) {
         if (!oid) return;
-        
+
+        try {
         const oldContentRaw = await GitStore.getFileAtCommit(this.currentFilename, oid);
         let oldContent = oldContentRaw || '';
-        
+
         const parsedOld = this.parseFrontMatter(oldContent);
         const block = Store.blocks.find(b => b.id === this.currentBlockId);
-        
+
         const container = document.getElementById('diffEditorContainer');
         container.innerHTML = '';
-        
+
         const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
-        
+
         this.editorView = new EditorView({
             doc: block.content || '',
             extensions: [
@@ -128,10 +134,15 @@ const HistoryView = {
             ],
             parent: container
         });
-        
+
         document.getElementById('restoreVersionBtn').disabled = false;
         this.selectedOid = oid;
         this.selectedOldContent = parsedOld.content;
+        } catch (e) {
+            console.error('Failed to load diff:', e);
+            const container = document.getElementById('diffEditorContainer');
+            if (container) container.innerHTML = `<div style="padding:2rem;color:var(--text-secondary)">Failed to load version: ${escapeHtml(e.message)}</div>`;
+        }
     },
     
     async restoreVersion() {

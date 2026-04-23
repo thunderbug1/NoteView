@@ -301,7 +301,7 @@ const KanbanView = {
                     <div class="kanban-card-footer">
                         ${task.badges.map(b => {
                             const dueUrgencyCls = (b.type === 'due' && urgency) ? ` badge-due-${urgency}` : '';
-                            return `<span class="badge badge-${b.type} kanban-badge${dueUrgencyCls}" data-type="${b.type}" data-value="${b.value}"${b.type === 'priority' ? ` data-priority="${b.value.toLowerCase()}"` : ''}>${escapeHtml(b.type)}: ${escapeHtml(b.value)}</span>`;
+                            return `<span class="badge badge-${b.type} kanban-badge${dueUrgencyCls}" data-type="${b.type}" data-value="${escapeHtml(b.value)}"${b.type === 'priority' ? ` data-priority="${escapeHtml(b.value.toLowerCase())}"` : ''}>${escapeHtml(b.type)}: ${escapeHtml(b.value)}</span>`;
                         }).join('')}
                     </div>
                 </div>
@@ -806,7 +806,7 @@ const KanbanView = {
         const menu = document.createElement('div');
         menu.className = 'kanban-due-menu';
         menu.innerHTML = `
-            <input type="date" value="${currentValue}" style="width:100%; padding:6px; box-sizing:border-box; border:1px solid var(--border); border-radius:4px; font-family:inherit; font-size:0.85rem;">
+            <input type="date" value="${escapeHtml(currentValue)}" style="width:100%; padding:6px; box-sizing:border-box; border:1px solid var(--border); border-radius:4px; font-family:inherit; font-size:0.85rem;">
             <button class="kanban-due-clear" style="width:100%; padding:6px; background:transparent; border:none; cursor:pointer; color:var(--text-muted); font-size:0.8rem; text-align:center; font-family:inherit;">Clear</button>
         `;
 

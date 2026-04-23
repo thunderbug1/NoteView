@@ -944,8 +944,7 @@ const SettingsView = {
                 try {
                     await Store.saveRemoteConfig({});
                     GitRemote.config = null;
-                    SyncManager._config.autoSync = false;
-                    SyncManager._stopIntervalSync();
+                    await SyncManager.saveConfig({ autoSync: false });
                     SyncManager._setStatus('idle', 'No remote configured');
                 } catch (err) {
                     alert('Failed to remove remote: ' + err.message);

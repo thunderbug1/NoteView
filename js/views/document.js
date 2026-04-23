@@ -1426,7 +1426,7 @@ const DocumentView = {
                 const container = modal.querySelector('#extract-tag-badges');
                 if (!container) return;
                 container.innerHTML = Array.from(selectedTags).map(tag =>
-                    `<span class="badge tag-badge" data-tag="${tag}">${Common.formatTagDisplay(tag)}<span class="badge-remove">&times;</span></span>`
+                    `<span class="badge tag-badge" data-tag="${escapeHtml(tag)}">${escapeHtml(Common.formatTagDisplay(tag))}<span class="badge-remove">&times;</span></span>`
                 ).join('');
                 container.querySelectorAll('.badge-remove').forEach(btn => {
                     btn.addEventListener('click', (e) => {
@@ -1481,7 +1481,7 @@ const DocumentView = {
                 acIndex = -1;
                 if (items.length === 0) { tagAc.style.display = 'none'; return; }
                 tagAc.innerHTML = items.map((t, i) =>
-                    `<div class="ac-item" data-index="${i}" data-tag="${t}">${Common.formatTagDisplay(t)}</div>`
+                    `<div class="ac-item" data-index="${i}" data-tag="${escapeHtml(t)}">${escapeHtml(Common.formatTagDisplay(t))}</div>`
                 ).join('');
                 tagAc.style.display = 'block';
                 tagAc.querySelectorAll('.ac-item').forEach(el => {

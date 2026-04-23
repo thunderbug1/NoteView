@@ -15,8 +15,12 @@ const GitRemote = {
     async setRemote(name, url, auth = null) {
         this.config = { name, url, auth };
         await Store.saveRemoteConfig(this.config);
-        
+
         // Add remote to local git
+        if (!GitStore.git || !GitStore.fs) {
+            console.error('GitRemote.setRemote: git not initialized');
+            return false;
+        }
         const { git, fs, dir } = GitStore;
         try {
             await git.addRemote({
