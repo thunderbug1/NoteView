@@ -53,7 +53,7 @@ const AssigneeModal = {
         const input = document.getElementById('assigneeModalInput');
         const promptBtn = document.getElementById('assigneeModalCreatePrompt');
 
-        setTimeout(() => input.focus(), 10);
+        input.focus();
 
         const selectContact = (contact) => {
             if (contact) {

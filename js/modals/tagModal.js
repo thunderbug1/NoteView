@@ -52,7 +52,7 @@ const TagModal = {
         let acSelectedIndex = -1;
         let acItems = [];
 
-        setTimeout(() => input.focus(), 10);
+        input.focus();
 
         // --- Helpers ---
 
@@ -412,9 +412,9 @@ const TagModal = {
             }
         });
 
-        // Close autocomplete on blur
+        // Close autocomplete on blur (mousedown on .ac-item uses preventDefault to block blur)
         input.addEventListener('blur', () => {
-            setTimeout(hideAutocomplete, 150);
+            hideAutocomplete();
         });
     },
 
@@ -719,7 +719,7 @@ const TagModal = {
         let acSelectedIndex = -1;
         let acItems = [];
 
-        setTimeout(() => input.focus(), 10);
+        input.focus();
 
         const updateItemVisuals = () => {
             modal.querySelectorAll('.tag-modal-item').forEach(item => {

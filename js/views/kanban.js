@@ -739,7 +739,7 @@ const KanbanView = {
             if (e.key === 'Enter') { e.preventDefault(); create(); }
             if (e.key === 'Escape') modal.close();
         });
-        setTimeout(() => input.focus(), 10);
+        input.focus();
     },
 
     showMoveModal(data) {
@@ -897,7 +897,7 @@ const KanbanView = {
                 document.removeEventListener('click', close);
             }
         };
-        setTimeout(() => document.addEventListener('click', close), 0);
+        document.addEventListener('click', close);
 
         // Apply changes on any date input change
         dueInput.addEventListener('change', () => {
@@ -956,7 +956,7 @@ const KanbanView = {
                 document.removeEventListener('click', close);
             }
         };
-        setTimeout(() => document.addEventListener('click', close), 0);
+        document.addEventListener('click', close);
 
         menu.querySelectorAll('.kanban-priority-option').forEach(opt => {
             opt.addEventListener('click', (e) => {

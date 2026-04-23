@@ -802,7 +802,7 @@ const DocumentView = {
                 document.removeEventListener('click', closeOnOutside);
             }
         };
-        setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+        document.addEventListener('click', closeOnOutside);
     },
 
     handleMicClick(e) {
@@ -1272,24 +1272,26 @@ const DocumentView = {
         // Re-render blocks so the newly generated note spawns in the DOM
         App.render();
 
-        // Restore scroll position and cursor AFTER CodeMirror finishes rebuilding (since render uses setTimeout)
-        setTimeout(() => {
-            if (blockId !== 'new') {
-                const newBlockElement = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
-                if (newBlockElement) {
-                    const newOffset = newBlockElement.getBoundingClientRect().top;
-                    window.scrollBy(0, newOffset - scrollOffset);
+        // Restore scroll position and cursor after the browser paints the new DOM
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (blockId !== 'new') {
+                    const newBlockElement = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
+                    if (newBlockElement) {
+                        const newOffset = newBlockElement.getBoundingClientRect().top;
+                        window.scrollBy(0, newOffset - scrollOffset);
+                    }
+
+                    // Re-focus original editor and restore the cursor near where it was split
+                    const newView = this.editors.get(blockId);
+                    if (newView) {
+                        newView.focus();
+                        const safePos = Math.min(cursorRestorePos, newView.state.doc.length);
+                        newView.dispatch({ selection: { anchor: safePos, head: safePos } });
+                    }
                 }
-                
-                // Re-focus original editor and restore the cursor near where it was split
-                const newView = this.editors.get(blockId);
-                if (newView) {
-                    newView.focus();
-                    const safePos = Math.min(cursorRestorePos, newView.state.doc.length);
-                    newView.dispatch({ selection: { anchor: safePos, head: safePos } });
-                }
-            }
-        }, 15);
+            });
+        });
     },
 
     _pickTagsBeforeCreate(initialTags) {
@@ -1541,7 +1543,7 @@ const DocumentView = {
             const titleInput = modal.querySelector('#extract-title-input');
             const tagInput = modal.querySelector('#extract-tag-input');
             const tagAc = modal.querySelector('#extract-tag-ac');
-            setTimeout(() => { titleInput.focus(); titleInput.select(); }, 10);
+            requestAnimationFrame(() => { titleInput.focus(); titleInput.select(); });
 
             renderBadges();
 
@@ -1610,7 +1612,7 @@ const DocumentView = {
             });
 
             tagInput.addEventListener('blur', () => {
-                setTimeout(() => { tagAc.style.display = 'none'; }, 150);
+                tagAc.style.display = 'none';
             });
 
             const submit = (withLink) => {
@@ -2951,9 +2953,16 @@ const DocumentView = {
         }
 
         // After CM renders at the estimated position, refine with actual coords
-        setTimeout(() => {
-            if (!refineScroll('50ms')) setTimeout(() => refineScroll('150ms'), 100);
-        }, 50);
+        let rafId;
+        const refineLoop = () => {
+            if (refineScroll('smooth')) {
+                return; // got coordinates, done
+            }
+            rafId = requestAnimationFrame(refineLoop);
+        };
+        rafId = requestAnimationFrame(refineLoop);
+        // Safety: stop trying after 500ms
+        setTimeout(() => cancelAnimationFrame(rafId), 500);
     },
 
     // Apply decorations per line. If hideSyntax is true, we replace the markdown markers.
@@ -3496,14 +3505,14 @@ const DocumentView = {
 
     // Focus the "new note" block at the bottom
     focusNewBlock() {
-        const tryFocus = (attempts = 0) => {
+        const doFocus = () => {
             const newBlock = document.querySelector('.block[data-id="new"]');
             const editor = this.editors.get('new');
 
             if (newBlock && editor) {
                 if (window.innerWidth <= 768) {
                     editor.focus();
-                    setTimeout(() => {
+                    requestAnimationFrame(() => {
                         const toolbarHeight = this._mobileToolbar && !this._mobileToolbar.classList.contains('hidden')
                             ? this._mobileToolbar.offsetHeight : 0;
                         const container = document.getElementById('viewContainer');
@@ -3512,18 +3521,47 @@ const DocumentView = {
                         const visibleHeight = containerRect.height - toolbarHeight;
                         const scrollTarget = container.scrollTop + blockRect.top - containerRect.top - (visibleHeight - blockRect.height) / 2;
                         container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
-                    }, 500);
+                    });
                 } else {
                     newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    setTimeout(() => editor.focus(), 150);
+                    editor.focus();
                 }
-            } else if (attempts < 15) {
-                setTimeout(() => tryFocus(attempts + 1), 50);
-            } else {
-                console.warn('focusNewBlock: could not find new block editor after 15 retries');
+                return true;
+            }
+            return false;
+        };
+
+        // Try immediately in case the element is already in the DOM
+        if (doFocus()) return;
+
+        // Watch for the block element to be inserted
+        const container = document.getElementById('viewContainer');
+        let observer;
+        const cleanup = () => {
+            if (observer) { observer.disconnect(); observer = null; }
+        };
+
+        const attemptFocus = () => {
+            if (doFocus()) {
+                cleanup();
             }
         };
-        tryFocus();
+
+        observer = new MutationObserver(() => {
+            if (document.querySelector('.block[data-id="new"]')) {
+                // Element exists but editor might not be ready yet — use rAF to wait for CM init
+                requestAnimationFrame(attemptFocus);
+            }
+        });
+        observer.observe(container, { childList: true, subtree: true });
+
+        // Safety: stop trying after 1 second
+        setTimeout(() => {
+            cleanup();
+            if (!doFocus()) {
+                console.warn('focusNewBlock: could not find new block editor after 1s');
+            }
+        }, 1000);
     },
 
     // Navigate to a block by wikilink target — scroll into view in document, or open modal if filtered out
@@ -3538,7 +3576,7 @@ const DocumentView = {
         if (blockEl) {
             blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             const editor = this.editors.get(block.id);
-            if (editor) setTimeout(() => editor.focus(), 150);
+            if (editor) editor.focus();
         } else {
             this.openNoteModal(targetId);
         }

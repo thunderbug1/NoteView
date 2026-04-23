@@ -86,15 +86,13 @@ const VaultModal = {
         menu.style.overflowY = 'auto';
 
         // Close on outside click
-        setTimeout(() => {
-            const closeDropdown = (e) => {
-                if (!menu.contains(e.target) && e.target !== btn) {
-                    menu.remove();
-                    document.removeEventListener('click', closeDropdown);
-                }
-            };
-            document.addEventListener('click', closeDropdown);
-        }, 50);
+        const closeDropdown = (e) => {
+            if (!menu.contains(e.target) && e.target !== btn) {
+                menu.remove();
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        document.addEventListener('click', closeDropdown);
     },
 
     async switchVault(name) {
@@ -248,15 +246,13 @@ const VaultModal = {
                 }
             });
 
-            setTimeout(() => {
-                const closeMenu = (e) => {
-                    if (!menu.contains(e.target) && e.target !== btn) {
-                        closeVaultMenu();
-                        document.removeEventListener('click', closeMenu);
-                    }
-                };
-                document.addEventListener('click', closeMenu);
-            }, 50);
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target) && e.target !== btn) {
+                    closeVaultMenu();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            document.addEventListener('click', closeMenu);
         }
 
         function wireRowEvents() {

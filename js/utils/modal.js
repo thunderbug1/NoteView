@@ -149,7 +149,7 @@ function createPrompt(options) {
         });
 
         const input = modal.querySelector('.modal-prompt-input');
-        setTimeout(() => input.focus(), 10);
+        input.focus();
 
         const submit = () => {
             const value = input.value.trim();

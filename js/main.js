@@ -614,7 +614,7 @@ const App = {
         // Vault switcher
         const vaultSwitcherBtn = document.getElementById('vaultSwitcherBtn');
         if (vaultSwitcherBtn) {
-            vaultSwitcherBtn.addEventListener('click', () => this.showVaultDropdown(vaultSwitcherBtn));
+            vaultSwitcherBtn.addEventListener('click', (e) => { e.stopPropagation(); this.showVaultDropdown(vaultSwitcherBtn); });
         }
 
         // Settings button
@@ -1113,11 +1113,14 @@ const App = {
         DocumentView.createEditor(cmContainer, blockId, initialContent);
 
         // Scroll to and highlight the task line if matchIndex was provided.
-        // Delay to let the modal layout settle and CodeMirror render lines.
         if (options.matchIndex != null) {
             const view = DocumentView.editors.get(blockId);
             if (view) {
-                setTimeout(() => DocumentView.highlightAndScrollTo(blockId, view, options.matchIndex), 100);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        DocumentView.highlightAndScrollTo(blockId, view, options.matchIndex);
+                    });
+                });
             }
         }
 

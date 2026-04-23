@@ -15,6 +15,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **When adding new `<script>` or `<link>` tags to `index.html`, also add them to `sw.js` `PRECACHE_URLS`.** The service worker precache must mirror all app resources for offline support. Bump `CACHE_NAME` and the `?v=` param together.
 - **When rendering into the right sidebar (`#sidebarRight .sidebar-scroll`), coexist with other panels.** Use `insertAdjacentHTML` or targeted `outerHTML` replacement on your own container element. Never replace the entire `container.innerHTML` — it destroys other panels (backlinks, deadlines).
 - **Don't export regex literals with the `g` flag on window globals.** The `lastIndex` property is mutable and shared across all callers. Use a getter that returns a fresh regex instead: `get MY_REGEX() { return /pattern/g; }`.
+- **Don't use `setTimeout` to avoid race conditions.** Timeouts are fragile — they break under CPU throttling, busy event loops, and vary across devices. Use deterministic alternatives instead:
+  - **Outside-click handlers:** Use `e.stopPropagation()` on the opening event, then attach the document listener immediately. Don't wrap `addEventListener` in `setTimeout(0)`.
+  - **Focus after DOM insertion:** Since `Modal.create()` and `appendChild()` are synchronous, call `.focus()` directly — no delay needed.
+  - **Wait for paint/layout:** Use `requestAnimationFrame` (double-rAF `requestAnimationFrame(() => requestAnimationFrame(fn))` to wait for a paint cycle).
+  - **Wait for element insertion:** Use `MutationObserver` with a safety timeout fallback instead of polling with `setTimeout`.
+  - **Scroll-then-focus:** `scrollIntoView` and `.focus()` are synchronous — call them together without delay.
+  - **Autocomplete blur/click race:** Use `mousedown` + `e.preventDefault()` on dropdown items to prevent blur, rather than delaying hide with `setTimeout`.
+  - Legitimate `setTimeout` uses are fine: debouncing, animation timing, retry backoff, safety cutoffs, and UI feedback delays.
 
 ## Project Overview
 

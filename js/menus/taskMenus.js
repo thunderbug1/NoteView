@@ -73,36 +73,34 @@ function createTaskMenus(documentView) {
         menu.innerHTML = html;
         document.body.appendChild(menu);
 
-        setTimeout(() => {
-            const closeMenu = (e) => {
-                if (!document.body.contains(menu)) {
-                    document.removeEventListener('click', closeMenu);
-                    return;
-                }
-                if (!menu.contains(e.target)) {
-                    menu.remove();
-                    document.removeEventListener('click', closeMenu);
-                }
-            };
-            document.addEventListener('click', closeMenu);
-
-            menu.addEventListener('click', (e) => {
-                const item = e.target.closest('.menu-item');
-                if (!item) return;
-
-                const action = item.dataset.action;
-                if (action === 'state') {
-                    const newVal = item.dataset.val;
-                    view.dispatch({ changes: { from, to, insert: `[${newVal}]` } });
-                }
-                if (action === 'copy-task') {
-                    const line = view.state.doc.lineAt(from);
-                    navigator.clipboard.writeText(line.text);
-                }
+        const closeMenu = (e) => {
+            if (!document.body.contains(menu)) {
+                document.removeEventListener('click', closeMenu);
+                return;
+            }
+            if (!menu.contains(e.target)) {
                 menu.remove();
                 document.removeEventListener('click', closeMenu);
-            });
-        }, 100);
+            }
+        };
+        document.addEventListener('click', closeMenu);
+
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.menu-item');
+            if (!item) return;
+
+            const action = item.dataset.action;
+            if (action === 'state') {
+                const newVal = item.dataset.val;
+                view.dispatch({ changes: { from, to, insert: `[${newVal}]` } });
+            }
+            if (action === 'copy-task') {
+                const line = view.state.doc.lineAt(from);
+                navigator.clipboard.writeText(line.text);
+            }
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        });
     }
 
     /**
@@ -145,43 +143,41 @@ function createTaskMenus(documentView) {
         menu.innerHTML = html;
         document.body.appendChild(menu);
 
-        setTimeout(() => {
-            const closeMenu = (e) => {
-                if (!document.body.contains(menu)) {
-                    document.removeEventListener('click', closeMenu);
-                    return;
-                }
-                if (!menu.contains(e.target)) {
-                    menu.remove();
-                    document.removeEventListener('click', closeMenu);
-                }
-            };
-            document.addEventListener('click', closeMenu);
-
-            menu.addEventListener('click', (e) => {
-                const item = e.target.closest('.menu-item');
-                if (!item) return;
-
-                const val = item.dataset.val;
-                if (val !== undefined) {
-                    // Check if priority already exists on the line to replace it
-                    const line = view.state.doc.lineAt(from);
-                    const regex = /\[priority::\s*[^\]]+\]/;
-                    const match = line.text.match(regex);
-
-                    if (match) {
-                        const matchFrom = line.from + match.index;
-                        const matchTo = matchFrom + match[0].length;
-                        const replacement = val ? `[priority:: ${val}]` : '';
-                        view.dispatch({ changes: { from: matchFrom, to: matchTo, insert: replacement } });
-                    } else if (val) {
-                        documentView.appendInlineField(view, from, to, 'priority', val);
-                    }
-                }
+        const closeMenu = (e) => {
+            if (!document.body.contains(menu)) {
+                document.removeEventListener('click', closeMenu);
+                return;
+            }
+            if (!menu.contains(e.target)) {
                 menu.remove();
                 document.removeEventListener('click', closeMenu);
-            });
-        }, 100);
+            }
+        };
+        document.addEventListener('click', closeMenu);
+
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.menu-item');
+            if (!item) return;
+
+            const val = item.dataset.val;
+            if (val !== undefined) {
+                // Check if priority already exists on the line to replace it
+                const line = view.state.doc.lineAt(from);
+                const regex = /\[priority::\s*[^\]]+\]/;
+                const match = line.text.match(regex);
+
+                if (match) {
+                    const matchFrom = line.from + match.index;
+                    const matchTo = matchFrom + match[0].length;
+                    const replacement = val ? `[priority:: ${val}]` : '';
+                    view.dispatch({ changes: { from: matchFrom, to: matchTo, insert: replacement } });
+                } else if (val) {
+                    documentView.appendInlineField(view, from, to, 'priority', val);
+                }
+            }
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        });
     }
 
     /**

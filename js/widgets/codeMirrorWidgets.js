@@ -9,6 +9,7 @@
  * Works on both desktop and mobile (touch-friendly).
  */
 function showDatePopover(event, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue) {
+    event.stopPropagation();
     document.querySelector('.date-popover')?.remove();
 
     const popover = document.createElement('div');
@@ -157,13 +158,11 @@ function showDatePopover(event, view, dueFrom, dueTo, dueValue, startFrom, start
             document.removeEventListener('touchstart', closeOnOutside);
         }
     };
-    setTimeout(() => {
-        document.addEventListener('mousedown', closeOnOutside);
-        document.addEventListener('touchstart', closeOnOutside, { passive: true });
-    }, 0);
+    document.addEventListener('mousedown', closeOnOutside);
+    document.addEventListener('touchstart', closeOnOutside, { passive: true });
 
     // Auto-focus the due input
-    setTimeout(() => dueInput.focus(), 10);
+    dueInput.focus();
 }
 
 /**
@@ -220,6 +219,7 @@ function createCodeMirrorWidgets(documentView) {
             };
             wrap.oncontextmenu = (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 if (documentView.showTaskMenu) {
                     documentView.showTaskMenu(e.pageX, e.pageY, view, this.from, this.to, this.state);
                 }
