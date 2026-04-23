@@ -726,14 +726,33 @@ const KanbanView = {
             const start = modal.querySelector('.task-create-start').value;
             if (start) taskLine += ` [start:: ${start}]`;
 
+            const boardEl = document.querySelector('.kanban-board');
+            const savedScrollLeft = boardEl ? boardEl.scrollLeft : 0;
+
             modal.close();
-            const newBlock = await Store.createBlock(taskLine);
-            TimelineView.invalidateCache();
-            SelectionManager.updateTagCounts();
-            await App.render();
-            const container = document.getElementById('viewContainer');
-            const newCard = container.querySelector(`.kanban-card[data-block-id="${newBlock.id}"]`);
-            if (newCard) KanbanView.highlightAndScrollToCard(newCard);
+            let newBlock = null;
+            try {
+                newBlock = await Store.createBlock(taskLine);
+                TimelineView.invalidateCache();
+                SelectionManager.updateTagCounts();
+            } catch (err) {
+                console.error('Failed to create kanban task:', err);
+                Common.showToast('Failed to create task: ' + (err.message || 'Unknown error'));
+            }
+            App.render();
+            if (newBlock) {
+                const container = document.getElementById('viewContainer');
+                const newCard = container.querySelector(`.kanban-card[data-block-id="${newBlock.id}"]`);
+                if (newCard) {
+                    KanbanView.highlightAndScrollToCard(newCard);
+                } else {
+                    const newBoardEl = document.querySelector('.kanban-board');
+                    if (newBoardEl) newBoardEl.scrollLeft = savedScrollLeft;
+                }
+            } else {
+                const newBoardEl = document.querySelector('.kanban-board');
+                if (newBoardEl) newBoardEl.scrollLeft = savedScrollLeft;
+            }
         };
 
         confirmBtn.addEventListener('click', create);

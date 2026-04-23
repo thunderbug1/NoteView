@@ -857,13 +857,17 @@ const Store = {
         this.blocks.push(block);
         RecentAccessTracker.touch(block.id);
 
-        // Record command AFTER creation
+        // Record command AFTER creation — failure should not prevent the block from being returned
         if (!UndoRedoManager.isExecuting && !extraMetadata.skipUndo) {
-            await UndoRedoManager.executeCommand({
-                type: 'create',
-                blockId: block.id,
-                blockData: { ...block }
-            });
+            try {
+                await UndoRedoManager.executeCommand({
+                    type: 'create',
+                    blockId: block.id,
+                    blockData: { ...block }
+                });
+            } catch (undoErr) {
+                console.error('Failed to record undo for new block:', undoErr);
+            }
         }
 
         return block;
