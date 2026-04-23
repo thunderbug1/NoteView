@@ -1400,6 +1400,89 @@
     flex-shrink: 0;
 }
 
+/* Mobile: compact action bar with scroll */
+@media (max-width: 768px) {
+    .select-action-bar {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transform: none;
+        border-radius: 0;
+        border-bottom: none;
+        border-left: none;
+        border-right: none;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 0.4rem 0.5rem;
+        padding-bottom: calc(0.4rem + env(safe-area-inset-bottom, 0px));
+        gap: 0.3rem;
+    }
+
+    .select-action-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    @keyframes selectBarSlideUp {
+        from {
+            transform: translateY(0.75rem);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .select-action-btn {
+        padding: 0.45rem 0.55rem;
+        min-height: 36px;
+        min-width: 36px;
+        justify-content: center;
+    }
+
+    .select-action-secondary {
+        padding: 0.4rem 0.45rem;
+        min-height: 32px;
+    }
+
+    .select-action-btn span {
+        display: none;
+    }
+
+    .select-count {
+        font-size: 0.75rem;
+        margin-right: 0.2rem;
+    }
+
+    .select-action-divider {
+        height: 1rem;
+    }
+
+    /* Move select-mode checkbox inside block on mobile (no left margin space) */
+    .select-mode-active article.block:not([data-id="new"])::before {
+        left: 0.25rem;
+        top: 0.35rem;
+        width: 22px;
+        height: 22px;
+    }
+
+    .select-mode-active article.block.block-selected::before {
+        background-size: 14px;
+    }
+
+    .select-mode-active .kanban-card::before {
+        top: 0.3rem;
+        left: 0.3rem;
+        width: 20px;
+        height: 20px;
+    }
+
+    .select-mode-active .kanban-card.block-selected::before {
+        background-size: 12px;
+    }
+}
+
 /* Toolbar select button active state */
 #toolbarSelectBtn.active {
     background: color-mix(in srgb, var(--accent) 15%, var(--bg-secondary));

@@ -277,8 +277,8 @@ const BlockSelector = {
 
         bar.innerHTML = `
             <span class="select-count">${hasSelection ? count + ' selected' : 'Select items'}</span>
-            <button class="select-action-btn select-action-secondary" data-action="selectall" title="Select all">All</button>
-            <button class="select-action-btn select-action-secondary" data-action="deselectall" title="Deselect all">None</button>
+            <button class="select-action-btn select-action-secondary" data-action="selectall" title="Select all"><span>All</span></button>
+            <button class="select-action-btn select-action-secondary" data-action="deselectall" title="Deselect all"><span>None</span></button>
             ${isDocView ? `
             <span class="select-action-divider"></span>
             <button class="select-action-btn select-action-secondary" data-action="collapseall" title="Collapse all notes">
@@ -291,19 +291,19 @@ const BlockSelector = {
             <span class="select-action-divider"></span>
             <button class="select-action-btn select-action-delete${hasSelection ? '' : ' select-action-disabled'}" data-action="delete" ${hasSelection ? '' : 'disabled'}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                Delete
+                <span>Delete</span>
             </button>
             ${isDocView ? `
             <button class="select-action-btn select-action-tags${hasSelection ? '' : ' select-action-disabled'}" data-action="tags" ${hasSelection ? '' : 'disabled'}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-                Tags
+                <span>Tags</span>
             </button>
             ` : ''}
             <button class="select-action-btn select-action-ai${aiDisabled || !hasSelection ? ' select-action-disabled' : ''}" data-action="ai" ${aiDisabled || !hasSelection ? 'disabled' : ''}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
-                AI
+                <span>AI</span>
             </button>
-            <button class="select-action-btn select-action-done" data-action="done">Done</button>
+            <button class="select-action-btn select-action-done" data-action="done"><span>Done</span></button>
         `;
 
         bar.querySelectorAll('.select-action-btn').forEach(btn => {
