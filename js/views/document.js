@@ -4,6 +4,15 @@
  * and rendered inline (e.g., **bold** shows as bold without asterisks)
  */
 
+// StateEffect to force hidden-line StateField rebuild when external filters change
+let _filterChangedEffect;
+function getFilterChangedEffect() {
+    if (!_filterChangedEffect && window.CodeMirror?.StateEffect) {
+        _filterChangedEffect = window.CodeMirror.StateEffect.define();
+    }
+    return _filterChangedEffect;
+}
+
 const DocumentView = {
     // Track CodeMirror editor instances by block ID
     editors: new Map(),
@@ -32,6 +41,8 @@ const DocumentView = {
     _recognition: null,
     _recordingBlockId: null,
     _isStopping: false,
+    _recognitionRestartCount: 0,
+    _maxRecognitionRestarts: 10,
     // Mobile toolbar state
     _mobileToolbar: null,
     _focusedEditor: null,
@@ -49,6 +60,9 @@ const DocumentView = {
     async render(blocks, options = {}) {
         // Cancel pending auto-saves before DOM rebuild to prevent stale writes
         this.cancelAllPendingSaves();
+
+        // Clear stale highlight positions from previous render
+        this._highlightPositions.clear();
 
         // Stop any active speech recognition before re-rendering
         if (this._recordingBlockId) {
@@ -77,6 +91,11 @@ const DocumentView = {
 
         if (groupBy) {
             const grouped = GroupManager.groupByNamespace(sorted, groupBy);
+            // Prune stale collapsed groups
+            const activeGroupKeys = new Set(grouped.map(g => g.key));
+            for (const key of [...this.collapsedGroups.keys()]) {
+                if (!activeGroupKeys.has(key)) this.collapsedGroups.delete(key);
+            }
             html = this.renderGroupedBlocks(grouped, groupBy);
         } else {
             html = this.renderFlatBlocks(sorted);
@@ -100,12 +119,22 @@ const DocumentView = {
             container.removeEventListener('click', this._deleteHandler);
         }
 
-        // Add event delegation for split marker click
+        // Add event delegation for split marker click and keyboard
         if (this._splitHandler) {
             container.removeEventListener('mousedown', this._splitHandler);
         }
         this._splitHandler = this.handleSplitMarkerClick.bind(this);
         container.addEventListener('mousedown', this._splitHandler);
+        if (this._splitKeyHandler) {
+            container.removeEventListener('keydown', this._splitKeyHandler);
+        }
+        this._splitKeyHandler = (e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.block-split-marker')) {
+                e.preventDefault();
+                this.handleSplitMarkerClick(e);
+            }
+        };
+        container.addEventListener('keydown', this._splitKeyHandler);
 
         // Add event delegation for tag button click
         if (this._tagHandler) {
@@ -204,15 +233,15 @@ const DocumentView = {
 
     renderBlockHtml(block) {
         return `
-            <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${block.id}">
+            <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${escapeHtml(block.id)}">
                 ${this.renderCollapseButton(block)}
-                <div class="block-split-marker" data-id="${block.id}" title="Split note here">
+                <div class="block-split-marker" data-id="${escapeHtml(block.id)}" title="Split note here" role="button" tabindex="0" aria-label="Split note here">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
                 </div>
                 ${this.renderBlockMetadata(block)}
                 <div class="block-editor">
-                    <div class="codemirror-container" data-id="${block.id}">${escapeHtml(block.content || '')}</div>
-                    <span class="save-indicator" data-id="${block.id}">saved</span>
+                    <div class="codemirror-container" data-id="${escapeHtml(block.id)}">${escapeHtml(block.content || '')}</div>
+                    <span class="save-indicator" data-id="${escapeHtml(block.id)}">saved</span>
                 </div>
             </article>
         `;
@@ -220,7 +249,7 @@ const DocumentView = {
 
     _saveScrollAnchor() {
         let anchorEl = this._focusedBlockId
-            ? document.querySelector(`article.block[data-id="${this._focusedBlockId}"]`)
+            ? document.querySelector(`article.block[data-id="${CSS.escape(this._focusedBlockId)}"]`)
             : null;
 
         if (!anchorEl) {
@@ -244,14 +273,19 @@ const DocumentView = {
 
     _restoreScrollFromAnchor(anchor) {
         if (!anchor) return;
-        const el = document.querySelector(`article.block[data-id="${anchor.id}"]`);
+        const el = document.querySelector(`article.block[data-id="${CSS.escape(anchor.id)}"]`);
         if (!el) return;
         const newOffset = el.getBoundingClientRect().top;
-        window.scrollBy(0, newOffset - anchor.offset);
+        const scroller = document.getElementById('viewContainer');
+        if (scroller) {
+            scroller.scrollBy(0, newOffset - anchor.offset);
+        } else {
+            window.scrollBy(0, newOffset - anchor.offset);
+        }
     },
 
     removeBlockElement(blockId) {
-        const article = document.querySelector(`article.block[data-id="${blockId}"]`);
+        const article = document.querySelector(`article.block[data-id="${CSS.escape(blockId)}"]`);
         if (!article) return false;
 
         // Clean up editor
@@ -337,7 +371,7 @@ const DocumentView = {
 
     renderCollapseButton(block) {
         const isCollapsed = this.collapsedBlocks.has(block.id);
-        return `<button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${block.id}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}">
+        return `<button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${escapeHtml(block.id)}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}" aria-label="${isCollapsed ? 'Expand note' : 'Collapse note'}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isCollapsed ? '15 18 9 12 15 6' : '6 9 12 15 18 9'}"/></svg>
         </button>`;
     },
@@ -377,7 +411,7 @@ const DocumentView = {
         // Task toggle button
         const actions = [];
         actions.push(`
-            <button class="task-toggle-btn" data-id="${block.id}" title="Toggle task on current line (Alt+T)">
+            <button class="task-toggle-btn" data-id="${escapeHtml(block.id)}" title="Toggle task on current line (Alt+T)" aria-label="Toggle task on current line">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
             </button>
         `);
@@ -385,7 +419,7 @@ const DocumentView = {
         // Microphone / Speech-to-Text button
         if (this.isSpeechRecognitionSupported()) {
             actions.push(`
-                <button class="mic-btn" data-id="${block.id}" title="Dictate text">
+                <button class="mic-btn" data-id="${escapeHtml(block.id)}" title="Dictate text" aria-label="Dictate text">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
                 </button>
             `);
@@ -395,7 +429,7 @@ const DocumentView = {
         if (window.AIAssistant) {
             const disabled = !AIAssistant.enabled;
             actions.push(`
-                <button class="ai-btn${disabled ? ' ai-btn-disabled' : ''}" data-id="${block.id}" title="${disabled ? 'Enable AI in Settings to use' : 'AI Assistant (Ctrl+Shift+A)'}">
+                <button class="ai-btn${disabled ? ' ai-btn-disabled' : ''}" data-id="${escapeHtml(block.id)}" title="${disabled ? 'Enable AI in Settings to use' : 'AI Assistant (Ctrl+Shift+A)'}" aria-label="AI Assistant">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
                 </button>
             `);
@@ -403,7 +437,7 @@ const DocumentView = {
 
         // 3-dot overflow menu (pin, copy, delete)
         actions.push(`
-            <button class="block-menu-btn" data-id="${block.id}" title="More actions">
+            <button class="block-menu-btn" data-id="${escapeHtml(block.id)}" title="More actions" aria-label="More actions">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
             </button>
         `);
@@ -430,13 +464,13 @@ const DocumentView = {
         return `
             <div class="block-tags">
                 ${sortedTags.map(tag => TagModal._renderBadge(tag)).join('')}
-                <button class="add-tag-btn" data-id="${block.id}" title="Edit tags"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+                <button class="add-tag-btn" data-id="${escapeHtml(block.id)}" title="Edit tags" aria-label="Edit tags"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             </div>
         `;
     },
 
     updateBlockTags(blockId) {
-        const article = document.querySelector(`article.block[data-id="${blockId}"]`);
+        const article = document.querySelector(`article.block[data-id="${CSS.escape(blockId)}"]`);
         if (!article) return false;
 
         const block = Store.blocks.find(b => b.id === blockId);
@@ -452,7 +486,7 @@ const DocumentView = {
     },
 
     updateBlockMetadata(blockId) {
-        const article = document.querySelector(`article.block[data-id="${blockId}"]`);
+        const article = document.querySelector(`article.block[data-id="${CSS.escape(blockId)}"]`);
         if (!article) return false;
 
         const block = Store.blocks.find(b => b.id === blockId);
@@ -487,14 +521,7 @@ const DocumentView = {
                 });
             });
         }
-        // Mic-btn clicks handled by container-level delegation in render()
-        newMetadata.querySelectorAll('.task-toggle-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.handleTaskToggleClick(e);
-            });
-        });
+        // Task-toggle-btn clicks handled by container-level delegation in render()
         newMetadata.querySelectorAll('.block-menu-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -519,6 +546,9 @@ const DocumentView = {
             if (existingEditor) {
                 cmContainer.textContent = '';
                 cmContainer.appendChild(existingEditor.dom);
+                // Force hidden-line StateField to rebuild for the current filter state
+                const effect = getFilterChangedEffect();
+                if (effect) existingEditor.dispatch({ effects: effect.of(undefined) });
                 return;
             }
 
@@ -571,21 +601,23 @@ const DocumentView = {
 
         const menu = document.createElement('div');
         menu.className = 'task-context-menu block-action-menu';
+        menu.setAttribute('role', 'menu');
+        menu.setAttribute('aria-label', 'Block actions');
         menu.innerHTML = `
-            <div class="menu-item" data-action="pin">
+            <div class="menu-item" data-action="pin" role="menuitem" tabindex="-1">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z"/></svg>
                 ${isPinned ? 'Unpin note' : 'Pin note'}
             </div>
-            <div class="menu-item" data-action="copy">
+            <div class="menu-item" data-action="copy" role="menuitem" tabindex="-1">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 Copy note text
             </div>
-            <div class="menu-item" data-action="history">
+            <div class="menu-item" data-action="history" role="menuitem" tabindex="-1">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 Revision history
             </div>
-            <div class="menu-divider"></div>
-            <div class="menu-item menu-item-danger" data-action="delete">
+            <div class="menu-divider" role="separator"></div>
+            <div class="menu-item menu-item-danger" data-action="delete" role="menuitem" tabindex="-1">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 Delete note
             </div>
@@ -597,12 +629,14 @@ const DocumentView = {
         menu.style.top = `${menuTop}px`;
         document.body.appendChild(menu);
 
-        // Adjust if menu goes off bottom of viewport
+        // Adjust if menu goes off bottom of viewport and focus first item
         requestAnimationFrame(() => {
             const menuRect = menu.getBoundingClientRect();
             if (menuRect.bottom > window.innerHeight) {
                 menu.style.top = `${rect.top - menuRect.height - 4}px`;
             }
+            const firstItem = menu.querySelector('[role="menuitem"]');
+            if (firstItem) firstItem.focus();
         });
 
         const closeHandler = (evt) => {
@@ -621,7 +655,7 @@ const DocumentView = {
             } else if (action === 'copy') {
                 const editor = this.editors.get(blockId);
                 const content = editor ? editor.state.doc.toString() : (block?.content || '');
-                navigator.clipboard.writeText(content);
+                navigator.clipboard.writeText(content).catch(() => Common.showToast('Clipboard access denied'));
             } else if (action === 'history') {
                 HistoryView.openHistory(blockId);
             } else if (action === 'delete') {
@@ -633,9 +667,33 @@ const DocumentView = {
         menu.addEventListener('click', handleAction);
         document.addEventListener('click', closeHandler);
         document.addEventListener('scroll', closeHandler, true);
+
+        // Keyboard navigation for menu
+        const keyHandler = (evt) => {
+            const items = [...menu.querySelectorAll('[role="menuitem"]')];
+            const idx = items.indexOf(document.activeElement);
+            if (evt.key === 'Escape') {
+                this.closeBlockMenu();
+                btn.focus();
+            } else if (evt.key === 'ArrowDown' || evt.key === 'ArrowRight') {
+                evt.preventDefault();
+                const next = idx < items.length - 1 ? idx + 1 : 0;
+                items[next].focus();
+            } else if (evt.key === 'ArrowUp' || evt.key === 'ArrowLeft') {
+                evt.preventDefault();
+                const prev = idx > 0 ? idx - 1 : items.length - 1;
+                items[prev].focus();
+            } else if (evt.key === 'Enter' || evt.key === ' ') {
+                evt.preventDefault();
+                if (items[idx]) items[idx].click();
+            }
+        };
+        menu.addEventListener('keydown', keyHandler);
+
         menu._cleanup = () => {
             document.removeEventListener('click', closeHandler);
             document.removeEventListener('scroll', closeHandler, true);
+            menu.removeEventListener('keydown', keyHandler);
         };
     },
 
@@ -719,6 +777,7 @@ const DocumentView = {
             const templateId = item.dataset.templateId;
             const template = templates.find(t => t.id === templateId);
             picker.remove();
+            document.removeEventListener('click', closeOnOutside);
 
             const effectiveId = blockId || anchorBtn.dataset.id || 'new';
             if (template && template.content) {
@@ -815,7 +874,7 @@ const DocumentView = {
 
     collapseBlock(blockId) {
         this.collapsedBlocks.set(blockId, true);
-        const blockEl = document.querySelector(`.block[data-id="${blockId}"]`);
+        const blockEl = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
         if (!blockEl) return;
 
         const editorDiv = blockEl.querySelector('.block-editor');
@@ -835,7 +894,7 @@ const DocumentView = {
 
     expandBlock(blockId) {
         this.collapsedBlocks.delete(blockId);
-        const blockEl = document.querySelector(`.block[data-id="${blockId}"]`);
+        const blockEl = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
         if (!blockEl) return;
 
         const editorDiv = blockEl.querySelector('.block-editor');
@@ -856,7 +915,7 @@ const DocumentView = {
     restoreCollapsedState(blocks) {
         for (const block of blocks) {
             if (this.collapsedBlocks.has(block.id)) {
-                const blockEl = document.querySelector(`.block[data-id="${block.id}"]`);
+                const blockEl = document.querySelector(`.block[data-id="${CSS.escape(block.id)}"]`);
                 if (!blockEl) continue;
                 const editorDiv = blockEl.querySelector('.block-editor');
                 if (editorDiv) editorDiv.style.display = 'none';
@@ -870,6 +929,8 @@ const DocumentView = {
         if (this._recognition) {
             this.stopSpeechRecognition();
         }
+
+        this._recognitionRestartCount = 0;
 
         const view = this.editors.get(blockId);
         if (!view) return;
@@ -947,6 +1008,12 @@ const DocumentView = {
         const onend = () => {
             if (this._recognitionSession !== sessionId) return;
             if (!this._isStopping && this._recordingBlockId === blockId) {
+                this._recognitionRestartCount++;
+                if (this._recognitionRestartCount > this._maxRecognitionRestarts) {
+                    console.warn('Speech recognition restart limit reached');
+                    this.stopSpeechRecognition();
+                    return;
+                }
                 // Create fresh instance to prevent buffered results leaking across sessions
                 this._insertedTranscript = '';
                 this._recognitionSession++;
@@ -1000,7 +1067,7 @@ const DocumentView = {
             btn.title = 'Dictate text';
         }
         if (blockId) {
-            const block = document.querySelector(`.block[data-id="${blockId}"]`);
+            const block = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
             if (block) {
                 block.classList.remove('block-recording');
             }
@@ -1057,6 +1124,11 @@ const DocumentView = {
         });
 
         if (window.visualViewport) {
+            // Remove previous listeners if any
+            if (this._mobileViewportHandler && window.visualViewport) {
+                window.visualViewport.removeEventListener('resize', this._mobileViewportHandler);
+                window.visualViewport.removeEventListener('scroll', this._mobileViewportHandler);
+            }
             const updatePosition = () => {
                 if (!this._mobileToolbar) return;
                 const vv = window.visualViewport;
@@ -1070,6 +1142,7 @@ const DocumentView = {
                     this._mobileToolbar.classList.add('hidden');
                 }
             };
+            this._mobileViewportHandler = updatePosition;
             window.visualViewport.addEventListener('resize', updatePosition);
             window.visualViewport.addEventListener('scroll', updatePosition);
         }
@@ -1188,7 +1261,7 @@ const DocumentView = {
         
         // Save scroll position relative to the block
         let scrollOffset = 0;
-        const blockElement = document.querySelector(`.block[data-id="${blockId}"]`);
+        const blockElement = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
         if (blockElement) {
             scrollOffset = blockElement.getBoundingClientRect().top;
         }
@@ -1202,7 +1275,7 @@ const DocumentView = {
         // Restore scroll position and cursor AFTER CodeMirror finishes rebuilding (since render uses setTimeout)
         setTimeout(() => {
             if (blockId !== 'new') {
-                const newBlockElement = document.querySelector(`.block[data-id="${blockId}"]`);
+                const newBlockElement = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
                 if (newBlockElement) {
                     const newOffset = newBlockElement.getBoundingClientRect().top;
                     window.scrollBy(0, newOffset - scrollOffset);
@@ -1542,7 +1615,11 @@ const DocumentView = {
 
             const submit = (withLink) => {
                 const title = titleInput.value.trim();
-                if (withLink && !title) return;
+                if (withLink && !title) {
+                    Common.showToast('Enter a title to extract');
+                    titleInput.focus();
+                    return;
+                }
                 finish(withLink ? { title, tags: Array.from(selectedTags) } : { title: '', tags: Array.from(selectedTags) });
                 modal.close();
             };
@@ -1778,7 +1855,7 @@ const DocumentView = {
 
     createMentionCompletionSource(container, resolveBlockId) {
         return (context) => {
-            const word = context.matchBefore(/@[a-zA-Z0-9_]*/);
+            const word = context.matchBefore(/@[\p{L}\p{N}_]*/u);
             if (!word) return null;
 
             const beforeChar = word.from > 0
@@ -1806,7 +1883,7 @@ const DocumentView = {
             return {
                 from: word.from,
                 options: suggestions,
-                validFor: /^@[a-zA-Z0-9_]*$/
+                validFor: /^@[\p{L}\p{N}_]*$/u
             };
         };
     },
@@ -1863,7 +1940,8 @@ const DocumentView = {
                 minHeight: '0'
             },
             ".cm-focused": {
-                outline: 'none'
+                outline: '2px solid var(--accent, #3b82f6)',
+                outlineOffset: '2px'
             },
             ".cm-tooltip.cm-tooltip-autocomplete": {
                 border: '1px solid var(--border)',
@@ -2197,15 +2275,26 @@ const DocumentView = {
         return lines.filter((_, i) => !hidden.has(i)).join('\n');
     },
 
+    // Cache parsed fenced blocks and tables per doc to avoid redundant regex passes
+    _parseCache: new WeakMap(),
+    _getCachedParse(doc) {
+        if (this._parseCache.has(doc)) return this._parseCache.get(doc);
+        const text = doc.toString();
+        const fencedBlocks = this.getFencedBlocks(text);
+        const tables = this.getTables(text, fencedBlocks);
+        const result = { fencedBlocks, tables };
+        this._parseCache.set(doc, result);
+        return result;
+    },
+
     /**
      * Build the decoration set from editor state.
      */
     buildDecorations(state, hasFocus) {
         const { Decoration } = window.CodeMirror;
         const builder = [];
-        const fencedBlocks = this.getFencedBlocks(state.doc.toString());
+        const { fencedBlocks, tables } = this._getCachedParse(state.doc);
         const fencedBlockLines = this.buildFencedBlockLineSet(state.doc, fencedBlocks);
-        const tables = this.getTables(state.doc.toString(), fencedBlocks);
         const tableLines = this.buildTableLineSet(state.doc, tables);
 
         // Get lines containing cursors ONLY if editor is focused
@@ -2379,12 +2468,13 @@ const DocumentView = {
     createHiddenLineExtension() {
         const { StateField, EditorView } = window.CodeMirror;
         const self = this;
+        const effect = getFilterChangedEffect();
         return StateField.define({
             create(state) {
                 return self.buildHiddenLineDecorations(state);
             },
             update(deco, tr) {
-                if (tr.docChanged || tr.selection) {
+                if (tr.docChanged || tr.selection || (effect && tr.effects.some(e => e.is(effect)))) {
                     return self.buildHiddenLineDecorations(tr.state);
                 }
                 return deco.map(tr.changes);
@@ -2399,7 +2489,7 @@ const DocumentView = {
      */
     buildFencedBlockInteriorDecorations(state) {
         const { Decoration } = window.CodeMirror;
-        const fencedBlocks = this.getFencedBlocks(state.doc.toString());
+        const { fencedBlocks } = this._getCachedParse(state.doc);
         const builder = [];
 
         for (const block of fencedBlocks) {
@@ -2446,8 +2536,7 @@ const DocumentView = {
 
     buildTableInteriorDecorations(state) {
         const { Decoration } = window.CodeMirror;
-        const fencedBlocks = this.getFencedBlocks(state.doc.toString());
-        const tables = this.getTables(state.doc.toString(), fencedBlocks);
+        const { tables } = this._getCachedParse(state.doc);
         const builder = [];
 
         for (const table of tables) {
@@ -2510,18 +2599,27 @@ const DocumentView = {
      */
     createUpdateListener(container, blockId, handleContentChange) {
         const { EditorView } = window.CodeMirror;
+        let lastLine = -1;
         return EditorView.updateListener.of((update) => {
             if (update.selectionSet || update.focusChanged || update.docChanged || update.geometryChanged) {
-                const marker = document.querySelector(`.block-split-marker[data-id="${blockId}"]`);
+                const marker = document.querySelector(`.block-split-marker[data-id="${CSS.escape(blockId)}"]`);
                 if (marker) {
                     if (update.view.hasFocus) {
                         if (update.state.doc.lines <= 1) {
                             marker.style.display = 'none';
+                            lastLine = -1;
                             return;
                         }
 
                         const sel = update.state.selection.main;
                         const isExtract = !sel.empty && sel.from !== sel.to;
+                        const curLine = update.state.doc.lineAt(sel.from).number;
+
+                        // Skip expensive layout queries on pure selection changes within the same line
+                        const needsGeometry = update.docChanged || update.geometryChanged || update.focusChanged || isExtract || lastLine !== curLine;
+                        lastLine = curLine;
+
+                        if (!needsGeometry) return;
 
                         const blockEl = container.closest('.block');
 
@@ -2531,7 +2629,6 @@ const DocumentView = {
                             if (!startCoords) { marker.style.display = 'none'; return; }
 
                             const startLineTop = startCoords.top - blockRect.top;
-                            const startLineHeight = startCoords.bottom - startCoords.top;
 
                             marker.style.display = 'flex';
 
@@ -2568,11 +2665,6 @@ const DocumentView = {
 
             if (update.docChanged) {
                 const content = update.state.doc.toString();
-                if (content !== '' && !content.endsWith('\n')) {
-                    update.view.dispatch({
-                        changes: { from: content.length, to: content.length, insert: '\n' }
-                    });
-                }
                 handleContentChange(content);
             }
         });
@@ -2612,7 +2704,7 @@ const DocumentView = {
                 if (lines < 3 && selectedText.length < 200) return false;
 
                 event.preventDefault();
-                navigator.clipboard.writeText(selectedText);
+                navigator.clipboard.writeText(selectedText).catch(() => Common.showToast('Clipboard access denied'));
                 self.handleExtractCut(view, selectedText, selection);
                 return true;
             },
@@ -2624,7 +2716,11 @@ const DocumentView = {
                     if (UndoRedoManager.isExecuting || App._aiIsStreaming || App._aiDictationActive) {
                         return;
                     }
-                     if (content.trim() === '') {
+                    // Guard against double-blur: skip if block was already deleted
+                    if (!Store.blocks.find(b => b.id === currentId)) {
+                        return;
+                    }
+                    if (content.trim() === '') {
                         App.deleteBlock(currentId);
                     } else {
                         // Only commit if content changed
@@ -2750,7 +2846,9 @@ const DocumentView = {
 
         editorView = view;
         this.editors.set(blockId, view);
-        this.originalContents.set(blockId, initialContent);
+        // Normalize to match editor's trailing-\n convention to avoid spurious saves
+        const normalizedContent = (blockId === 'new' && initialContent === '') ? '' : (initialContent.endsWith('\n') ? initialContent : initialContent + '\n');
+        this.originalContents.set(blockId, normalizedContent);
     },
 
     /**
@@ -2928,15 +3026,18 @@ const DocumentView = {
 
     // Registry of line decorator functions. Each takes (text, from, builder, hideSyntax, Decoration, usedRanges, widgets).
     get _lineDecorators() {
-        return [
-            this.decorateInlineFields.bind(this),
-            this.decorateTaskAnchors.bind(this),
-            this.decorateHeaders.bind(this),
-            this.decorateInlineFormats.bind(this),
-            this.decorateLinks.bind(this),
-            this.decorateBareUrls.bind(this),
-            this.decorateWikilinks.bind(this)
-        ];
+        if (!this._cachedLineDecorators) {
+            this._cachedLineDecorators = [
+                this.decorateInlineFields.bind(this),
+                this.decorateTaskAnchors.bind(this),
+                this.decorateHeaders.bind(this),
+                this.decorateInlineFormats.bind(this),
+                this.decorateLinks.bind(this),
+                this.decorateBareUrls.bind(this),
+                this.decorateWikilinks.bind(this)
+            ];
+        }
+        return this._cachedLineDecorators;
     },
 
     // Decorator: inline fields (e.g. [due:: 2026-03-25], [assignee:: @user])
@@ -3007,6 +3108,16 @@ const DocumentView = {
             { regex: /`(.+?)`/g, class: 'md-code', syntaxLen: 1 }
         ];
 
+        // Prune usedRanges to only keep active ranges (sorted by from, prune by maintaining start index)
+        let checkStart = 0;
+        const overlaps = (matchFrom, matchTo) => {
+            while (checkStart < usedRanges.length && usedRanges[checkStart].to <= matchFrom) checkStart++;
+            for (let i = checkStart; i < usedRanges.length; i++) {
+                if (matchFrom < usedRanges[i].to && matchTo > usedRanges[i].from) return true;
+            }
+            return false;
+        };
+
         for (const pattern of patterns) {
             pattern.regex.lastIndex = 0;
             let match;
@@ -3014,8 +3125,7 @@ const DocumentView = {
                 const matchFrom = from + match.index;
                 const matchTo = matchFrom + match[0].length;
 
-                let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
-                if (!overlaps) {
+                if (!overlaps(matchFrom, matchTo)) {
                     builder.push(Decoration.mark({ class: pattern.class }).range(matchFrom, matchTo));
                     if (hideSyntax) {
                         builder.push(Decoration.replace({}).range(matchFrom, matchFrom + pattern.syntaxLen));
@@ -3221,9 +3331,13 @@ const DocumentView = {
                     }
                 });
             }
-        } finally {
+        } catch (err) {
+            console.error('Failed to promote placeholder:', err);
+            this.newBlockContent = '';
             this.isPromoting = false;
+            return;
         }
+        this.isPromoting = false;
     },
 
     cancelAllPendingSaves() {
@@ -3234,7 +3348,7 @@ const DocumentView = {
     },
 
     scheduleSave(blockId, content) {
-        const indicator = document.querySelector(`.save-indicator[data-id="${blockId}"]`);
+        const indicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
         if (indicator) {
             indicator.textContent = 'saving...';
             indicator.classList.add('saving');
@@ -3251,19 +3365,21 @@ const DocumentView = {
         const timeout = setTimeout(async () => {
             this.saveTimeouts.delete(blockId);
             await App.saveBlockContent(blockId, content);
-            
-            if (indicator) {
-                indicator.textContent = 'saved';
-                indicator.classList.remove('saving');
-                indicator.classList.add('saved');
+
+            // Re-query indicator in case re-render replaced it
+            const currentIndicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
+            if (currentIndicator) {
+                currentIndicator.textContent = 'saved';
+                currentIndicator.classList.remove('saving');
+                currentIndicator.classList.add('saved');
                 // Show undo hint
                 if (UndoRedoManager.canUndo()) {
-                    indicator.title = 'Press Ctrl+Z to undo';
+                    currentIndicator.title = 'Press Ctrl+Z to undo';
                 }
                 // Hide saved indicator after 2 seconds
                 setTimeout(() => {
-                    if (indicator.textContent === 'saved') {
-                        indicator.textContent = '';
+                    if (currentIndicator.textContent === 'saved') {
+                        currentIndicator.textContent = '';
                     }
                 }, 2000);
             }
@@ -3279,11 +3395,15 @@ const DocumentView = {
         await Store.createBlock(content);
         this.newBlockContent = '';
 
-        // Clear editors map to prevent memory leaks
+        // Cancel pending saves before destroying editors to prevent stale writes
+        this.cancelAllPendingSaves();
         this.editors.clear();
 
         SelectionManager.updateTagCounts();
         await App.render();
+
+        // Focus the new empty block
+        this.focusNewBlock();
 
         // Scroll to new empty block
         setTimeout(() => {
@@ -3361,6 +3481,12 @@ const DocumentView = {
             window.visualViewport.removeEventListener('resize', this._mobileKeyboardHandler);
             this._mobileKeyboardHandler = null;
         }
+        if (this._mobileViewportHandler && window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', this._mobileViewportHandler);
+            window.visualViewport.removeEventListener('scroll', this._mobileViewportHandler);
+            this._mobileViewportHandler = null;
+        }
+        this.hideMobileToolbar();
     },
 
     // Focus the "new note" block at the bottom
@@ -3388,6 +3514,8 @@ const DocumentView = {
                 }
             } else if (attempts < 15) {
                 setTimeout(() => tryFocus(attempts + 1), 50);
+            } else {
+                console.warn('focusNewBlock: could not find new block editor after 15 retries');
             }
         };
         tryFocus();
