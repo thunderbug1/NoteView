@@ -335,6 +335,14 @@ const App = {
             // 1. Standard swipe logic for horizontal movements
             if (absDx < 50 || absDy > 30) return;
 
+            // If touch started inside a kanban board that can still scroll in the swipe direction, skip sidebar gesture
+            const kanbanBoard = touchStartTarget?.closest('.kanban-board');
+            if (kanbanBoard) {
+                const atLeftEdge = kanbanBoard.scrollLeft <= 0;
+                const atRightEdge = kanbanBoard.scrollLeft + kanbanBoard.clientWidth >= kanbanBoard.scrollWidth - 1;
+                if ((dx > 0 && !atLeftEdge) || (dx < 0 && !atRightEdge)) return;
+            }
+
             if (dx > 0 && !sidebar.classList.contains('sidebar-open') &&
                 !sidebarRight.classList.contains('sidebar-open')) {
                 const fromLeft = touchStartX;
