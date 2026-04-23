@@ -4,6 +4,20 @@
 
 const KanbanView = {
     collapsedGroups: new Map(),
+    showUpcoming: false,
+    UPCOMING_STORAGE_KEY: 'noteview-kanban-show-upcoming',
+
+    loadShowUpcoming() {
+        try {
+            return localStorage.getItem(this.UPCOMING_STORAGE_KEY) === 'true';
+        } catch { return false; }
+    },
+
+    saveShowUpcoming(val) {
+        try {
+            localStorage.setItem(this.UPCOMING_STORAGE_KEY, String(val));
+        } catch {}
+    },
 
     columns: [
         { id: 'todo', label: 'Todo', state: ' ' },
@@ -68,19 +82,43 @@ const KanbanView = {
         // Apply sidebar filters
         const tasks = this.applyTaskFilters(allTasks);
 
+        // Start-date filtering
+        this.showUpcoming = this.loadShowUpcoming();
+        const notStartedIds = new Set(
+            tasks.filter(t => TaskParser.isNotStarted(t)).map(t => t.id)
+        );
+        const hiddenCount = notStartedIds.size;
+        const visibleTasks = this.showUpcoming
+            ? tasks
+            : tasks.filter(t => !notStartedIds.has(t.id));
+
         const { groupBy } = options;
 
         if (groupBy) {
             const blockMap = new Map(blocks.map(b => [b.id, b]));
-            this.renderGroupedKanban(container, tasks, fullHierarchy, allTasksById, groupBy, blockMap);
+            this.renderGroupedKanban(container, visibleTasks, fullHierarchy, allTasksById, groupBy, blockMap, hiddenCount);
         } else {
-            this.renderFlatKanban(container, tasks, fullHierarchy, allTasksById);
+            this.renderFlatKanban(container, visibleTasks, fullHierarchy, allTasksById, hiddenCount);
         }
 
         this.attachEventListeners(container);
     },
 
-    renderFlatKanban(container, tasks, fullHierarchy, allTasksById) {
+    renderToolbar(hiddenCount) {
+        if (hiddenCount === 0 && !this.showUpcoming) return '';
+        const activeClass = this.showUpcoming ? ' active' : '';
+        const label = this.showUpcoming
+            ? 'Hide upcoming'
+            : `Show upcoming (${hiddenCount})`;
+        return `<div class="kanban-toolbar">
+            <button class="kanban-toolbar-btn kanban-toggle-upcoming${activeClass}" data-action="toggle-upcoming">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+                ${label}
+            </button>
+        </div>`;
+    },
+
+    renderFlatKanban(container, tasks, fullHierarchy, allTasksById, hiddenCount = 0) {
         let html = '';
         this.columns.forEach(col => {
             const colTasks = tasks.filter(t => t.state === col.state);
@@ -115,10 +153,10 @@ const KanbanView = {
             `;
         });
 
-        container.innerHTML = `<div class="kanban-board">${html}</div>`;
+        container.innerHTML = `${this.renderToolbar(hiddenCount)}<div class="kanban-board">${html}</div>`;
     },
 
-    renderGroupedKanban(container, tasks, fullHierarchy, allTasksById, namespace, blockMap) {
+    renderGroupedKanban(container, tasks, fullHierarchy, allTasksById, namespace, blockMap, hiddenCount = 0) {
         // Group tasks by tag namespace via their source block
         const groupTasks = new Map();
         const ungroupedTasks = [];
@@ -152,7 +190,7 @@ const KanbanView = {
             html += this.renderSwimlane(null, ungroupedTasks, fullHierarchy, allTasksById, namespace, true);
         }
 
-        container.innerHTML = html;
+        container.innerHTML = `${this.renderToolbar(hiddenCount)}${html}`;
     },
 
     renderSwimlane(key, tasks, fullHierarchy, allTasksById, namespace, isUngrouped) {
@@ -277,10 +315,11 @@ const KanbanView = {
         const hasDue = task.badges.some(b => b.type === 'due');
         const hasAssignee = task.badges.some(b => b.type === 'assignee');
         const hasPriority = task.badges.some(b => b.type === 'priority');
+        const hasStart = task.badges.some(b => b.type === 'start');
 
         let actionBtns = '';
-        if (!hasDue) {
-            actionBtns += `<button class="kanban-action-btn" data-action="due" title="Add deadline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></button>`;
+        if (!hasDue || !hasStart) {
+            actionBtns += `<button class="kanban-action-btn" data-action="date" title="Add date"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></button>`;
         }
         if (!hasAssignee) {
             actionBtns += `<button class="kanban-action-btn" data-action="assignee" title="Add assignee"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></button>`;
@@ -386,30 +425,8 @@ const KanbanView = {
                 e.stopPropagation();
                 const action = btn.dataset.action;
 
-                if (action === 'due') {
-                    const dateInput = document.createElement('input');
-                    dateInput.type = 'date';
-                    dateInput.style.position = 'absolute';
-                    dateInput.style.opacity = '0';
-                    dateInput.style.pointerEvents = 'none';
-                    document.body.appendChild(dateInput);
-
-                    dateInput.addEventListener('change', () => {
-                        if (dateInput.value) {
-                            KanbanView.updateTaskBadge(card, 'due', dateInput.value);
-                        }
-                        dateInput.remove();
-                    });
-
-                    dateInput.addEventListener('blur', () => {
-                        dateInput.remove();
-                    });
-
-                    // Position near the button
-                    const rect = btn.getBoundingClientRect();
-                    dateInput.style.left = rect.left + 'px';
-                    dateInput.style.top = rect.bottom + 'px';
-                    dateInput.showPicker ? dateInput.showPicker() : dateInput.click();
+                if (action === 'date') {
+                    KanbanView.showDateMenu(btn, card);
                 }
 
                 if (action === 'assignee') {
@@ -476,8 +493,8 @@ const KanbanView = {
                 e.stopPropagation();
                 const type = badge.dataset.type;
 
-                if (type === 'due') {
-                    KanbanView.showDueMenu(badge, card);
+                if (type === 'due' || type === 'start') {
+                    KanbanView.showDateMenu(badge, card);
                 }
 
                 if (type === 'assignee') {
@@ -573,6 +590,16 @@ const KanbanView = {
     },
 
     attachEventListeners(container) {
+        // Show/hide upcoming toggle
+        container.querySelectorAll('.kanban-toggle-upcoming').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                KanbanView.showUpcoming = !KanbanView.showUpcoming;
+                KanbanView.saveShowUpcoming(KanbanView.showUpcoming);
+                App.render();
+            });
+        });
+
         // Swimlane collapse toggle
         container.querySelectorAll('.kanban-swimlane-label').forEach(label => {
             label.addEventListener('click', (e) => {
@@ -660,6 +687,9 @@ const KanbanView = {
                     <label>Due
                         <input type="date" class="task-create-due">
                     </label>
+                    <label>Start
+                        <input type="date" class="task-create-start">
+                    </label>
                 </div>
                 <div class="task-create-actions">
                     <button class="modal-cancel-btn">Cancel</button>
@@ -690,6 +720,8 @@ const KanbanView = {
             if (assignee) taskLine += ` [assignee:: ${assignee}]`;
             const due = modal.querySelector('.task-create-due').value;
             if (due) taskLine += ` [due:: ${due}]`;
+            const start = modal.querySelector('.task-create-start').value;
+            if (start) taskLine += ` [start:: ${start}]`;
 
             modal.close();
             const newBlock = await Store.createBlock(taskLine);
@@ -795,20 +827,61 @@ const KanbanView = {
     },
 
     /**
-     * Show a floating menu with date picker and clear option for due date.
+     * Show a floating menu with unified due/start date picker.
      */
-    showDueMenu(badgeOrBtn, card) {
-        const existing = document.querySelector('.kanban-due-menu');
+    showDateMenu(badgeOrBtn, card) {
+        const existing = document.querySelector('.kanban-date-menu');
         if (existing) existing.remove();
 
-        const currentValue = badgeOrBtn.dataset ? (badgeOrBtn.dataset.value || '') : '';
+        // Read current badge values from the card
+        const dueBadge = card.querySelector('.kanban-badge[data-type="due"]');
+        const startBadge = card.querySelector('.kanban-badge[data-type="start"]');
+        const dueValue = dueBadge ? (dueBadge.dataset.value || '') : '';
+        const startValue = startBadge ? (startBadge.dataset.value || '') : '';
+        const hasStart = !!startValue;
 
         const menu = document.createElement('div');
-        menu.className = 'kanban-due-menu';
-        menu.innerHTML = `
-            <input type="date" value="${escapeHtml(currentValue)}" style="width:100%; padding:6px; box-sizing:border-box; border:1px solid var(--border); border-radius:4px; font-family:inherit; font-size:0.85rem;">
-            <button class="kanban-due-clear" style="width:100%; padding:6px; background:transparent; border:none; cursor:pointer; color:var(--text-muted); font-size:0.8rem; text-align:center; font-family:inherit;">Clear</button>
-        `;
+        menu.className = 'kanban-date-menu';
+
+        // Due row
+        const dueLabel = document.createElement('label');
+        dueLabel.className = 'kanban-date-field';
+        dueLabel.innerHTML = '<span>Due</span>';
+        const dueInput = document.createElement('input');
+        dueInput.type = 'date';
+        dueInput.value = dueValue;
+        dueLabel.appendChild(dueInput);
+
+        // Start toggle
+        const startToggle = document.createElement('button');
+        startToggle.type = 'button';
+        startToggle.className = 'kanban-date-start-toggle';
+        startToggle.innerHTML = hasStart
+            ? '<span class="kanban-date-arrow expanded">▸</span> Start date'
+            : '<span class="kanban-date-arrow">▸</span> Start date';
+
+        // Start row
+        const startRow = document.createElement('div');
+        startRow.className = 'kanban-date-start-row' + (hasStart ? ' expanded' : '');
+        const startLabel = document.createElement('label');
+        startLabel.className = 'kanban-date-field';
+        startLabel.innerHTML = '<span>Start</span>';
+        const startInput = document.createElement('input');
+        startInput.type = 'date';
+        startInput.value = startValue;
+        startLabel.appendChild(startInput);
+        startRow.appendChild(startLabel);
+
+        startToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isExpanded = startRow.classList.toggle('expanded');
+            startToggle.querySelector('.kanban-date-arrow').classList.toggle('expanded', isExpanded);
+            if (isExpanded) startInput.focus();
+        });
+
+        menu.appendChild(dueLabel);
+        menu.appendChild(startToggle);
+        menu.appendChild(startRow);
 
         const rect = badgeOrBtn.getBoundingClientRect();
         menu.style.position = 'fixed';
@@ -818,9 +891,6 @@ const KanbanView = {
 
         document.body.appendChild(menu);
 
-        const dateInput = menu.querySelector('input[type="date"]');
-        dateInput.focus();
-
         const close = (e) => {
             if (!menu.contains(e.target)) {
                 menu.remove();
@@ -829,17 +899,23 @@ const KanbanView = {
         };
         setTimeout(() => document.addEventListener('click', close), 0);
 
-        dateInput.addEventListener('change', () => {
-            if (dateInput.value) {
-                KanbanView.updateTaskBadge(card, 'due', dateInput.value);
+        // Apply changes on any date input change
+        dueInput.addEventListener('change', () => {
+            if (dueInput.value) {
+                KanbanView.updateTaskBadge(card, 'due', dueInput.value);
+            } else {
+                KanbanView.updateTaskBadge(card, 'due', null);
             }
             menu.remove();
             document.removeEventListener('click', close);
         });
 
-        menu.querySelector('.kanban-due-clear').addEventListener('click', (e) => {
-            e.stopPropagation();
-            KanbanView.updateTaskBadge(card, 'due', null);
+        startInput.addEventListener('change', () => {
+            if (startInput.value) {
+                KanbanView.updateTaskBadge(card, 'start', startInput.value);
+            } else {
+                KanbanView.updateTaskBadge(card, 'start', null);
+            }
             menu.remove();
             document.removeEventListener('click', close);
         });

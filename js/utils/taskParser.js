@@ -15,7 +15,7 @@ const TASK_STATES = {
 };
 
 // Badge keys that we want to extract
-const KNOWN_BADGE_KEYS = ['due', 'assignee', 'priority'];
+const KNOWN_BADGE_KEYS = ['due', 'assignee', 'priority', 'start'];
 
 // Regex patterns
 const CHECKBOX_REGEX = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm;
@@ -177,6 +177,36 @@ function getDueTimestamp(task) {
 
     const timestamp = new Date(due).getTime();
     return Number.isNaN(timestamp) ? Number.NaN : timestamp;
+}
+
+function getStartTimestamp(task) {
+    const start = getBadgeValue(task, 'start').trim();
+    if (!start) return Number.NaN;
+    const timestamp = new Date(start).getTime();
+    return Number.isNaN(timestamp) ? Number.NaN : timestamp;
+}
+
+function isNotStarted(task) {
+    if (isClosedTask(task)) return false;
+    const ts = getStartTimestamp(task);
+    if (Number.isNaN(ts)) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return ts > today.getTime() + 86400000;
+}
+
+function getStartDateString(task) {
+    const start = getBadgeValue(task, 'start').trim();
+    if (!start) return '';
+    const ts = new Date(start).getTime();
+    if (Number.isNaN(ts)) return start;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfToday = today.getTime();
+    const diffDays = Math.round((ts - startOfToday) / 86400000);
+    if (diffDays < 0) return `Started ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`;
+    if (diffDays === 0) return 'Starts today';
+    return `Starts in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
 }
 
 /**
@@ -493,6 +523,9 @@ window.TaskParser = {
     getBadgeValue,
     getPriorityRank,
     getDueTimestamp,
+    getStartTimestamp,
+    isNotStarted,
+    getStartDateString,
     getDeadlineUrgency,
     getDueDateString,
     getTasksWithUrgency,

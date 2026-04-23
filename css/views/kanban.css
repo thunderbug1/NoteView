@@ -203,21 +203,120 @@
     cursor: pointer;
 }
 
-/* Floating due date picker */
-.kanban-due-menu {
+/* Start date badge on kanban cards */
+.kanban-badge.badge-start {
+    border-color: rgba(34, 197, 94, 0.3);
+    background-color: rgba(34, 197, 94, 0.05);
+    color: #16a34a;
+}
+
+/* Kanban toolbar (upcoming toggle) */
+.kanban-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem 0.5rem;
+}
+
+.kanban-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.kanban-toolbar-btn:hover {
+    color: var(--accent);
+    background: var(--bg-hover);
+    border-color: var(--accent);
+}
+
+.kanban-toolbar-btn.active {
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.08));
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* Floating date picker (unified due + start) */
+.kanban-date-menu {
     background: var(--bg-primary, #fff);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow-md);
-    padding: 6px;
+    padding: 8px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    min-width: 160px;
+    gap: 6px;
+    min-width: 190px;
 }
 
-.kanban-due-clear:hover {
-    color: var(--danger, #ef4444);
+.kanban-date-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.kanban-date-field span {
+    min-width: 2.2rem;
+    font-weight: 500;
+}
+
+.kanban-date-field input {
+    flex: 1;
+    padding: 5px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    box-sizing: border-box;
+}
+
+.kanban-date-start-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.kanban-date-start-toggle:hover {
+    color: #16a34a;
+}
+
+.kanban-date-arrow {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 0.7rem;
+}
+
+.kanban-date-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+.kanban-date-start-row {
+    display: none;
+}
+
+.kanban-date-start-row.expanded {
+    display: block;
 }
 
 /* Floating priority picker */

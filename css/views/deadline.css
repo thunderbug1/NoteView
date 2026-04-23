@@ -183,13 +183,13 @@
 }
 
 /* ============================================
-   Due Date Popover (editor badge click)
+   Date Popover (editor — unified due + start)
    ============================================ */
 
-.due-popover {
+.date-popover {
     position: fixed;
     z-index: 10000;
-    width: 220px;
+    width: 240px;
     background: var(--bg-primary);
     border: 1px solid var(--border);
     border-radius: var(--radius-md, 8px);
@@ -200,23 +200,77 @@
     gap: 0.5rem;
 }
 
-.due-popover-input {
-    width: 100%;
-    padding: 0.5rem 0.6rem;
+.date-popover-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.date-popover-label {
+    min-width: 2.2rem;
+    font-weight: 500;
+}
+
+.date-popover-label-start {
+    color: #16a34a;
+}
+
+.date-popover-input {
+    flex: 1;
+    padding: 0.45rem 0.5rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm, 6px);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-primary);
     background: var(--bg-secondary);
     box-sizing: border-box;
+    font-family: inherit;
 }
 
-.due-popover-actions {
+.date-popover-start-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.date-popover-start-toggle:hover {
+    color: #16a34a;
+}
+
+.date-popover-arrow {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 0.7rem;
+}
+
+.date-popover-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+.date-popover-start-row {
+    display: none;
+}
+
+.date-popover-start-row.expanded {
+    display: block;
+}
+
+.date-popover-actions {
     display: flex;
     gap: 0.4rem;
 }
 
-.due-popover-btn {
+.date-popover-btn {
     flex: 1;
     padding: 0.45rem 0.5rem;
     border: 1px solid var(--border);
@@ -227,20 +281,21 @@
     background: var(--bg-secondary);
     color: var(--text-primary);
     text-align: center;
+    font-family: inherit;
     -webkit-tap-highlight-color: transparent;
 }
 
-.due-popover-btn:active {
+.date-popover-btn:active {
     opacity: 0.8;
 }
 
-.due-popover-save {
+.date-popover-save {
     background: var(--accent);
     color: #fff;
     border-color: var(--accent);
 }
 
-.due-popover-remove {
+.date-popover-clear {
     color: var(--danger-color, #ef4444);
     border-color: rgba(239, 68, 68, 0.25);
 }

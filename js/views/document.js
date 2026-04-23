@@ -2119,6 +2119,11 @@ const DocumentView = {
                 backgroundColor: 'rgba(59, 130, 246, 0.05)',
                 color: 'var(--accent)'
             },
+            ".badge-start": {
+                borderColor: 'rgba(34, 197, 94, 0.3)',
+                backgroundColor: 'rgba(34, 197, 94, 0.05)',
+                color: '#16a34a'
+            },
             ".badge-assignee": {
                 borderColor: 'var(--badge-time-border, #d8b4fe)',
                 backgroundColor: 'var(--badge-time-bg, #faf5ff)',
@@ -2993,7 +2998,7 @@ const DocumentView = {
 
         // 2. Add-field widgets for task lines
         if (isTaskLine) {
-            if (!text.includes('[due::')) {
+            if (!text.includes('[due::') || !text.includes('[start::')) {
                 builder.push(Decoration.widget({
                     widget: new widgets.AddDeadlineWidget(from, line.to),
                     side: 1
@@ -3042,7 +3047,7 @@ const DocumentView = {
 
     // Decorator: inline fields (e.g. [due:: 2026-03-25], [assignee:: @user])
     decorateInlineFields(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
-        const inlineFieldRegex = /\[(due|assignee|priority)::\s*([^\]]+)\]/g;
+        const inlineFieldRegex = /\[(due|assignee|priority|start)::\s*([^\]]+)\]/g;
         let fieldMatch;
         while ((fieldMatch = inlineFieldRegex.exec(text)) !== null) {
             const matchFrom = from + fieldMatch.index;

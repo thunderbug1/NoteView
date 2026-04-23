@@ -4,60 +4,150 @@
  */
 
 /**
- * Show a popover for editing or removing a due date badge.
+ * Show a unified popover for editing due and start date badges.
+ * The start date row is collapsible — expanded if a start value exists.
  * Works on both desktop and mobile (touch-friendly).
  */
-function showDuePopover(event, view, from, to, currentValue) {
-    // Close any existing popover
-    document.querySelector('.due-popover')?.remove();
+function showDatePopover(event, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue) {
+    document.querySelector('.date-popover')?.remove();
 
     const popover = document.createElement('div');
-    popover.className = 'due-popover';
+    popover.className = 'date-popover';
 
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.value = currentValue.trim();
-    dateInput.className = 'due-popover-input';
+    // --- Due date row ---
+    const dueLabel = document.createElement('label');
+    dueLabel.className = 'date-popover-field';
+    dueLabel.innerHTML = '<span class="date-popover-label">Due</span>';
+    const dueInput = document.createElement('input');
+    dueInput.type = 'date';
+    dueInput.value = (dueValue || '').trim();
+    dueInput.className = 'date-popover-input';
+    dueInput.addEventListener('mousedown', (e) => e.stopPropagation());
+    dueLabel.appendChild(dueInput);
 
+    // --- Start date toggle + row ---
+    const hasStart = !!startValue;
+    const startToggle = document.createElement('button');
+    startToggle.className = 'date-popover-start-toggle';
+    startToggle.type = 'button';
+    startToggle.innerHTML = hasStart
+        ? '<span class="date-popover-arrow expanded">▸</span> Start date'
+        : '<span class="date-popover-arrow">▸</span> Start date';
+
+    const startRow = document.createElement('div');
+    startRow.className = 'date-popover-start-row' + (hasStart ? ' expanded' : '');
+    const startLabel = document.createElement('label');
+    startLabel.className = 'date-popover-field';
+    startLabel.innerHTML = '<span class="date-popover-label date-popover-label-start">Start</span>';
+    const startInput = document.createElement('input');
+    startInput.type = 'date';
+    startInput.value = (startValue || '').trim();
+    startInput.className = 'date-popover-input';
+    startInput.addEventListener('mousedown', (e) => e.stopPropagation());
+    startLabel.appendChild(startInput);
+    startRow.appendChild(startLabel);
+
+    startToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isExpanded = startRow.classList.toggle('expanded');
+        startToggle.querySelector('.date-popover-arrow').classList.toggle('expanded', isExpanded);
+        if (isExpanded) startInput.focus();
+    });
+
+    // --- Buttons ---
     const btnRow = document.createElement('div');
-    btnRow.className = 'due-popover-actions';
+    btnRow.className = 'date-popover-actions';
 
     const saveBtn = document.createElement('button');
     saveBtn.textContent = 'Save';
-    saveBtn.className = 'due-popover-btn due-popover-save';
+    saveBtn.className = 'date-popover-btn date-popover-save';
     saveBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (dateInput.value) {
-            view.dispatch({ changes: { from, to, insert: `[due:: ${dateInput.value}]` } });
-        }
+        applyChanges();
         popover.remove();
     });
 
-    const removeBtn = document.createElement('button');
-    removeBtn.textContent = 'Remove';
-    removeBtn.className = 'due-popover-btn due-popover-remove';
-    removeBtn.addEventListener('click', (e) => {
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = 'Clear';
+    clearBtn.className = 'date-popover-btn date-popover-clear';
+    clearBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        view.dispatch({ changes: { from, to, insert: '' } });
+        const changes = [];
+        // Remove due badge (and preceding space)
+        if (dueFrom != null) {
+            let delFrom = dueFrom;
+            if (delFrom > 0 && view.state.doc.sliceString(delFrom - 1, delFrom) === ' ') delFrom -= 1;
+            changes.push({ from: delFrom, to: dueTo, insert: '' });
+        }
+        // Remove start badge (and preceding space)
+        if (startFrom != null) {
+            let delFrom = startFrom;
+            if (delFrom > 0 && view.state.doc.sliceString(delFrom - 1, delFrom) === ' ') delFrom -= 1;
+            // Adjust if start badge comes before due (positions shifted)
+            if (changes.length > 0 && startFrom < dueFrom) {
+                // start badge is before due — the positions are relative to original text
+            }
+            changes.push({ from: delFrom, to: startTo, insert: '' });
+        }
+        if (changes.length) view.dispatch({ changes });
         popover.remove();
     });
 
     btnRow.appendChild(saveBtn);
-    btnRow.appendChild(removeBtn);
-    popover.appendChild(dateInput);
+    btnRow.appendChild(clearBtn);
+
+    popover.appendChild(dueLabel);
+    popover.appendChild(startToggle);
+    popover.appendChild(startRow);
     popover.appendChild(btnRow);
     document.body.appendChild(popover);
 
     // Position near the click/tap
-    const rect = (event.target instanceof HTMLElement ? event.target : event.target.parentElement).getBoundingClientRect();
-    const popW = 220;
+    const target = event.target instanceof HTMLElement ? event.target : event.target.parentElement;
+    const rect = target.getBoundingClientRect();
+    const popW = 240;
     let left = rect.left + rect.width / 2 - popW / 2;
     let top = rect.bottom + 6;
-    // Keep within viewport
     left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
-    if (top + 120 > window.innerHeight) top = rect.top - 120;
+    if (top + 200 > window.innerHeight) top = rect.top - 200;
     popover.style.left = left + 'px';
     popover.style.top = top + 'px';
+
+    function applyChanges() {
+        const changes = [];
+
+        // Update or skip due
+        if (dueFrom != null) {
+            if (dueInput.value) {
+                changes.push({ from: dueFrom, to: dueTo, insert: `[due:: ${dueInput.value}]` });
+            }
+            // If due cleared while existing, remove it
+        } else if (dueInput.value) {
+            // No existing due badge — will append below
+        }
+
+        // Update or skip start
+        if (startFrom != null) {
+            if (startInput.value) {
+                changes.push({ from: startFrom, to: startTo, insert: `[start:: ${startInput.value}]` });
+            }
+        } else if (startInput.value) {
+            // No existing start badge — will append below
+        }
+
+        // Apply inline changes first
+        if (changes.length) view.dispatch({ changes });
+
+        // Append new badges that don't have an existing position
+        // Use the reference position (dueFrom or this.from) for line lookup
+        const refPos = dueFrom != null ? dueFrom : (startFrom != null ? startFrom : 0);
+        if (dueInput.value && dueFrom == null) {
+            documentView.appendInlineField(view, refPos, refPos, 'due', dueInput.value);
+        }
+        if (startInput.value && startFrom == null) {
+            documentView.appendInlineField(view, refPos, refPos, 'start', startInput.value);
+        }
+    }
 
     // Close on outside click/tap
     const closeOnOutside = (e) => {
@@ -67,22 +157,13 @@ function showDuePopover(event, view, from, to, currentValue) {
             document.removeEventListener('touchstart', closeOnOutside);
         }
     };
-    // Delay to avoid the opening click immediately closing it
     setTimeout(() => {
         document.addEventListener('mousedown', closeOnOutside);
         document.addEventListener('touchstart', closeOnOutside, { passive: true });
     }, 0);
 
-    dateInput.addEventListener('mousedown', (e) => e.stopPropagation());
-    dateInput.addEventListener('change', () => {
-        if (dateInput.value) {
-            view.dispatch({ changes: { from, to, insert: `[due:: ${dateInput.value}]` } });
-        }
-        popover.remove();
-    });
-
-    // Auto-focus the date input
-    setTimeout(() => dateInput.focus(), 10);
+    // Auto-focus the due input
+    setTimeout(() => dueInput.focus(), 10);
 }
 
 /**
@@ -182,6 +263,12 @@ function createCodeMirrorWidgets(documentView) {
                     }
                 } catch (_) { /* ignore line lookup errors */ }
                 wrap.title = 'Tap to edit';
+            } else if (this.type === 'start') {
+                wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg></span> `;
+                const valSpan = document.createElement('span');
+                valSpan.textContent = this.value;
+                wrap.appendChild(valSpan);
+                wrap.title = 'Tap to edit start date';
             } else if (this.type === 'assignee') {
                 wrap.innerHTML = `<span class="icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px; vertical-align:text-top;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span> `;
                 const valSpan = document.createElement('span');
@@ -206,8 +293,28 @@ function createCodeMirrorWidgets(documentView) {
                 e.preventDefault();
                 e.stopPropagation();
 
-                if (this.type === 'due') {
-                    showDuePopover(e, view, this.from, this.to, this.value);
+                if (this.type === 'due' || this.type === 'start') {
+                    // Find both due and start badges on the same line for the unified popover
+                    const line = view.state.doc.lineAt(this.from);
+                    const lineText = line.text;
+                    let dueFrom = null, dueTo = null, dueValue = '';
+                    let startFrom = null, startTo = null, startValue = '';
+
+                    const dueMatch = lineText.match(/\[due::\s*([^\]]+)\]/);
+                    if (dueMatch) {
+                        dueFrom = line.from + dueMatch.index;
+                        dueTo = dueFrom + dueMatch[0].length;
+                        dueValue = dueMatch[1].trim();
+                    }
+
+                    const startMatch = lineText.match(/\[start::\s*([^\]]+)\]/);
+                    if (startMatch) {
+                        startFrom = line.from + startMatch.index;
+                        startTo = startFrom + startMatch[0].length;
+                        startValue = startMatch[1].trim();
+                    }
+
+                    showDatePopover(e, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue);
                     return;
                 }
 
@@ -465,32 +572,23 @@ function createCodeMirrorWidgets(documentView) {
         toDOM(view) {
             const wrap = document.createElement("span");
             wrap.className = "md-add-deadline";
-            wrap.style.position = "relative";
             wrap.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`;
-            wrap.title = "Add Deadline";
+            wrap.title = "Add Date";
 
-            const dateInput = document.createElement("input");
-            dateInput.type = "date";
-            dateInput.style.position = "absolute";
-            dateInput.style.opacity = "0";
-            dateInput.style.width = "100%";
-            dateInput.style.height = "100%";
-            dateInput.style.left = "0";
-            dateInput.style.top = "0";
-            dateInput.style.cursor = "pointer";
-
-            dateInput.onmousedown = (e) => {
-                // Prevent CodeMirror from swallowing the click, but allow default so the input gets focus and opens the calendar
+            const handleClick = (e) => {
+                e.preventDefault();
                 e.stopPropagation();
+                // No existing badges — open unified popover with empty fields
+                showDatePopover(e, view, null, null, '', null, null, '');
             };
 
-            dateInput.onchange = (e) => {
-                if (dateInput.value) {
-                    documentView.appendInlineField(view, this.from, this.to, 'due', dateInput.value);
-                }
+            wrap.onmousedown = handleClick;
+            wrap.onclick = handleClick;
+            wrap.ontouchend = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClick(e);
             };
-
-            wrap.appendChild(dateInput);
             return wrap;
         }
         ignoreEvent() { return true; }
