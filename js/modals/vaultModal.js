@@ -45,8 +45,9 @@ const VaultModal = {
             });
         }
 
-        // Pre-warm permissions for all vaults while we have user gesture
+        // Pre-warm permissions for local vaults while we have user gesture (skip OPFS — no permission needed)
         vaultList.forEach(v => {
+            if (Store.isOPFSVault(v)) return;
             Store.getVaultHandle(v.name).then(handle => {
                 if (!handle) return;
                 handle.queryPermission({ mode: 'readwrite' }).then(perm => {
@@ -129,29 +130,23 @@ const VaultModal = {
     async showManager() {
         const vaultList = await Store.getVaultList();
         const currentName = Store.directoryHandle?.name || '';
+        const hasLocalPicker = 'showDirectoryPicker' in window;
 
         const folderIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+
+        const browserIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
 
         const dotsIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>`;
 
         const renderList = (vaults) => vaults.map(v => `
             <div class="vault-manager-row${v.name === currentName ? ' active' : ''}" data-vault="${escapeHtml(v.name)}">
-                ${folderIcon}
+                ${Store.isOPFSVault(v) ? browserIcon : folderIcon}
                 <span class="vault-manager-name">${escapeHtml(v.name)}</span>
                 <button class="vault-manager-menu-btn" data-vault="${escapeHtml(v.name)}" title="Vault options">${dotsIcon}</button>
             </div>
         `).join('');
 
-        const modal = Modal.create({
-            title: 'Manage Vaults',
-            content: `
-                <div class="vault-manager">
-                    <div class="vault-manager-sidebar">
-                        <div class="vault-manager-list" id="vaultManagerList">
-                            ${vaultList.length > 0 ? renderList(vaultList) : '<div style="text-align:center;color:var(--text-muted);padding:2rem 0">No vaults added yet</div>'}
-                        </div>
-                    </div>
-                    <div class="vault-manager-actions">
+        const localActions = hasLocalPicker ? `
                         <div class="vault-manager-action">
                             <div class="vault-manager-action-text">
                                 <h4>Create new vault</h4>
@@ -165,6 +160,25 @@ const VaultModal = {
                                 <p>Open an existing folder on your device</p>
                             </div>
                             <button class="vault-manager-action-btn secondary" id="openFolderAsVaultBtn">Open</button>
+                        </div>` : '';
+
+        const modal = Modal.create({
+            title: 'Manage Vaults',
+            content: `
+                <div class="vault-manager">
+                    <div class="vault-manager-sidebar">
+                        <div class="vault-manager-list" id="vaultManagerList">
+                            ${vaultList.length > 0 ? renderList(vaultList) : '<div style="text-align:center;color:var(--text-muted);padding:2rem 0">No vaults added yet</div>'}
+                        </div>
+                    </div>
+                    <div class="vault-manager-actions">
+                        ${localActions}
+                        <div class="vault-manager-action">
+                            <div class="vault-manager-action-text">
+                                <h4>Create browser vault</h4>
+                                <p>No permission prompts — stays in browser storage</p>
+                            </div>
+                            <button class="vault-manager-action-btn secondary" id="createBrowserVaultBtn">Create</button>
                         </div>
                     </div>
                 </div>
@@ -291,10 +305,29 @@ const VaultModal = {
             }
         };
 
+        const createBrowserVault = async () => {
+            const name = window.prompt('Browser vault name:', 'Browser Vault');
+            if (!name) return;
+            try {
+                modal.close();
+                const container = document.getElementById('viewContainer');
+                if (container) container.innerHTML = '<div class="loading">Loading notes...</div>';
+
+                await Store.createOPFSVault(name);
+                await App.completeInitialization();
+                VaultModal.updateVaultSwitcherName();
+            } catch (err) {
+                App.showError(err.message || 'Failed to create browser vault');
+            }
+        };
+
         const createBtn = modal.querySelector('#createVaultBtn');
         if (createBtn) createBtn.addEventListener('click', openVaultFromPicker);
 
         const openBtn = modal.querySelector('#openFolderAsVaultBtn');
         if (openBtn) openBtn.addEventListener('click', openVaultFromPicker);
+
+        const browserVaultBtn = modal.querySelector('#createBrowserVaultBtn');
+        if (browserVaultBtn) browserVaultBtn.addEventListener('click', createBrowserVault);
     }
 };

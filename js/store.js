@@ -57,7 +57,11 @@ const Store = {
 
     // Check browser support
     isSupported() {
-        return 'showDirectoryPicker' in window;
+        return 'showDirectoryPicker' in window || ('storage' in navigator && 'getDirectory' in navigator.storage);
+    },
+
+    isOPFSVault(vaultEntry) {
+        return vaultEntry && vaultEntry.type === 'opfs';
     },
 
     // Initialize IndexedDB
@@ -390,11 +394,18 @@ const Store = {
 
         if (savedHandle) {
             try {
-                // Check if we still have permission
-                let permission = await savedHandle.queryPermission({ mode: 'readwrite' });
-                if (permission !== 'granted') {
-                    // Chrome auto-grants for installed PWAs even without user gesture
-                    permission = await savedHandle.requestPermission({ mode: 'readwrite' });
+                // Look up vault entry to check if OPFS (no permission needed)
+                const vaultList = await this.getVaultList();
+                const vaultEntry = vaultList.find(v => v.name === savedHandle.name);
+
+                // Check permission — skip for OPFS vaults
+                let permission = 'granted';
+                if (!this.isOPFSVault(vaultEntry)) {
+                    permission = await savedHandle.queryPermission({ mode: 'readwrite' });
+                    if (permission !== 'granted') {
+                        // Chrome auto-grants for installed PWAs even without user gesture
+                        permission = await savedHandle.requestPermission({ mode: 'readwrite' });
+                    }
                 }
                 if (permission === 'granted') {
                     this.directoryHandle = savedHandle;
@@ -590,6 +601,7 @@ const Store = {
     },
 
     async changeDirectory() {
+        if (!window.showDirectoryPicker) return false;
         try {
             const newHandle = await window.showDirectoryPicker();
             this.directoryHandle = newHandle;
@@ -610,7 +622,7 @@ const Store = {
 
     // --- Vault management ---
 
-    async saveVault(handle) {
+    async saveVault(handle, type = 'local') {
         if (!this.db) {
             await this.initDB();
             if (!this.db) return;
@@ -631,18 +643,21 @@ const Store = {
 
         // Update vault list
         const list = await this.getVaultList();
-        if (!list.some(v => v.name === name)) {
-            list.push({ name, addedAt: new Date().toISOString() });
-            await new Promise((resolve, reject) => {
-                try {
-                    const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
-                    const store = tx.objectStore(this.STORE_NAME);
-                    const req = store.put(list, 'vaultList');
-                    req.onsuccess = () => resolve();
-                    req.onerror = () => reject(req.error);
-                } catch (e) { reject(e); }
-            });
+        const existing = list.find(v => v.name === name);
+        if (!existing) {
+            list.push({ name, type, addedAt: new Date().toISOString() });
+        } else {
+            existing.type = type;
         }
+        await new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.put(list, 'vaultList');
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            } catch (e) { reject(e); }
+        });
 
         // Keep lastDirectory in sync for backward compat
         await this.saveDirectoryHandle(handle);
@@ -686,6 +701,20 @@ const Store = {
             if (!this.db) return;
         }
 
+        // Check if this is an OPFS vault before removing metadata
+        const list = await this.getVaultList();
+        const entry = list.find(v => v.name === name);
+
+        // For OPFS vaults, actually delete the directory contents
+        if (this.isOPFSVault(entry)) {
+            try {
+                const opfsRoot = await navigator.storage.getDirectory();
+                await opfsRoot.removeEntry(name, { recursive: true });
+            } catch (e) {
+                console.warn('Could not delete OPFS vault directory:', e);
+            }
+        }
+
         // Remove the handle
         await new Promise((resolve, reject) => {
             try {
@@ -698,7 +727,6 @@ const Store = {
         });
 
         // Update vault list
-        const list = await this.getVaultList();
         const filtered = list.filter(v => v.name !== name);
         await new Promise((resolve, reject) => {
             try {
@@ -744,12 +772,17 @@ const Store = {
     },
 
     async switchToVault(handle) {
-        // Check / request permission
-        const perm = await handle.queryPermission({ mode: 'readwrite' });
-        if (perm !== 'granted') {
-            const requested = await handle.requestPermission({ mode: 'readwrite' });
-            if (requested !== 'granted') {
-                throw new Error('Permission denied for vault');
+        // Check / request permission — skip for OPFS vaults
+        const vaultList = await this.getVaultList();
+        const vaultEntry = vaultList.find(v => v.name === handle.name);
+
+        if (!this.isOPFSVault(vaultEntry)) {
+            const perm = await handle.queryPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') {
+                const requested = await handle.requestPermission({ mode: 'readwrite' });
+                if (requested !== 'granted') {
+                    throw new Error('Permission denied for vault');
+                }
             }
         }
 
@@ -764,6 +797,22 @@ const Store = {
         await UndoRedoManager.clear();
         TimelineView.invalidateRawDataCache();
         TimelineView.invalidateCache();
+    },
+
+    async createOPFSVault(name) {
+        const opfsRoot = await navigator.storage.getDirectory();
+        const vaultHandle = await opfsRoot.getDirectoryHandle(name, { create: true });
+        this.directoryHandle = vaultHandle;
+        await this.saveDirectoryHandle(vaultHandle);
+        await this.saveVault(vaultHandle, 'opfs');
+        await GitStore.init(vaultHandle);
+        await this.loadBlocks();
+        RecentAccessTracker.init(vaultHandle.name);
+        RecentAccessTracker.prune(this.blocks.map(b => b.id));
+        await UndoRedoManager.clear();
+        TimelineView.invalidateRawDataCache();
+        TimelineView.invalidateCache();
+        return vaultHandle;
     },
 
     extractContacts() {
