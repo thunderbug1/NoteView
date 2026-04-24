@@ -306,10 +306,15 @@
     padding: 0;
 }
 
+/* Remove CodeMirror's default block widget spacing */
+.codemirror-container .cm-widgetBlock {
+    margin: 0;
+}
+
 .md-fenced-block-preview {
     display: block;
     width: 100%;
-    margin: 0.45rem 0;
+    margin: 0;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--bg-secondary);
@@ -325,8 +330,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.7rem 0.85rem;
+    gap: 0.5rem;
+    padding: 0.1rem 0.4rem;
     border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg-primary) 60%, var(--bg-secondary));
 }
@@ -342,8 +347,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 1.7rem;
-    padding: 0 0.55rem;
+    min-height: 1.3rem;
+    padding: 0 0.45rem;
     border-radius: var(--radius-full);
     background: var(--bg-primary);
     border: 1px solid var(--border);
@@ -370,7 +375,7 @@
     background: var(--bg-primary);
     color: var(--text-primary);
     border-radius: var(--radius-full);
-    padding: 0.35rem 0.75rem;
+    padding: 0.2rem 0.5rem;
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
@@ -385,13 +390,14 @@
 .md-fenced-block-body {
     margin: 0;
     max-height: 180px;
+    min-height: 0;
     overflow: auto;
-    padding: 0.9rem 0.95rem 1rem;
+    padding: 0 0.4rem 0.1rem;
     color: var(--text-primary);
     background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 88%, transparent), var(--bg-primary));
     font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
     font-size: 0.82rem;
-    line-height: 1.45;
+    line-height: 1.3;
     white-space: pre-wrap;
 }
 

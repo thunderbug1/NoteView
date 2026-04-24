@@ -455,19 +455,7 @@ function createCodeMirrorWidgets(documentView) {
             const infoLabel = this.block.info || this.block.kind;
 
             wrap.className = `md-fenced-block-preview kind-${this.block.kind}`;
-            wrap.innerHTML = `
-                <div class="md-fenced-block-header">
-                    <div class="md-fenced-block-meta">
-                        <span class="md-fenced-block-kind"></span>
-                        <span class="md-fenced-block-count"></span>
-                    </div>
-                    <div class="md-fenced-block-actions">
-                        <button type="button" class="md-fenced-block-btn" data-action="edit">Edit</button>
-                        <button type="button" class="md-fenced-block-btn primary" data-action="open">Open</button>
-                    </div>
-                </div>
-                <pre class="md-fenced-block-body"></pre>
-            `;
+            wrap.innerHTML = `<div class="md-fenced-block-header"><div class="md-fenced-block-meta"><span class="md-fenced-block-kind"></span><span class="md-fenced-block-count"></span></div><div class="md-fenced-block-actions"><button type="button" class="md-fenced-block-btn" data-action="edit">Edit</button><button type="button" class="md-fenced-block-btn primary" data-action="open">Open</button></div></div><pre class="md-fenced-block-body"></pre>`;
 
             const kind = wrap.querySelector('.md-fenced-block-kind');
             if (kind) {
@@ -481,7 +469,7 @@ function createCodeMirrorWidgets(documentView) {
 
             const preview = wrap.querySelector('.md-fenced-block-body');
             if (preview) {
-                preview.textContent = this.block.preview || '(empty block)';
+                preview.textContent = (this.block.preview || '(empty block)').trim();
             }
 
             wrap.querySelector('[data-action="open"]').addEventListener('click', (e) => {

@@ -2636,6 +2636,7 @@ const DocumentView = {
                             if (!startCoords) { marker.style.display = 'none'; return; }
 
                             const startLineTop = startCoords.top - blockRect.top;
+                            const startLineHeight = startCoords.bottom - startCoords.top;
 
                             marker.style.display = 'flex';
 
