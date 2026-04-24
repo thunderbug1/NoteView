@@ -455,7 +455,7 @@ function createCodeMirrorWidgets(documentView) {
             const infoLabel = this.block.info || this.block.kind;
 
             wrap.className = `md-fenced-block-preview kind-${this.block.kind}`;
-            wrap.innerHTML = `<div class="md-fenced-block-header"><div class="md-fenced-block-meta"><span class="md-fenced-block-kind"></span><span class="md-fenced-block-count"></span></div><div class="md-fenced-block-actions"><button type="button" class="md-fenced-block-btn" data-action="edit">Edit</button><button type="button" class="md-fenced-block-btn primary" data-action="open">Open</button></div></div><pre class="md-fenced-block-body"></pre>`;
+            wrap.innerHTML = `<div class="md-fenced-block-header"><div class="md-fenced-block-meta"><span class="md-fenced-block-kind"></span><span class="md-fenced-block-count"></span></div><div class="md-fenced-block-actions"><button type="button" class="md-fenced-block-btn copy-btn" data-action="copy" title="Copy to clipboard"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button><button type="button" class="md-fenced-block-btn" data-action="edit">Edit</button><button type="button" class="md-fenced-block-btn primary" data-action="open">Open</button></div></div><pre class="md-fenced-block-body"></pre>`;
 
             const kind = wrap.querySelector('.md-fenced-block-kind');
             if (kind) {
@@ -482,6 +482,18 @@ function createCodeMirrorWidgets(documentView) {
                 e.preventDefault();
                 e.stopPropagation();
                 documentView.focusFencedBlock(view, this.block.from);
+            });
+
+            wrap.querySelector('[data-action="copy"]').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const text = (this.block.preview || '').trim();
+                navigator.clipboard.writeText(text).then(() => {
+                    const btn = wrap.querySelector('[data-action="copy"]');
+                    const svg = btn.innerHTML;
+                    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                    setTimeout(() => { btn.innerHTML = svg; }, 1500);
+                });
             });
 
             return wrap;

@@ -387,6 +387,15 @@
     border-color: var(--accent);
 }
 
+.md-fenced-block-btn.copy-btn {
+    padding: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    color: var(--text-muted);
+}
+
 .md-fenced-block-body {
     margin: 0;
     max-height: 180px;
