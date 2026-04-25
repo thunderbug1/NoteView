@@ -104,7 +104,10 @@ const SyncManager = {
             } else {
                 this._lastError = err.message;
                 this._setStatus('error', err.message);
-                showToast('Sync failed: ' + err.message, {
+                const msg = this._isCorsError(err)
+                    ? 'Sync failed: CORS blocked — configure a CORS proxy in Settings → Sync'
+                    : 'Sync failed: ' + err.message;
+                showToast(msg, {
                     actionLabel: 'Retry',
                     action: () => this.sync()
                 });
@@ -221,6 +224,11 @@ const SyncManager = {
     _isConflictError(err) {
         const msg = (err.message || err.data?.message || '').toLowerCase();
         return msg.includes('conflict') || msg.includes('non-fast-forward') || msg.includes('merge');
+    },
+
+    _isCorsError(err) {
+        const msg = (err.message || '').toLowerCase();
+        return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('type: failed');
     },
 
     async _showConflictHelp() {

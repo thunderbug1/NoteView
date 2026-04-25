@@ -41,17 +41,16 @@ const GitRemote = {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
-        const url = this._applyCorsProxy(this.config.url);
 
         try {
             await git.push({
                 fs,
                 dir,
+                http: window.GitHttp,
                 remote: this.config.name,
                 ref,
-                onAuth: () => this.config.auth,
-                http: window.GitHttp,
-                ...(url !== this.config.url ? { url } : {})
+                corsProxy: this._getCorsProxy(),
+                onAuth: () => this.config.auth
             });
             console.log('Push successful');
             return true;
@@ -65,18 +64,17 @@ const GitRemote = {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
-        const url = this._applyCorsProxy(this.config.url);
 
         try {
             await git.pull({
                 fs,
                 dir,
+                http: window.GitHttp,
                 remote: this.config.name,
                 ref,
                 author: GitStore.author,
+                corsProxy: this._getCorsProxy(),
                 onAuth: () => this.config.auth,
-                http: window.GitHttp,
-                ...(url !== this.config.url ? { url } : {}),
                 fastForward: true,
                 singleBranch: true
             });
@@ -139,10 +137,8 @@ const GitRemote = {
         }
     },
 
-    _applyCorsProxy(url) {
-        const proxy = (window.SyncManager && SyncManager._config.corsProxy) || '';
-        if (!proxy || !url) return url;
-        return proxy.replace(/\/$/, '') + '/' + url;
+    _getCorsProxy() {
+        return (window.SyncManager && SyncManager._config.corsProxy) || undefined;
     }
 };
 
