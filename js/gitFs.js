@@ -10,26 +10,30 @@ class GitFSAdapter {
     // Resolves a path like "dir/file.txt" to a FileSystemHandle
     async _resolvePath(path, create = false, isFile = true) {
         if (!path || path === '/' || path === '.') return this.rootHandle;
-        
+
         const parts = path.split('/').filter(p => p);
         let currentHandle = this.rootHandle;
-        
+
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             const isLast = i === parts.length - 1;
-            
+
             if (isLast && isFile) {
                 try {
                     return await currentHandle.getFileHandle(part, { create });
                 } catch (e) {
-                    if (e.name === 'NotFoundError') throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' });
+                    if (e.name === 'NotFoundError' || e.name === 'TypeMismatchError') {
+                        throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' });
+                    }
                     throw e;
                 }
             } else {
                 try {
                     currentHandle = await currentHandle.getDirectoryHandle(part, { create });
                 } catch (e) {
-                    if (e.name === 'NotFoundError') throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' });
+                    if (e.name === 'NotFoundError' || e.name === 'TypeMismatchError') {
+                        throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' });
+                    }
                     throw e;
                 }
             }
@@ -163,7 +167,7 @@ class GitFSAdapter {
                     const parentHandle = await self._resolvePath(parentPath, false, false);
                     await parentHandle.removeEntry(dirName, { recursive: true });
                 } catch (e) {
-                    if (e.name !== 'NotFoundError') throw e;
+                    if (e.name !== 'NotFoundError' && e.name !== 'TypeMismatchError') throw e;
                 }
             },
 
@@ -175,7 +179,7 @@ class GitFSAdapter {
                     const parentHandle = await self._resolvePath(parentPath, false, false);
                     await parentHandle.removeEntry(fileName);
                 } catch (e) {
-                    if (e.name !== 'NotFoundError') throw e;
+                    if (e.name !== 'NotFoundError' && e.name !== 'TypeMismatchError') throw e;
                 }
             },
 

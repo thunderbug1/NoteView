@@ -85,7 +85,7 @@ const GitRemote = {
             const remoteRef = `refs/remotes/${remoteName}/${ref}`;
             const commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
             await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
-            await git.checkout({ fs, dir, ref });
+            await git.checkout({ fs, dir, ref, force: true });
             console.log('Checkout from remote successful');
             await this._afterPull();
             return true;
