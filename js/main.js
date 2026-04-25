@@ -1131,9 +1131,10 @@ const App = {
             content,
             modalClass: 'tag-modal content-modal',
             onClose: () => {
-                // If we were in Kanban, we might want to refresh the view to reflect changes
+                // If we were in Kanban, we might want to refresh the view to reflect changes.
+                // Small delay ensures modal DOM is fully cleared before we re-render the view.
                 if (Store.currentView === 'kanban') {
-                    this.render();
+                    setTimeout(() => this.render(), 50);
                 }
             }
         });
@@ -1822,6 +1823,9 @@ const App = {
                 }
                 const preview = modal.querySelector('.ai-transcript-preview');
                 if (preview) preview.remove();
+
+                // Ensure the view is refreshed to show the new note
+                setTimeout(() => this.render(), 50);
             }
         });
 
@@ -1940,10 +1944,10 @@ const App = {
 
                 if (method === 'task') {
                     const taskPrefix = '- [ ] ';
-                    const docLen = editor.state.doc.length;
-                    if (docLen === 0) {
+                    const docText = editor.state.doc.toString().trim();
+                    if (docText.length === 0) {
                         editor.dispatch({
-                            changes: { from: 0, insert: taskPrefix },
+                            changes: { from: 0, to: editor.state.doc.length, insert: taskPrefix },
                             selection: { anchor: taskPrefix.length }
                         });
                     }
