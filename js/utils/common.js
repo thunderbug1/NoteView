@@ -202,7 +202,7 @@ function showToast(message, { action, actionLabel, duration } = {}) {
         'padding:0.75rem 1.5rem;background:var(--bg-secondary);border:1px solid var(--border);' +
         'border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;' +
         'z-index:10001;box-shadow:var(--shadow-lg);transition:opacity 0.3s;opacity:1;' +
-        'display:flex;align-items:center;gap:0.75rem;white-space:nowrap;';
+        'display:flex;align-items:center;gap:0.75rem;max-width:min(90vw,500px);';
 
     const textSpan = document.createElement('span');
     textSpan.textContent = message;
