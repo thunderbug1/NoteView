@@ -58,6 +58,7 @@ const App = {
             container.innerHTML = '<div class="loading">Loading notes...</div>';
             await Store.createOPFSVault(name);
             await this.completeInitialization();
+            this.setView('settings');
         } catch (err) {
             this.showError(err.message || 'Failed to create browser vault');
         }

@@ -315,6 +315,7 @@ const VaultModal = {
 
                 await Store.createOPFSVault(name);
                 await App.completeInitialization();
+                App.setView('settings');
                 VaultModal.updateVaultSwitcherName();
             } catch (err) {
                 App.showError(err.message || 'Failed to create browser vault');
