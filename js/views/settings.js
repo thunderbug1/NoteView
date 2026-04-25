@@ -908,6 +908,7 @@ const SettingsView = {
                     <div class="ai-form-row">
                         <label>CORS Proxy <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(optional)</span></label>
                         <input type="url" id="remoteCorsInput" value="${escapeHtml(syncCfg.corsProxy || '')}" placeholder="https://cors.isomorphic-git.org">
+                        <button type="button" id="remoteCorsDefaultBtn" class="settings-btn secondary" style="margin-top:0.35rem;font-size:0.8rem">Use default (cors.isomorphic-git.org)</button>
                         <p class="settings-item-hint" style="margin-top:0.35rem">Needed for private repos or self-hosted git servers. Public GitHub repos work without a proxy.</p>
                     </div>
                     <div class="ai-form-actions">
@@ -936,6 +937,10 @@ const SettingsView = {
         });
 
         modal.querySelector('#remoteCancelBtn').addEventListener('click', () => modal.close());
+
+        modal.querySelector('#remoteCorsDefaultBtn').addEventListener('click', () => {
+            modal.querySelector('#remoteCorsInput').value = 'https://cors.isomorphic-git.org';
+        });
 
         const removeBtn = modal.querySelector('#remoteRemoveBtn');
         if (removeBtn) {
