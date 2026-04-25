@@ -66,6 +66,9 @@ const GitRemote = {
         const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
         const remoteName = this.config.name;
 
+        // Remove local config files that conflict with remote checkout
+        try { await fs.unlink('.noteview/settings.json'); } catch (e) {}
+
         // Check if local branch exists (fresh repos have none)
         let hasLocalBranch = false;
         try {
