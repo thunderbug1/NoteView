@@ -162,7 +162,10 @@
     border: none;
 }
 .codemirror-container .cm-lineNumbers {
-    display: none;
+    display: none !important;
+}
+.codemirror-container:focus-within .cm-lineNumbers {
+    display: flex !important;
 }
 
 /* Fold placeholder shown when a region is collapsed */
