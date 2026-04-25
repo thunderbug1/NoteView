@@ -1367,19 +1367,36 @@ const Store = {
         this.blocks = [];
         this._filteredBlocksCache.invalidate();
 
-        for await (const entry of this.directoryHandle.values()) {
-            if (entry.name === '.git') continue;
+        let entries;
+        try {
+            entries = this.directoryHandle.values();
+        } catch (err) {
+            console.error('loadBlocks: failed to iterate directory:', err);
+            this.extractContacts();
+            return;
+        }
 
-            if (entry.kind === 'file' && entry.name.endsWith('.md')) {
-                const file = await entry.getFile();
-                const content = await file.text();
-                const parsed = parseFrontMatter(content);
-                this.blocks.push({
-                    id: entry.name.replace('.md', ''),
-                    filename: entry.name,
-                    fileHandle: entry,
-                    ...parsed
-                });
+        for await (const entry of entries) {
+            try {
+                if (entry.name === '.git') continue;
+
+                if (entry.kind === 'file' && entry.name.endsWith('.md')) {
+                    const file = await entry.getFile();
+                    const content = await file.text();
+                    const parsed = parseFrontMatter(content);
+                    this.blocks.push({
+                        id: entry.name.replace('.md', ''),
+                        filename: entry.name,
+                        fileHandle: entry,
+                        ...parsed
+                    });
+                }
+            } catch (err) {
+                if (err.name === 'NotFoundError') {
+                    console.warn('loadBlocks: skipping stale entry:', err.message);
+                    continue;
+                }
+                throw err;
             }
         }
         this.extractContacts();
