@@ -179,18 +179,9 @@ const DocumentView = {
         // Restore scroll position after DOM rebuild
         requestAnimationFrame(() => {
             this._restoreScrollFromAnchor(scrollAnchor);
-            this.adjustScrollability();
         });
     },
 
-    adjustScrollability() {
-        const container = document.getElementById('viewContainer');
-        if (window.innerWidth > 768) {
-            container.style.overflowY = '';
-            return;
-        }
-        container.style.overflowY = container.scrollHeight <= container.clientHeight ? 'hidden' : '';
-    },
 
     renderFlatBlocks(blocks) {
         return blocks.map(block => this.renderBlockHtml(block)).join('');
