@@ -16,5 +16,6 @@ curl -sL https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js -o vendor/mar
 
 echo "Downloading isomorphic-git..."
 curl -sL https://unpkg.com/isomorphic-git@1.24.5/index.umd.min.js -o vendor/isomorphic-git.js
+curl -sL https://unpkg.com/isomorphic-git@1.24.5/http/web/index.umd.min.js -o vendor/isomorphic-git-http.js
 
 echo "Done! Vendor files are ready."

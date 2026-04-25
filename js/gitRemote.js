@@ -50,6 +50,7 @@ const GitRemote = {
                 remote: this.config.name,
                 ref,
                 onAuth: () => this.config.auth,
+                http: window.GitHttp,
                 ...(url !== this.config.url ? { url } : {})
             });
             console.log('Push successful');
@@ -74,6 +75,7 @@ const GitRemote = {
                 ref,
                 author: GitStore.author,
                 onAuth: () => this.config.auth,
+                http: window.GitHttp,
                 ...(url !== this.config.url ? { url } : {}),
                 fastForward: true,
                 singleBranch: true
@@ -113,7 +115,8 @@ const GitRemote = {
             try {
                 remoteHead = await git.resolveRef({ fs, dir, ref: `refs/remotes/${this.config.name}/${ref}` });
             } catch (e) {
-                // Remote tracking branch might not exist yet
+                // Remote tracking branch might not exist yet. Try to fetch first?
+                // For now just return unknown as before.
                 return { hasRemote: true, unpushed: 'unknown' };
             }
 

@@ -259,6 +259,7 @@ const SyncManager = {
                     remote: GitRemote.config.name,
                     ref,
                     force: true,
+                    http: window.GitHttp,
                     onAuth: () => GitRemote.config.auth
                 });
                 this._pendingCommits = 0;
