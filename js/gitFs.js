@@ -54,10 +54,17 @@ class GitFSAdapter {
             },
 
             async writeFile(path, data, options) {
-                const handle = await self._resolvePath(path, true, true);
-                const writable = await handle.createWritable();
-                await writable.write(data);
-                await writable.close();
+                try {
+                    const handle = await self._resolvePath(path, true, true);
+                    const writable = await handle.createWritable();
+                    await writable.write(data);
+                    await writable.close();
+                } catch (e) {
+                    if (e.name === 'NotFoundError') {
+                        throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' });
+                    }
+                    throw e;
+                }
             },
 
             async stat(path) {
@@ -76,7 +83,7 @@ class GitFSAdapter {
                         isSymbolicLink: () => false
                     };
                 }
-                
+
                 let handle;
                 let isDir = false;
                 try {
@@ -97,9 +104,16 @@ class GitFSAdapter {
                 let size = 0;
                 let mtime = Date.now();
                 if (!isDir) {
-                    const file = await handle.getFile();
-                    size = file.size;
-                    mtime = file.lastModified;
+                    try {
+                        const file = await handle.getFile();
+                        size = file.size;
+                        mtime = file.lastModified;
+                    } catch (e) {
+                        if (e.name === 'NotFoundError') {
+                            throw Object.assign(new Error(`ENOENT: no such file or directory, stat '${path}'`), { code: 'ENOENT' });
+                        }
+                        throw e;
+                    }
                 }
 
                 return {
@@ -122,12 +136,19 @@ class GitFSAdapter {
             },
 
             async readdir(path) {
-                const handle = await self._resolvePath(path, false, false);
-                const entries = [];
-                for await (const name of handle.keys()) {
-                    entries.push(name);
+                try {
+                    const handle = await self._resolvePath(path, false, false);
+                    const entries = [];
+                    for await (const name of handle.keys()) {
+                        entries.push(name);
+                    }
+                    return entries;
+                } catch (e) {
+                    if (e.code === 'ENOENT' || e.name === 'NotFoundError') {
+                        throw Object.assign(new Error(`ENOENT: no such file or directory, scandir '${path}'`), { code: 'ENOENT' });
+                    }
+                    throw e;
                 }
-                return entries;
             },
 
             async mkdir(path) {
@@ -138,16 +159,24 @@ class GitFSAdapter {
                 const parts = path.split('/').filter(p => p);
                 const dirName = parts.pop();
                 const parentPath = parts.join('/');
-                const parentHandle = await self._resolvePath(parentPath, false, false);
-                await parentHandle.removeEntry(dirName, { recursive: true });
+                try {
+                    const parentHandle = await self._resolvePath(parentPath, false, false);
+                    await parentHandle.removeEntry(dirName, { recursive: true });
+                } catch (e) {
+                    if (e.name !== 'NotFoundError') throw e;
+                }
             },
 
             async unlink(path) {
                 const parts = path.split('/').filter(p => p);
                 const fileName = parts.pop();
                 const parentPath = parts.join('/');
-                const parentHandle = await self._resolvePath(parentPath, false, false);
-                await parentHandle.removeEntry(fileName);
+                try {
+                    const parentHandle = await self._resolvePath(parentPath, false, false);
+                    await parentHandle.removeEntry(fileName);
+                } catch (e) {
+                    if (e.name !== 'NotFoundError') throw e;
+                }
             },
 
             // Stubs for isomorphic-git
