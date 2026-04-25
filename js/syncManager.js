@@ -30,6 +30,14 @@ const SyncManager = {
         this._isOnline = navigator.onLine;
         this._setupNetworkListeners();
 
+        // Restore pending count from git state
+        if (GitRemote.config) {
+            const status = await GitRemote.getStatus();
+            if (typeof status.unpushed === 'number' && status.unpushed > 0) {
+                this._pendingCommits = status.unpushed;
+            }
+        }
+
         if (this._config.autoSync && GitRemote.config) {
             this._startIntervalSync();
         }
@@ -37,7 +45,8 @@ const SyncManager = {
         console.log('[SyncManager] initialized', {
             autoSync: this._config.autoSync,
             interval: this._config.syncInterval,
-            hasRemote: !!GitRemote.config
+            hasRemote: !!GitRemote.config,
+            pendingCommits: this._pendingCommits
         });
 
         this._setStatus(this._status, this._statusDetail);
@@ -127,9 +136,7 @@ const SyncManager = {
     onCommit() {
         this._pendingCommits++;
         this._setStatus(this._status, this._statusDetail);
-        if (this._config.autoSync && this._pendingCommits >= this._config.commitThreshold) {
-            this._scheduleIdleSync();
-        }
+        this._scheduleIdleSync();
     },
 
     onTabVisible() {
@@ -153,19 +160,13 @@ const SyncManager = {
     // --- Scheduling ---
 
     _scheduleIdleSync() {
-        if (this._idleSyncScheduled || this._status === 'syncing') return;
-        this._idleSyncScheduled = true;
-
-        const run = () => {
-            this._idleSyncScheduled = false;
-            this.sync();
-        };
-
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(run, { timeout: 10000 });
-        } else {
-            setTimeout(run, 2000);
-        }
+        if (this._status === 'syncing') return;
+        clearTimeout(this._idleSyncTimer);
+        this._idleSyncTimer = setTimeout(() => {
+            if (GitRemote.config && this._isNetworkAvailable()) {
+                this.sync();
+            }
+        }, 3000);
     },
 
     _startIntervalSync() {
