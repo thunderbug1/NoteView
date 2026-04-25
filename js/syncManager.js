@@ -99,12 +99,11 @@ const SyncManager = {
 
             // Re-render to reflect pulled changes and update unpushed markers
             if (window.App && typeof App.render === 'function') {
+                await Store.loadBlocks();
                 Store._filteredBlocksCache.invalidate();
                 SelectionManager.updateTagCounts();
-                if (pulled) {
-                    TimelineView.invalidateRawDataCache();
-                    TimelineView.invalidateCache();
-                }
+                TimelineView.invalidateRawDataCache();
+                TimelineView.invalidateCache();
                 App.render();
             }
             return true;
