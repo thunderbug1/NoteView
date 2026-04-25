@@ -13,10 +13,7 @@ const GitRemote = {
     },
 
     async setRemote(name, url, auth = null) {
-        this.config = { name, url, auth };
-        await Store.saveRemoteConfig(this.config);
-
-        // Add remote to local git
+        // Add remote to local git first
         if (!GitStore.git || !GitStore.fs) {
             console.error('GitRemote.setRemote: git not initialized');
             return false;
@@ -30,11 +27,15 @@ const GitRemote = {
                 url: url,
                 force: true
             });
-            return true;
         } catch (err) {
             console.error('Failed to add remote:', err);
             return false;
         }
+
+        // Only persist config after git operation succeeds
+        this.config = { name, url, auth };
+        await Store.saveRemoteConfig(this.config);
+        return true;
     },
 
     async push() {
@@ -66,9 +67,6 @@ const GitRemote = {
         const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
         const remoteName = this.config.name;
 
-        // Remove local config files that conflict with remote checkout
-        try { await fs.unlink('.noteview/settings.json'); } catch (e) {}
-
         // Check if local branch exists (fresh repos have none)
         let hasLocalBranch = false;
         try {
@@ -77,6 +75,8 @@ const GitRemote = {
         } catch (e) { /* no local branch yet */ }
 
         if (!hasLocalBranch) {
+            // Remove local config files only on fresh checkout to avoid conflicts
+            try { await fs.unlink('.noteview/settings.json'); } catch (e) {}
             console.log('Pull: no local branch, fetching and checking out from remote');
             await git.fetch({
                 fs, dir,
@@ -86,11 +86,15 @@ const GitRemote = {
                 onAuth: () => this.config.auth
             });
             const remoteRef = `refs/remotes/${remoteName}/${ref}`;
-            const commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
+            let commitOid;
+            try {
+                commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
+            } catch (e) {
+                throw new Error(`Remote branch '${ref}' not found. Push some commits first.`);
+            }
             await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
             await git.checkout({ fs, dir, ref, force: true });
             console.log('Checkout from remote successful');
-            await this._afterPull();
             return true;
         }
 
@@ -108,18 +112,11 @@ const GitRemote = {
                 singleBranch: true
             });
             console.log('Pull successful');
-            await this._afterPull();
             return true;
         } catch (err) {
             console.error('Pull failed:', err);
             throw err;
         }
-    },
-
-    async _afterPull() {
-        await Store.loadBlocks();
-        TimelineView.invalidateRawDataCache();
-        TimelineView.invalidateCache();
     },
 
     async sync() {
@@ -153,13 +150,15 @@ const GitRemote = {
                 return { hasRemote: true, unpushed: 0 };
             }
 
-            // Simple count of commits ahead
-            const commits = await git.log({ fs, dir, depth: 50 });
+            // Count commits ahead of remote HEAD
+            const commits = await git.log({ fs, dir, depth: 200 });
             let unpushed = 0;
+            let foundRemote = false;
             for (const commit of commits) {
-                if (commit.oid === remoteHead) break;
+                if (commit.oid === remoteHead) { foundRemote = true; break; }
                 unpushed++;
             }
+            if (!foundRemote) unpushed = commits.length;
 
             return { hasRemote: true, unpushed };
         } catch (err) {

@@ -868,8 +868,12 @@ const Store = {
         this._filteredBlocksCache.invalidate();
 
         // Commit deletion to git
-        await GitStore.commitDeletion(fileName, `Delete ${fileName}`);
-        if (window.SyncManager) SyncManager.onCommit();
+        try {
+            await GitStore.commitDeletion(fileName, `Delete ${fileName}`);
+            if (window.SyncManager) SyncManager.onCommit();
+        } catch (e) {
+            console.error('Failed to commit deletion to git:', e);
+        }
     },
 
     // Get display title for a block (first heading, or empty string if none)

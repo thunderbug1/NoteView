@@ -14,6 +14,7 @@ const SyncManager = {
     _lastSyncTime: null,
     _lastError: null,
     _idleSyncScheduled: false,
+    _syncing: false,
 
     _config: {
         autoSync: false,
@@ -32,10 +33,7 @@ const SyncManager = {
 
         // Restore pending count from git state
         if (GitRemote.config) {
-            const status = await GitRemote.getStatus();
-            if (typeof status.unpushed === 'number' && status.unpushed > 0) {
-                this._pendingCommits = status.unpushed;
-            }
+            await this._refreshPendingCount();
         }
 
         if (this._config.autoSync && GitRemote.config) {
@@ -86,15 +84,19 @@ const SyncManager = {
             this._setStatus('idle', 'Offline');
             return false;
         }
-        if (this._status === 'syncing') return false;
+        if (this._syncing) return false;
+        this._syncing = true;
 
         this._setStatus('syncing', 'Syncing...');
         try {
-            const pulled = await GitRemote.pull();
+            await GitRemote.pull();
             await GitRemote.push();
-            this._pendingCommits = 0;
             this._lastSyncTime = new Date().toISOString();
             this._lastError = null;
+
+            // Reconcile pending count from authoritative git state
+            await this._refreshPendingCount();
+
             this._setStatus('idle', 'Synced');
 
             // Re-render to reflect pulled changes and update unpushed markers
@@ -126,7 +128,11 @@ const SyncManager = {
                     action: () => this.sync()
                 });
             }
+            // Reconcile even on failure — partial sync may have changed count
+            await this._refreshPendingCount().catch(() => {});
             return false;
+        } finally {
+            this._syncing = false;
         }
     },
 
@@ -145,15 +151,13 @@ const SyncManager = {
     },
 
     onTabHidden() {
-        if (this._config.autoSync && GitRemote.config && this._pendingCommits > 0) {
-            const pendingBeforePush = this._pendingCommits;
-            GitRemote.push().then(() => {
-                this._pendingCommits = Math.max(0, this._pendingCommits - pendingBeforePush);
-            }).catch(err => {
-                this._lastError = err.message;
-                console.warn('[SyncManager] background push failed:', err);
-            });
-        }
+        if (this._syncing || !this._config.autoSync || !GitRemote.config || this._pendingCommits <= 0) return;
+        GitRemote.push().then(() => {
+            this._refreshPendingCount().catch(() => {});
+        }).catch(err => {
+            this._lastError = err.message;
+            console.warn('[SyncManager] background push failed:', err);
+        });
     },
 
     // --- Scheduling ---
@@ -226,11 +230,23 @@ const SyncManager = {
         return this._isOnline && navigator.onLine;
     },
 
+    // --- Pending count reconciliation ---
+
+    async _refreshPendingCount() {
+        try {
+            const status = await GitRemote.getStatus();
+            if (typeof status.unpushed === 'number') {
+                this._pendingCommits = status.unpushed;
+                this._setStatus(this._status, this._statusDetail);
+            }
+        } catch (e) { /* ignore */ }
+    },
+
     // --- Conflict help ---
 
     _isConflictError(err) {
         const msg = (err.message || err.data?.message || '').toLowerCase();
-        return msg.includes('conflict') || msg.includes('non-fast-forward') || msg.includes('merge');
+        return msg.includes('conflict') || msg.includes('non-fast-forward') || msg.includes('merge conflict');
     },
 
     _isCorsError(err) {
@@ -263,6 +279,7 @@ const SyncManager = {
 
         modal.querySelector('#conflictDismissBtn').addEventListener('click', () => modal.close());
         modal.querySelector('#conflictForceBtn').addEventListener('click', async () => {
+            if (!confirm('Force push will overwrite the remote history. Are you sure?')) return;
             const btn = modal.querySelector('#conflictForceBtn');
             btn.disabled = true;
             btn.textContent = 'Pushing...';

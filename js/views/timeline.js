@@ -359,10 +359,14 @@ const TimelineView = {
             const remoteName = GitRemote.config?.name || 'origin';
             const remoteHead = await git.resolveRef({ fs, dir, ref: `refs/remotes/${remoteName}/${ref}` }).catch(() => null);
             if (remoteHead) {
+                let foundRemote = false;
                 for (const c of commits) {
-                    if (c.oid === remoteHead) break;
+                    if (c.oid === remoteHead) { foundRemote = true; break; }
                     unpushedOids.add(c.oid);
                 }
+                // If remote HEAD not in our commit list (diverged histories),
+                // don't mark everything as unpushed — treat as unknown
+                if (!foundRemote) unpushedOids.clear();
             }
         } catch (e) { /* ignore */ }
 
