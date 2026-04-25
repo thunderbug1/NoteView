@@ -15,7 +15,7 @@ const TASK_STATES = {
 };
 
 // Badge keys that we want to extract
-const KNOWN_BADGE_KEYS = ['due', 'assignee', 'priority', 'start'];
+const KNOWN_BADGE_KEYS = ['due', 'assignee', 'priority', 'start', 'completed'];
 
 // Regex patterns
 const CHECKBOX_REGEX = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm;

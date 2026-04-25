@@ -136,7 +136,7 @@ const KanbanView = {
                 }
             }
 
-            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds);
+            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds, col.state);
 
             html += `
                 <div class="kanban-column" data-column-id="${col.id}">
@@ -213,7 +213,7 @@ const KanbanView = {
                 }
             }
 
-            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds);
+            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds, col.state);
 
             columnsHtml += `
                 <div class="kanban-column" data-column-id="${col.id}">
@@ -353,14 +353,27 @@ const KanbanView = {
      * Only root tasks (those without a parent in this column) are sorted;
      * children maintain document order under their parent.
      */
-    renderColumnTasks(colTasks, hierarchy, tasksById, colTaskIds, orphanedIds = new Set()) {
+    renderColumnTasks(colTasks, hierarchy, tasksById, colTaskIds, orphanedIds = new Set(), columnState = null) {
         // Roots: parentId is null OR parent not in this column
         const rootTasks = colTasks.filter(t => {
             const entry = hierarchy.get(t.id);
             return !entry.parentId || !colTaskIds.has(entry.parentId);
         });
 
-        const sortedRoots = SortManager.sortItems('kanban', rootTasks);
+        let sortedRoots = SortManager.sortItems('kanban', rootTasks);
+
+        // Done column: sort by completion time (newest first)
+        if (columnState === 'x') {
+            sortedRoots.sort((a, b) => {
+                const aCompleted = a.badges?.find(bg => bg.type === 'completed')?.value || '';
+                const bCompleted = b.badges?.find(bd => bd.type === 'completed')?.value || '';
+                const aTime = aCompleted ? new Date(aCompleted).getTime() : 0;
+                const bTime = bCompleted ? new Date(bCompleted).getTime() : 0;
+                // Newest first; tasks without completed badge sink to bottom
+                return bTime - aTime;
+            });
+        }
+
         let html = '';
         for (const root of sortedRoots) {
             html += this.renderTaskWithChildren(root, hierarchy, tasksById, colTaskIds, 0, orphanedIds);
@@ -579,7 +592,8 @@ const KanbanView = {
                         if (content[targetPos - 1] === '[' && content[targetPos + 1] === ']') {
                             const newStateLabel = targetColumn?.label || targetState;
                             const commitMessage = `Move task to ${newStateLabel}`;
-                            const newContent = content.substring(0, targetPos) + targetState + content.substring(targetPos + 1);
+                            let newContent = content.substring(0, targetPos) + targetState + content.substring(targetPos + 1);
+                            newContent = KanbanView.applyCompletedBadge(newContent, data.matchIndex, data.matchLength, targetState);
                             await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
                             App.render();
                         } else {
@@ -800,7 +814,8 @@ const KanbanView = {
 
                 if (blockContent[targetPos - 1] === '[' && blockContent[targetPos + 1] === ']') {
                     const commitMessage = `Move task to ${targetColumn.label}`;
-                    const newContent = blockContent.substring(0, targetPos) + targetColumn.state + blockContent.substring(targetPos + 1);
+                    let newContent = blockContent.substring(0, targetPos) + targetColumn.state + blockContent.substring(targetPos + 1);
+                    newContent = KanbanView.applyCompletedBadge(newContent, data.matchIndex, data.matchLength, targetColumn.state);
                     await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
                 }
 
@@ -808,6 +823,30 @@ const KanbanView = {
                 App.render();
             });
         });
+    },
+
+    /**
+     * Stamp or strip [completed:: timestamp] on a task line within block content.
+     * Returns the modified content string (does not save).
+     */
+    applyCompletedBadge(content, matchIndex, matchLength, targetState) {
+        let nextNewline = content.indexOf('\n', matchIndex);
+        if (nextNewline === -1) nextNewline = content.length;
+        let taskLine = content.substring(matchIndex, nextNewline);
+        const completedRegex = /\s*\[completed::\s*[^\]]+\]/g;
+
+        if (targetState === 'x') {
+            const timestamp = new Date().toISOString();
+            if (completedRegex.test(taskLine)) {
+                taskLine = taskLine.replace(completedRegex, ` [completed:: ${timestamp}]`);
+            } else {
+                taskLine = taskLine.trimEnd() + ` [completed:: ${timestamp}]`;
+            }
+        } else {
+            taskLine = taskLine.replace(completedRegex, '');
+        }
+
+        return content.substring(0, matchIndex) + taskLine + content.substring(nextNewline);
     },
 
     /**
