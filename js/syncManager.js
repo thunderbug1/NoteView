@@ -81,12 +81,17 @@ const SyncManager = {
 
         this._setStatus('syncing', 'Syncing...');
         try {
-            await GitRemote.pull();
+            const pulled = await GitRemote.pull();
             await GitRemote.push();
             this._pendingCommits = 0;
             this._lastSyncTime = new Date().toISOString();
             this._lastError = null;
             this._setStatus('idle', 'Synced');
+            
+            // If data changed via pull, trigger a re-render if the app is active
+            if (pulled && window.App && typeof App.render === 'function') {
+                App.render();
+            }
             return true;
         } catch (err) {
             if (this._isConflictError(err)) {
