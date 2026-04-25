@@ -866,6 +866,10 @@ const Store = {
         this.blocks.splice(index, 1);
         this.extractContacts();
         this._filteredBlocksCache.invalidate();
+
+        // Commit deletion to git
+        await GitStore.commitBlock(fileName, `Delete ${fileName}`);
+        if (window.SyncManager) SyncManager.onCommit();
     },
 
     // Get display title for a block (first heading, or empty string if none)

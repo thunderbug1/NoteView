@@ -258,6 +258,7 @@ const App = {
             if (status === 'idle' && pendingCommits > 0) {
                 title += `${pendingCommits} unpushed`;
                 btn.style.color = 'var(--accent)';
+                btn.innerHTML += '<span class="sync-dot" style="position:absolute;top:2px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--accent)"></span>';
             } else if (status === 'idle') {
                 title += lastSyncTime ? `synced (${formatRelativeDate(lastSyncTime)})` : 'ready';
             } else {

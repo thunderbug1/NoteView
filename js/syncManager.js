@@ -90,6 +90,8 @@ const SyncManager = {
             
             // If data changed via pull, trigger a re-render if the app is active
             if (pulled && window.App && typeof App.render === 'function') {
+                Store._filteredBlocksCache.invalidate();
+                SelectionManager.updateTagCounts();
                 App.render();
             }
             return true;
