@@ -64,13 +64,14 @@ const GitRemote = {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+        const remoteName = this.config.name;
 
         try {
             await git.pull({
                 fs,
                 dir,
                 http: window.GitHttp,
-                remote: this.config.name,
+                remote: remoteName,
                 ref,
                 author: GitStore.author,
                 corsProxy: this._getCorsProxy(),
@@ -79,16 +80,40 @@ const GitRemote = {
                 singleBranch: true
             });
             console.log('Pull successful');
-            // Reload notes after pull
-            await Store.loadBlocks();
-            // Pull may have added/rewritten commits — force full timeline rebuild
-            TimelineView.invalidateRawDataCache();
-            TimelineView.invalidateCache();
+            await this._afterPull();
             return true;
         } catch (err) {
+            // Fresh local repo has no branch to merge into — fetch and checkout manually
+            const msg = (err.message || '').toLowerCase();
+            if (msg.includes('could not find')) {
+                console.log('Pull: local branch missing, fetching and checking out from remote');
+                await git.fetch({
+                    fs, dir,
+                    http: window.GitHttp,
+                    remote: remoteName,
+                    ref,
+                    corsProxy: this._getCorsProxy(),
+                    onAuth: () => this.config.auth,
+                    singleBranch: true
+                });
+                // Point local branch at the fetched remote ref
+                const remoteRef = `refs/remotes/${remoteName}/${ref}`;
+                const commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
+                await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
+                await git.checkout({ fs, dir, ref });
+                console.log('Checkout from remote successful');
+                await this._afterPull();
+                return true;
+            }
             console.error('Pull failed:', err);
             throw err;
         }
+    },
+
+    async _afterPull() {
+        await Store.loadBlocks();
+        TimelineView.invalidateRawDataCache();
+        TimelineView.invalidateCache();
     },
 
     async sync() {
