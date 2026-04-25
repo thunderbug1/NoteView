@@ -351,6 +351,21 @@ const TimelineView = {
         const commits = await GitStore.getFullHistory(100);
         if (commits.length === 0) return [];
 
+        // Determine which commits are unpushed
+        const unpushedOids = new Set();
+        try {
+            const { git, fs, dir } = GitStore;
+            const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+            const remoteName = GitRemote.config?.name || 'origin';
+            const remoteHead = await git.resolveRef({ fs, dir, ref: `refs/remotes/${remoteName}/${ref}` }).catch(() => null);
+            if (remoteHead) {
+                for (const c of commits) {
+                    if (c.oid === remoteHead) break;
+                    unpushedOids.add(c.oid);
+                }
+            }
+        } catch (e) { /* ignore */ }
+
         // Process from oldest to newest for correct diffing
         const chronological = [...commits].reverse();
         const currentHeadOid = commits[0].oid;
@@ -411,6 +426,10 @@ const TimelineView = {
 
         // Return newest first
         allEvents.reverse();
+        // Tag unpushed events
+        for (const event of allEvents) {
+            event.unpushed = unpushedOids.has(event.oid);
+        }
         return allEvents;
     },
 
@@ -561,9 +580,10 @@ const TimelineView = {
         }
 
         const noteName = event.blockId;
-        
+        const unpushedClass = event.unpushed ? ' tl-unpushed' : '';
+
         return `
-            <div class="tl-event" data-block-id="${escapeHtml(event.blockId)}" data-oid="${escapeHtml(event.oid)}" data-filename="${escapeHtml(event.filename)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
+            <div class="tl-event${unpushedClass}" data-block-id="${escapeHtml(event.blockId)}" data-oid="${escapeHtml(event.oid)}" data-filename="${escapeHtml(event.filename)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
                 <div class="tl-dot-wrapper">
                     <div class="tl-dot tl-${stateClass}"></div>
                 </div>
@@ -575,6 +595,7 @@ const TimelineView = {
                     ${transitionHtml}
                     <div class="tl-card-footer">
                         <span class="tl-note-name" title="Open note">${escapeHtml(noteName)}</span>
+                        ${event.unpushed ? '<span class="tl-sync-pending" title="Not yet synced to remote">unpushed</span>' : ''}
                     </div>
                 </div>
             </div>

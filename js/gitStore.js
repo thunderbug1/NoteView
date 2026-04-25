@@ -31,7 +31,7 @@ const GitStore = {
     
     async commitBlock(filename, message = 'Update note') {
         if (!this.git || !this.fs || !filename) return;
-        
+
         try {
             await this.git.add({ fs: this.fs, dir: this.dir, filepath: filename });
             const sha = await this.git.commit({
@@ -44,6 +44,24 @@ const GitStore = {
             return sha;
         } catch (err) {
             console.error(`Failed to commit ${filename}:`, err);
+        }
+    },
+
+    async commitDeletion(filename, message = 'Delete note') {
+        if (!this.git || !this.fs || !filename) return;
+
+        try {
+            await this.git.remove({ fs: this.fs, dir: this.dir, filepath: filename });
+            const sha = await this.git.commit({
+                fs: this.fs,
+                dir: this.dir,
+                author: this.author,
+                message: message
+            });
+            console.log(`Committed deletion of ${filename} as ${sha}`);
+            return sha;
+        } catch (err) {
+            console.error(`Failed to commit deletion of ${filename}:`, err);
         }
     },
     

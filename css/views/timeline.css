@@ -286,6 +286,19 @@
     text-decoration: underline;
 }
 
+.tl-unpushed .tl-card {
+    border-left: 2px solid var(--accent);
+}
+
+.tl-sync-pending {
+    font-size: 0.65rem;
+    color: var(--accent);
+    opacity: 0.6;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+}
+
 .tl-refresh-btn {
     position: fixed;
     bottom: 2rem;

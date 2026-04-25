@@ -868,7 +868,7 @@ const Store = {
         this._filteredBlocksCache.invalidate();
 
         // Commit deletion to git
-        await GitStore.commitBlock(fileName, `Delete ${fileName}`);
+        await GitStore.commitDeletion(fileName, `Delete ${fileName}`);
         if (window.SyncManager) SyncManager.onCommit();
     },
 

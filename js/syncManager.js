@@ -87,11 +87,15 @@ const SyncManager = {
             this._lastSyncTime = new Date().toISOString();
             this._lastError = null;
             this._setStatus('idle', 'Synced');
-            
-            // If data changed via pull, trigger a re-render if the app is active
-            if (pulled && window.App && typeof App.render === 'function') {
+
+            // Re-render to reflect pulled changes and update unpushed markers
+            if (window.App && typeof App.render === 'function') {
                 Store._filteredBlocksCache.invalidate();
                 SelectionManager.updateTagCounts();
+                if (pulled) {
+                    TimelineView.invalidateRawDataCache();
+                    TimelineView.invalidateCache();
+                }
                 App.render();
             }
             return true;
@@ -122,6 +126,7 @@ const SyncManager = {
 
     onCommit() {
         this._pendingCommits++;
+        this._setStatus(this._status, this._statusDetail);
         if (this._config.autoSync && this._pendingCommits >= this._config.commitThreshold) {
             this._scheduleIdleSync();
         }
