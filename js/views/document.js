@@ -1066,57 +1066,59 @@ const DocumentView = {
     },
 
     createMobileToolbar() {
-        if (this._mobileToolbar) return;
         if (!('ontouchstart' in window)) return;
 
-        const toolbar = document.createElement('div');
-        toolbar.className = 'mobile-toolbar hidden';
-        toolbar.innerHTML = `
-            <button class="mobile-toolbar-btn" data-action="newNote" title="New Note">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-            </button>
-            <button class="mobile-toolbar-btn" data-action="outdent" title="Outdent">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 8 3 12 7 16"></polyline><line x1="11" y1="4" x2="21" y2="4"></line><line x1="11" y1="9" x2="21" y2="9"></line><line x1="11" y1="14" x2="21" y2="14"></line><line x1="11" y1="19" x2="21" y2="19"></line></svg>
-            </button>
-            <button class="mobile-toolbar-btn" data-action="indent" title="Indent">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 7 12 3 16"></polyline><line x1="11" y1="4" x2="21" y2="4"></line><line x1="11" y1="9" x2="21" y2="9"></line><line x1="11" y1="14" x2="21" y2="14"></line><line x1="11" y1="19" x2="21" y2="19"></line></svg>
-            </button>
-            <button class="mobile-toolbar-btn" data-action="toggleTask" title="Toggle task">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-            </button>
-        `;
-        document.body.appendChild(toolbar);
-        this._mobileToolbar = toolbar;
+        // Create toolbar DOM and button listeners (once)
+        if (!this._mobileToolbar) {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'mobile-toolbar hidden';
+            toolbar.innerHTML = `
+                <button class="mobile-toolbar-btn" data-action="newNote" title="New Note">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+                <button class="mobile-toolbar-btn" data-action="outdent" title="Outdent">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 8 3 12 7 16"></polyline><line x1="11" y1="4" x2="21" y2="4"></line><line x1="11" y1="9" x2="21" y2="9"></line><line x1="11" y1="14" x2="21" y2="14"></line><line x1="11" y1="19" x2="21" y2="19"></line></svg>
+                </button>
+                <button class="mobile-toolbar-btn" data-action="indent" title="Indent">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 7 12 3 16"></polyline><line x1="11" y1="4" x2="21" y2="4"></line><line x1="11" y1="9" x2="21" y2="9"></line><line x1="11" y1="14" x2="21" y2="14"></line><line x1="11" y1="19" x2="21" y2="19"></line></svg>
+                </button>
+                <button class="mobile-toolbar-btn" data-action="toggleTask" title="Toggle task">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                </button>
+            `;
+            document.body.appendChild(toolbar);
+            this._mobileToolbar = toolbar;
 
-        toolbar.querySelectorAll('.mobile-toolbar-btn').forEach(btn => {
-            btn.addEventListener('mousedown', (e) => {
-                e.preventDefault();
+            toolbar.querySelectorAll('.mobile-toolbar-btn').forEach(btn => {
+                btn.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                });
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const action = btn.dataset.action;
+                    const view = this._focusedEditor;
+                    if (!view) return;
+
+                    const { indentMore, indentLess } = window.CodeMirror;
+                    if (action === 'indent') {
+                        indentMore(view);
+                    } else if (action === 'outdent') {
+                        indentLess(view);
+                    } else if (action === 'toggleTask') {
+                        this.toggleTaskOnCurrentLine(view);
+                    } else if (action === 'newNote') {
+                        App.handleNewNote();
+                    }
+                }, { passive: false });
             });
-            btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                const action = btn.dataset.action;
-                const view = this._focusedEditor;
-                if (!view) return;
+        }
 
-                const { indentMore, indentLess } = window.CodeMirror;
-                if (action === 'indent') {
-                    indentMore(view);
-                } else if (action === 'outdent') {
-                    indentLess(view);
-                } else if (action === 'toggleTask') {
-                    this.toggleTaskOnCurrentLine(view);
-                } else if (action === 'newNote') {
-                    App.handleNewNote();
-                }
-            }, { passive: false });
-        });
-
+        // Re-attach viewport handlers every render (cleanup removes them)
         if (window.visualViewport) {
-            // Remove previous listeners if any
-            if (this._mobileViewportHandler && window.visualViewport) {
+            if (this._mobileViewportHandler) {
                 window.visualViewport.removeEventListener('resize', this._mobileViewportHandler);
                 window.visualViewport.removeEventListener('scroll', this._mobileViewportHandler);
             }
