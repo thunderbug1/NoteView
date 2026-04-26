@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="css/views/settings.css">
     <link rel="stylesheet" href="css/views/deadline.css">
     <link rel="stylesheet" href="css/views/ai.css">
+    <link rel="stylesheet" href="css/views/capture.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
@@ -51,6 +52,9 @@
                     </div>
                     <div class="tag-radio-option" data-group="view" data-tag="kanban">
                         <span class="tag-badge">Kanban</span>
+                    </div>
+                    <div class="tag-radio-option capture-view-option" data-group="view" data-tag="capture">
+                        <span class="tag-badge">Capture</span>
                     </div>
                 </div>
             </div>
@@ -241,6 +245,7 @@
     <script src="js/views/timeline.js"></script>
     <script src="js/views/kanban.js"></script>
     <script src="js/views/settings.js"></script>
+    <script src="js/views/capture.js"></script>
     <script src="js/ai.js"></script>
 
     <script src="js/modals/tagModal.js"></script>
@@ -252,7 +257,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js?v=16');
+            navigator.serviceWorker.register('./sw.js?v=19');
         }
     </script>
 

@@ -437,16 +437,20 @@ const Store = {
     loadCurrentView() {
         try {
             const savedView = localStorage.getItem(this.CURRENT_VIEW_STORAGE_KEY);
-            const allowedViews = new Set(['document', 'timeline', 'kanban', 'settings']);
+            const allowedViews = new Set(['document', 'timeline', 'kanban', 'capture', 'settings']);
 
-            this.currentView = allowedViews.has(savedView) ? savedView : 'document';
+            this.currentView = allowedViews.has(savedView) ? savedView : null;
+            if (!this.currentView) {
+                // Default to capture on mobile, document on desktop
+                this.currentView = window.innerWidth <= 768 ? 'capture' : 'document';
+            }
             console.log('[Store] loadCurrentView', {
                 savedView,
                 resolvedView: this.currentView
             });
         } catch (error) {
             console.warn('Could not load current view:', error);
-            this.currentView = 'document';
+            this.currentView = window.innerWidth <= 768 ? 'capture' : 'document';
         }
 
         return this.currentView;

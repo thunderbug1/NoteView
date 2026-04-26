@@ -1,0 +1,115 @@
+/* ============================================
+   NoteView - Capture View (mobile-first)
+   ============================================ */
+
+.capture-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 2rem 1.5rem;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.capture-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.capture-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.capture-note-count {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.capture-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.capture-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 0.75rem);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: var(--text-primary);
+}
+
+.capture-card:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.capture-card:active {
+    transform: translateY(0);
+}
+
+.capture-card svg {
+    color: var(--accent);
+}
+
+.capture-card-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.capture-browse-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 0.75rem);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.9rem;
+    width: 100%;
+    justify-content: center;
+}
+
+.capture-browse-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Hidden on desktop — only shown on mobile */
+.capture-view {
+    display: none;
+}
+
+.capture-view-option {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .capture-view {
+        display: flex;
+    }
+
+    .capture-view-option {
+        display: block;
+    }
+}

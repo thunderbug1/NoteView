@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v18';
+const CACHE_NAME = 'noteview-v19';
 
 const PRECACHE_URLS = [
   './',
@@ -16,6 +16,7 @@ const PRECACHE_URLS = [
   './css/views/settings.css',
   './css/views/deadline.css',
   './css/views/ai.css',
+  './css/views/capture.css',
   './vendor/marked.js',
   './vendor/isomorphic-git.js',
   './vendor/isomorphic-git-http.js',
@@ -51,6 +52,7 @@ const PRECACHE_URLS = [
   './js/views/timeline.js',
   './js/views/kanban.js',
   './js/views/settings.js',
+  './js/views/capture.js',
   './js/main.js',
 ];
 

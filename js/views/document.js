@@ -101,7 +101,7 @@ const DocumentView = {
             html = this.renderFlatBlocks(sorted);
         }
 
-        html += `
+        const placeholderHtml = `
             <article class="block empty" data-id="new">
                 <div class="block-tags">
                     ${this.getSelectedContextBadge()}
@@ -111,6 +111,8 @@ const DocumentView = {
                 </div>
             </article>
         `;
+
+        html = placeholderHtml + html;
 
         container.innerHTML = html;
 
@@ -3343,7 +3345,7 @@ const DocumentView = {
             // 3. Reset new block content
             this.newBlockContent = '';
 
-            // 4. Inject a new placeholder at the end
+            // 4. Inject a new placeholder at the top
             const container = document.getElementById('viewContainer');
             const newPlaceholderHtml = `
                 <article class="block empty" data-id="new">
@@ -3355,7 +3357,7 @@ const DocumentView = {
                     </div>
                 </article>
             `;
-            container.insertAdjacentHTML('beforeend', newPlaceholderHtml);
+            container.insertAdjacentHTML('afterbegin', newPlaceholderHtml);
 
             // 5. Initialize editor for the new placeholder
             const newCmContainer = container.querySelector('.block[data-id="new"] .codemirror-container');
@@ -3461,10 +3463,10 @@ const DocumentView = {
         // Focus the new empty block
         this.focusNewBlock();
 
-        // Scroll to new empty block
+        // Scroll to top where the new placeholder is
         setTimeout(() => {
             const container = document.getElementById('viewContainer');
-            container.scrollTop = container.scrollHeight;
+            container.scrollTop = 0;
         }, 100);
     },
 

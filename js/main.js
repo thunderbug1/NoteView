@@ -840,6 +840,9 @@ const App = {
             case 'kanban':
                 KanbanView.render(blocks, { groupBy });
                 break;
+            case 'capture':
+                CaptureView.render(blocks);
+                break;
             case 'settings':
                 SettingsView.render(blocks);
                 break;
@@ -850,9 +853,9 @@ const App = {
             BlockSelector.refreshSelectionUI();
         }
 
-        // Hide FAB in kanban — columns have their own add-task buttons
+        // Hide FAB in kanban and capture views
         const fab = document.getElementById('fabNewNote');
-        if (fab) fab.style.display = (view === 'kanban') ? 'none' : '';
+        if (fab) fab.style.display = (view === 'kanban' || view === 'capture') ? 'none' : '';
 
         // Update undo/redo button states
         this.updateUndoRedoUI();
@@ -1635,7 +1638,7 @@ const App = {
 
     handleNewNote() {
         if (document.querySelector('.content-modal')) return;
-        this.showCreationPicker();
+        this.showNewNoteModal('type');
     },
 
     showCreationPicker() {
@@ -1818,6 +1821,22 @@ const App = {
         };
 
         const micSvg = this._micSvg;
+        const speechSupported = DocumentView.isSpeechRecognitionSupported();
+        const aiConfigured = AIAssistant.isConfigured();
+
+        // Method switch toolbar (always visible, lets user switch creation mode)
+        let methodToolbarHtml = '<div class="creation-method-toolbar">';
+        methodToolbarHtml += `<button class="creation-method-btn${method === 'type' ? ' active' : ''}" data-method="type" title="Write"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>`;
+        if (speechSupported) {
+            methodToolbarHtml += `<button class="creation-method-btn${method === 'dictate' ? ' active' : ''}" data-method="dictate" title="Dictate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>`;
+            if (aiConfigured) {
+                methodToolbarHtml += `<button class="creation-method-btn${method === 'ai-dictate' ? ' active' : ''}" data-method="ai-dictate" title="AI Dictate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg><span class="ai-sparkle" style="font-size:0.6rem">\u2728</span></button>`;
+            }
+        }
+        methodToolbarHtml += `<button class="creation-method-btn${method === 'task' ? ' active' : ''}" data-method="task" title="Task"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
+        methodToolbarHtml += `<button class="creation-method-btn${method === 'template' ? ' active' : ''}" data-method="template" title="Template"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></button>`;
+        methodToolbarHtml += '</div>';
+
         let actionBtnHtml = '';
         if (method === 'dictate') {
             actionBtnHtml = `<button class="creation-btn mic-btn active-method" data-action="dictate" data-id="${modalBlockId}" title="Stop dictation">${micSvg} Stop</button>`;
@@ -1826,6 +1845,7 @@ const App = {
         }
 
         const content = `
+            ${methodToolbarHtml}
             ${actionBtnHtml ? `<div class="block block-creation-actions" style="margin-bottom: 0.75rem;">${actionBtnHtml}</div>` : ''}
             <div class="block-metadata">
                 <div class="block-tags">
@@ -1919,7 +1939,7 @@ const App = {
                                 <span class="save-indicator" data-id="${promotedId}">saved</span>
                             </div>
                         `;
-                        newBlockArticle.parentNode.insertBefore(article, newBlockArticle);
+                        newBlockArticle.parentNode.insertBefore(article, newBlockArticle.nextSibling);
                         // Create editor for the inserted block
                         const cmContainer = article.querySelector('.codemirror-container');
                         if (cmContainer) {
@@ -1946,6 +1966,51 @@ const App = {
                 } else if (action === 'ai-dictate') {
                     this.handleAIMicClick(modalBlockId, btn);
                     if (!this._aiDictationActive) actionsDiv.remove();
+                }
+            });
+        }
+
+        // Method switch toolbar
+        const methodToolbar = modal.querySelector('.creation-method-toolbar');
+        if (methodToolbar) {
+            methodToolbar.addEventListener('click', (e) => {
+                const btn = e.target.closest('.creation-method-btn');
+                if (!btn) return;
+                e.preventDefault();
+                const newMethod = btn.dataset.method;
+                if (newMethod === method) return;
+
+                // Stop any active recording
+                DocumentView.stopSpeechRecognition();
+                if (this._aiDictationActive) {
+                    this.stopAIDictation(createdBlockId || modalBlockId);
+                }
+                const preview = modal.querySelector('.ai-transcript-preview');
+                if (preview) preview.remove();
+
+                // Close this modal and reopen with the new method
+                const origCloseFn = modal.close.bind(modal);
+                // Prevent the full render-on-close since we're reopening immediately
+                modal.close = () => {
+                    Store.blocks = Store.blocks.filter(b => b.id !== 'new');
+                    if (createdBlockId) {
+                        const ed = DocumentView.editors.get(createdBlockId);
+                        if (ed) { ed.destroy(); DocumentView.editors.delete(createdBlockId); }
+                    } else {
+                        DocumentView.editors.delete(modalBlockId);
+                    }
+                    origCloseFn();
+                };
+                // Persist created content if any
+                const editor = DocumentView.editors.get(createdBlockId || modalBlockId);
+                const currentContent = editor ? editor.state.doc.toString() : '';
+                modal.close();
+
+                // If block was already created, reopen modal for continued editing
+                if (createdBlockId && currentContent.trim()) {
+                    this.showNewNoteModal(newMethod);
+                } else {
+                    this.showNewNoteModal(newMethod);
                 }
             });
         }

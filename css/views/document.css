@@ -987,6 +987,40 @@
     }
 }
 
+/* Method switch toolbar inside creation modal */
+.creation-method-toolbar {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.creation-method-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md, 0.5rem);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.75rem;
+}
+
+.creation-method-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.creation-method-btn.active {
+    background: var(--accent-light, rgba(59, 130, 246, 0.08));
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 /* Mobile indentation toolbar (above virtual keyboard) */
 .mobile-toolbar {
     position: fixed;

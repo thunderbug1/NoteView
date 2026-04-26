@@ -73,6 +73,7 @@ All core modules are plain objects on `window` — there are no ES module import
 - **`TagModal`** (`js/modals/tagModal.js`) — Tag selection and creation modal for blocks.
 - **`AssigneeModal`** (`js/modals/assigneeModal.js`) — Contact selection modal for task assignment.
 - **`VaultModal`** (`js/modals/vaultModal.js`) — Vault management: dropdown switcher, manager modal, vault switching.
+- **`CaptureView`** (`js/views/capture.js`) — Mobile-only capture-first view. Shows creation method grid (Write, Dictate, AI Dictate, Task, Template) with a "Browse notes" button. Default view on mobile (≤ 768px). Hidden in sidebar view switcher on desktop.
 
 ### Views
 
