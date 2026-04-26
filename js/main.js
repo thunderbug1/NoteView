@@ -909,11 +909,23 @@ const App = {
         BacklinksPanel.render(Store.blocks, DocumentView.getFocusedBlockId());
     },
 
-    async deleteBlock(id) {
-        await Store.deleteBlock(id);
-        // Invalidate timeline cache after deleting
+    async deleteBlock(id, options = {}) {
+        try {
+            await Store.deleteBlock(id);
+        } catch (err) {
+            Common.showToast('Failed to delete note: ' + (err.message || 'Unknown error'));
+            return;
+        }
         TimelineView.invalidateCache();
         SelectionManager.updateTagCounts();
+
+        if (options.showToast) {
+            Common.showToast('Note deleted', {
+                actionLabel: 'Undo',
+                action: () => UndoRedoManager.undo(),
+                duration: 8000
+            });
+        }
 
         // Surgical DOM removal for document view (no filters active)
         if (Store.currentView === 'document') {

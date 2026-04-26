@@ -636,7 +636,7 @@ const DocumentView = {
             }
         };
 
-        const handleAction = (evt) => {
+        const handleAction = async (evt) => {
             const item = evt.target.closest('.menu-item');
             if (!item) return;
             const action = item.dataset.action;
@@ -650,7 +650,17 @@ const DocumentView = {
             } else if (action === 'history') {
                 HistoryView.openHistory(blockId);
             } else if (action === 'delete') {
-                App.deleteBlock(blockId);
+                this.closeBlockMenu();
+                const confirmed = await Modal.confirm({
+                    title: 'Delete Note',
+                    message: 'Delete this note permanently?',
+                    confirmText: 'Delete',
+                    cancelText: 'Cancel'
+                });
+                if (confirmed) {
+                    await App.deleteBlock(blockId, { showToast: true });
+                }
+                return;
             }
             this.closeBlockMenu();
         };
@@ -2724,7 +2734,7 @@ const DocumentView = {
                 self.handleExtractCut(view, selectedText, selection);
                 return true;
             },
-            blur: (event, view) => {
+            blur: async (event, view) => {
                 const currentId = view.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
                 const content = view.state.doc.toString();
                 if (currentId !== 'new' && currentId !== 'new-modal') {
@@ -2737,7 +2747,20 @@ const DocumentView = {
                         return;
                     }
                     if (content.trim() === '') {
-                        App.deleteBlock(currentId);
+                        const originalContent = self.originalContents.get(currentId);
+                        if (originalContent && originalContent.trim() !== '') {
+                            const confirmed = await Modal.confirm({
+                                title: 'Delete Empty Note',
+                                message: 'This note is now empty. Delete it?',
+                                confirmText: 'Delete',
+                                cancelText: 'Keep'
+                            });
+                            if (confirmed) {
+                                App.deleteBlock(currentId, { showToast: true });
+                            }
+                        } else {
+                            App.deleteBlock(currentId);
+                        }
                     } else {
                         // Only commit if content changed
                         const originalContent = self.originalContents.get(currentId);
@@ -3387,7 +3410,17 @@ const DocumentView = {
         // Schedule save for THIS block
         const timeout = setTimeout(async () => {
             this.saveTimeouts.delete(blockId);
-            await App.saveBlockContent(blockId, content);
+            try {
+                await App.saveBlockContent(blockId, content);
+            } catch (err) {
+                const failedIndicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
+                if (failedIndicator) {
+                    failedIndicator.textContent = 'Save failed';
+                    failedIndicator.classList.remove('saving');
+                }
+                Common.showToast('Save failed: ' + (err.message || 'Unknown error'));
+                return;
+            }
 
             // Re-query indicator in case re-render replaced it
             const currentIndicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
