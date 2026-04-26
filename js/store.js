@@ -435,14 +435,17 @@ const Store = {
     },
 
     loadCurrentView() {
+        const isMobile = window.matchMedia('(max-width: 768px)').matches
+            || ('ontouchstart' in window && window.innerWidth <= 900);
         try {
             const savedView = localStorage.getItem(this.CURRENT_VIEW_STORAGE_KEY);
             const allowedViews = new Set(['document', 'timeline', 'kanban', 'capture', 'settings']);
 
-            this.currentView = allowedViews.has(savedView) ? savedView : null;
-            if (!this.currentView) {
-                // Default to capture on mobile, document on desktop
-                this.currentView = window.innerWidth <= 768 ? 'capture' : 'document';
+            if (isMobile) {
+                // Mobile always starts on capture view
+                this.currentView = 'capture';
+            } else {
+                this.currentView = allowedViews.has(savedView) ? savedView : 'document';
             }
             console.log('[Store] loadCurrentView', {
                 savedView,
@@ -450,7 +453,7 @@ const Store = {
             });
         } catch (error) {
             console.warn('Could not load current view:', error);
-            this.currentView = window.innerWidth <= 768 ? 'capture' : 'document';
+            this.currentView = isMobile ? 'capture' : 'document';
         }
 
         return this.currentView;
