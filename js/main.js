@@ -1045,9 +1045,9 @@ const App = {
             if (DocumentView.updateBlockMetadata(id)) return;
         }
 
-        // Skip full render if block's editor is in a modal (render would steal it)
+        // Skip full render if block's editor is outside the view container (e.g. in a modal)
         const editor = DocumentView.editors.get(id);
-        if (editor && editor.dom.closest('.modal-overlay')) return;
+        if (editor && !editor.dom.closest('#viewContainer')) return;
 
         this.render();
     },
