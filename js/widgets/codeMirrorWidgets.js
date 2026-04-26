@@ -209,6 +209,7 @@ function createCodeMirrorWidgets(documentView) {
             };
             wrap.onmousedown = (e) => {
                 if (e.button !== 0) {
+                    e.preventDefault();
                     e.stopPropagation();
                     return;
                 }

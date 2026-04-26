@@ -2170,7 +2170,7 @@ const DocumentView = {
                 color: 'var(--accent)',
                 backgroundColor: 'var(--bg-hover, #f1f5f9)'
             },
-            ".cm-line:hover .md-add-deadline, .cm-line:hover .md-add-action": {
+            ".cm-focused .cm-line:hover .md-add-deadline, .cm-focused .cm-line:hover .md-add-action": {
                 display: 'inline-flex'
             },
         });
@@ -2681,6 +2681,21 @@ const DocumentView = {
                 if (blockId && blockId !== 'new') {
                     self._focusedBlockId = blockId;
                     RecentAccessTracker.touch(blockId);
+                }
+            },
+            contextmenu: (event, view) => {
+                if (event.target.closest?.('.cm-task-check')) {
+                    const pos = view.posAtCoords(event);
+                    if (pos != null) {
+                        const line = view.state.doc.lineAt(pos);
+                        const match = line.text.match(/^(\s*[-*+]\s+)\[([ xX\/bB\-])\]/);
+                        if (match) {
+                            const from = line.from + match[1].length;
+                            const to = from + 3;
+                            event.preventDefault();
+                            self.showTaskMenu(event.pageX, event.pageY, view, from, to, match[2]);
+                        }
+                    }
                 }
             },
             paste: (event, view) => {
