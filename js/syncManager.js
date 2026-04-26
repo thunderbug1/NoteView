@@ -110,7 +110,14 @@ const SyncManager = {
             }
             return true;
         } catch (err) {
-            if (this._isConflictError(err)) {
+            if (this._isOverwriteError(err)) {
+                this._lastError = err.message;
+                this._setStatus('conflict', 'Local changes conflict with remote');
+                showToast('Sync blocked: local changes would be overwritten by remote updates.', {
+                    actionLabel: 'Resolve',
+                    action: () => this._showOverwriteHelp(err)
+                });
+            } else if (this._isConflictError(err)) {
                 this._lastError = err.message;
                 this._setStatus('conflict', 'Merge conflict detected');
                 showToast('Sync conflict: remote has changes. Manual resolution needed.', {
@@ -249,6 +256,12 @@ const SyncManager = {
         return msg.includes('conflict') || msg.includes('non-fast-forward') || msg.includes('merge conflict');
     },
 
+    _isOverwriteError(err) {
+        if (err.code === 'CheckoutConflictError') return true;
+        const msg = (err.message || err.data?.message || '').toLowerCase();
+        return msg.includes('would be overwritten');
+    },
+
     _isCorsError(err) {
         const msg = (err.message || '').toLowerCase();
         return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('type: failed');
@@ -305,6 +318,327 @@ const SyncManager = {
                 alert('Force push failed: ' + err.message);
             }
         });
+    },
+
+    async _showOverwriteHelp(err) {
+        const filepaths = err.data?.filepaths || [];
+        const { git, fs, dir } = GitStore;
+        const ref = this._config.branch || 'main';
+        const remoteName = GitRemote.config.name;
+
+        // Build diff data for each conflicting file
+        const diffs = [];
+        let fetchError = null;
+        try {
+            // Ensure remote objects are available (pull already fetched before failing)
+            let remoteOid;
+            try {
+                remoteOid = await git.resolveRef({ fs, dir, ref: `refs/remotes/${remoteName}/${ref}` });
+            } catch (e) {
+                // Fetch if remote ref not resolved
+                await git.fetch({
+                    fs, dir, http: window.GitHttp,
+                    remote: remoteName, ref,
+                    corsProxy: GitRemote._getCorsProxy(),
+                    onAuth: () => GitRemote.config.auth
+                });
+                remoteOid = await git.resolveRef({ fs, dir, ref: `refs/remotes/${remoteName}/${ref}` });
+            }
+
+            // Read remote commit tree to get file blob OIDs
+            const remoteCommit = await git.readCommit({ fs, dir, oid: remoteOid });
+            const tree = await git.readTree({ fs, dir, oid: remoteCommit.commit.tree });
+
+            for (const filepath of filepaths) {
+                if (!filepath.endsWith('.md')) continue;
+                // Local content
+                let localContent = '';
+                try { localContent = new TextDecoder().decode(await fs.readFile(filepath)); } catch (e) { /* deleted locally */ }
+                // Remote content
+                let remoteContent = '';
+                const entry = tree.tree.find(e => e.path === filepath);
+                if (entry) {
+                    try {
+                        const { blob } = await git.readBlob({ fs, dir, oid: entry.oid });
+                        remoteContent = new TextDecoder().decode(blob);
+                    } catch (e) { /* not in remote */ }
+                }
+                diffs.push({ filepath, localContent, remoteContent });
+            }
+        } catch (e) {
+            fetchError = e;
+        }
+
+        // Build file cards HTML
+        let filesHtml;
+        if (fetchError) {
+            filesHtml = `<div style="padding:0.75rem;color:var(--text-secondary);font-size:0.85rem">
+                Could not load diff preview: ${escapeHtml(fetchError.message)}.
+                <br>Conflicting files: ${escapeHtml(filepaths.join(', '))}.
+            </div>`;
+        } else if (diffs.length === 0) {
+            filesHtml = `<div style="padding:0.75rem;color:var(--text-secondary);font-size:0.85rem">
+                Conflicting files: ${escapeHtml(filepaths.join(', '))}.
+            </div>`;
+        } else {
+            filesHtml = diffs.map(({ filepath, localContent, remoteContent }) => {
+                const diffLines = this._computeLineDiff(localContent, remoteContent);
+                const changedCount = diffLines.filter(l => l.type === 'added' || l.type === 'removed').length;
+                const diffBodyId = 'diffBody_' + filepath.replace(/[^a-zA-Z0-9]/g, '_');
+                const diffLinesHtml = diffLines.map(l => {
+                    const escaped = escapeHtml(l.text);
+                    if (l.type === 'removed') return `<div style="background:rgba(244,63,94,0.15);color:var(--color-danger,#f44);padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all">- ${escaped}</div>`;
+                    if (l.type === 'added') return `<div style="background:rgba(16,185,129,0.15);color:var(--color-success,#10b981);padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all">+ ${escaped}</div>`;
+                    return `<div style="padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all;color:var(--text-secondary)">&nbsp; ${escaped}</div>`;
+                }).join('');
+
+                return `
+                <div class="overwrite-file-card" style="border:1px solid var(--border);border-radius:var(--radius-sm,6px);overflow:hidden;margin-bottom:0.5rem">
+                    <button class="overwrite-file-header" data-target="${diffBodyId}" style="
+                        width:100%;display:flex;align-items:center;justify-content:space-between;
+                        padding:0.7rem 0.85rem;background:var(--bg-secondary);border:none;cursor:pointer;
+                        font-size:0.9rem;color:var(--text-primary);text-align:left;min-height:44px;
+                        font-family:inherit
+                    ">
+                        <span style="font-weight:500">${escapeHtml(filepath)}</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted)">${changedCount} line${changedCount !== 1 ? 's' : ''} changed</span>
+                    </button>
+                    <div id="${diffBodyId}" style="display:none;max-height:200px;overflow-y:auto;border-top:1px solid var(--border);padding:0.25rem 0">
+                        ${diffLinesHtml}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        const modal = Modal.create({
+            title: 'Local Changes Detected',
+            content: `
+                <div style="font-size:0.9rem;line-height:1.6">
+                    <p>You have unsaved edits that conflict with updates from the remote repository.</p>
+                    <p style="margin-top:0.5rem"><strong>Nothing has been changed yet.</strong> Choose how to proceed:</p>
+                    <div style="margin-top:0.75rem">${filesHtml}</div>
+                    <div style="margin-top:1rem;display:flex;flex-direction:column;gap:0.5rem">
+                        <button id="overwriteForcePullBtn" style="
+                            padding:0.85rem 1rem;border-radius:8px;background:var(--bg-secondary);
+                            border:1px solid var(--border);cursor:pointer;text-align:left;
+                            font-size:0.9rem;line-height:1.4;min-height:44px;font-family:inherit;width:100%
+                        ">
+                            <div style="font-weight:600;color:var(--text-primary)">Pull Remote Changes</div>
+                            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem">
+                                Update to match the remote version.
+                                <span style="color:var(--color-danger,#f44)">Your unsaved edits will be lost.</span>
+                            </div>
+                        </button>
+                        <button id="overwriteKeepLocalBtn" style="
+                            padding:0.85rem 1rem;border-radius:8px;background:var(--bg-secondary);
+                            border:1px solid var(--border);cursor:pointer;text-align:left;
+                            font-size:0.9rem;line-height:1.4;min-height:44px;font-family:inherit;width:100%
+                        ">
+                            <div style="font-weight:600;color:var(--text-primary)">Keep Your Changes</div>
+                            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.25rem">
+                                Save your edits and push them.
+                                <span style="color:var(--color-danger,#f44)">Remote changes will be overwritten.</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div style="margin-top:0.75rem;display:flex;justify-content:flex-end">
+                        <button id="overwriteDismissBtn" class="settings-btn secondary">Cancel</button>
+                    </div>
+                </div>
+            `,
+            width: '420px'
+        });
+
+        // Toggle diff body on file header click
+        modal.querySelectorAll('.overwrite-file-header').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const body = modal.querySelector('#' + btn.dataset.target);
+                if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
+            });
+        });
+
+        modal.querySelector('#overwriteDismissBtn').addEventListener('click', () => modal.close());
+
+        // Option A: Force Pull
+        modal.querySelector('#overwriteForcePullBtn').addEventListener('click', async () => {
+            if (!confirm('This will discard your local edits and use the remote version. Continue?')) return;
+            const pullBtn = modal.querySelector('#overwriteForcePullBtn');
+            const keepBtn = modal.querySelector('#overwriteKeepLocalBtn');
+            pullBtn.disabled = true;
+            keepBtn.disabled = true;
+            pullBtn.querySelector('div:first-child').textContent = 'Pulling...';
+            try {
+                const { git, fs, dir } = GitStore;
+                const ref = this._config.branch || 'main';
+                const remoteName = GitRemote.config.name;
+
+                await git.fetch({
+                    fs, dir, http: window.GitHttp,
+                    remote: remoteName, ref,
+                    corsProxy: GitRemote._getCorsProxy(),
+                    onAuth: () => GitRemote.config.auth
+                });
+                const remoteOid = await git.resolveRef({ fs, dir, ref: `refs/remotes/${remoteName}/${ref}` });
+                await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: remoteOid, force: true });
+                await git.checkout({ fs, dir, ref, force: true });
+                await git.push({
+                    fs, dir, http: window.GitHttp,
+                    remote: remoteName, ref,
+                    corsProxy: GitRemote._getCorsProxy(),
+                    onAuth: () => GitRemote.config.auth
+                });
+
+                this._pendingCommits = 0;
+                this._lastError = null;
+                this._setStatus('idle', 'Force pull succeeded');
+
+                if (window.App && typeof App.render === 'function') {
+                    await Store.loadBlocks();
+                    Store._filteredBlocksCache.invalidate();
+                    SelectionManager.updateTagCounts();
+                    TimelineView.invalidateRawDataCache();
+                    TimelineView.invalidateCache();
+                    App.render();
+                }
+
+                showToast('Updated to match remote.');
+                modal.close();
+            } catch (err) {
+                pullBtn.disabled = false;
+                keepBtn.disabled = false;
+                pullBtn.querySelector('div:first-child').textContent = 'Pull Remote Changes';
+                alert('Force pull failed: ' + err.message);
+            }
+        });
+
+        // Option B: Keep Local + Force Push
+        modal.querySelector('#overwriteKeepLocalBtn').addEventListener('click', async () => {
+            if (!confirm('This will save your local edits and overwrite the remote. Continue?')) return;
+            const keepBtn = modal.querySelector('#overwriteKeepLocalBtn');
+            const pullBtn = modal.querySelector('#overwriteForcePullBtn');
+            keepBtn.disabled = true;
+            pullBtn.disabled = true;
+            keepBtn.querySelector('div:first-child').textContent = 'Saving...';
+            try {
+                const { git, fs, dir } = GitStore;
+                const ref = this._config.branch || 'main';
+                const remoteName = GitRemote.config.name;
+
+                const filenames = await fs.readdir(dir);
+                for (const name of filenames) {
+                    if (name.endsWith('.md')) {
+                        await git.add({ fs, dir, filepath: name });
+                    }
+                }
+                await git.commit({
+                    fs, dir,
+                    author: GitStore.author,
+                    message: 'Local edits preserved during sync conflict'
+                });
+                await git.push({
+                    fs, dir, http: window.GitHttp,
+                    remote: remoteName, ref, force: true,
+                    corsProxy: GitRemote._getCorsProxy(),
+                    onAuth: () => GitRemote.config.auth
+                });
+
+                this._pendingCommits = 0;
+                this._lastError = null;
+                this._setStatus('idle', 'Force push succeeded');
+                showToast('Local edits saved and pushed.');
+                modal.close();
+            } catch (err) {
+                keepBtn.disabled = false;
+                pullBtn.disabled = false;
+                keepBtn.querySelector('div:first-child').textContent = 'Keep Your Changes';
+                alert('Failed to save and push: ' + err.message);
+            }
+        });
+    },
+
+    _computeLineDiff(localContent, remoteContent) {
+        const localLines = localContent.split('\n');
+        const remoteLines = remoteContent.split('\n');
+        const result = [];
+
+        const m = localLines.length;
+        const n = remoteLines.length;
+
+        // Fall back to simple comparison for very large files (O(n*m) table)
+        if (m * n > 500000) {
+            return this._simpleDiff(localLines, remoteLines);
+        }
+
+        // Build LCS table
+        const dp = [];
+        for (let i = 0; i <= m; i++) {
+            dp[i] = new Uint32Array(n + 1);
+        }
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                if (localLines[i - 1] === remoteLines[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1] + 1;
+                } else {
+                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                }
+            }
+        }
+
+        // Backtrack to produce diff
+        const actions = [];
+        let i = m, j = n;
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && localLines[i - 1] === remoteLines[j - 1]) {
+                actions.push({ type: 'same', text: localLines[i - 1] });
+                i--; j--;
+            } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                actions.push({ type: 'added', text: remoteLines[j - 1] });
+                j--;
+            } else {
+                actions.push({ type: 'removed', text: localLines[i - 1] });
+                i--;
+            }
+        }
+        actions.reverse();
+
+        // Collapse consecutive unchanged lines for readability
+        let unchangedBuffer = [];
+        for (const action of actions) {
+            if (action.type === 'same') {
+                unchangedBuffer.push(action.text);
+            } else {
+                if (unchangedBuffer.length > 3) {
+                    result.push({ type: 'same', text: `... ${unchangedBuffer.length} unchanged lines ...` });
+                } else {
+                    for (const line of unchangedBuffer) result.push({ type: 'same', text: line });
+                }
+                unchangedBuffer = [];
+                result.push(action);
+            }
+        }
+        if (unchangedBuffer.length > 3) {
+            result.push({ type: 'same', text: `... ${unchangedBuffer.length} unchanged lines ...` });
+        } else {
+            for (const line of unchangedBuffer) result.push({ type: 'same', text: line });
+        }
+
+        return result;
+    },
+
+    _simpleDiff(localLines, remoteLines) {
+        const result = [];
+        const maxLen = Math.max(localLines.length, remoteLines.length);
+        for (let i = 0; i < maxLen; i++) {
+            const local = i < localLines.length ? localLines[i] : null;
+            const remote = i < remoteLines.length ? remoteLines[i] : null;
+            if (local === remote) {
+                result.push({ type: 'same', text: local });
+            } else {
+                if (local !== null) result.push({ type: 'removed', text: local });
+                if (remote !== null) result.push({ type: 'added', text: remote });
+            }
+        }
+        return result;
     },
 
 };
