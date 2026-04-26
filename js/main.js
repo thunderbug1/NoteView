@@ -1045,6 +1045,10 @@ const App = {
             if (DocumentView.updateBlockMetadata(id)) return;
         }
 
+        // Skip full render if block's editor is in a modal (render would steal it)
+        const editor = DocumentView.editors.get(id);
+        if (editor && editor.dom.closest('.modal-overlay')) return;
+
         this.render();
     },
 
@@ -1775,7 +1779,15 @@ const App = {
         const openTagModal = () => {
             if (createdBlockId) {
                 // Block exists — open tag modal for real block
-                TagModal.show(createdBlockId);
+                TagModal.show(createdBlockId, {
+                    onClose: () => {
+                        const block = Store.blocks.find(b => b.id === createdBlockId);
+                        if (block) {
+                            modalTags = [...(block.tags || [])];
+                            renderModalTags();
+                        }
+                    }
+                });
             } else {
                 // Block not yet created — use temp block approach
                 const tempId = 'new';
