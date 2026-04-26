@@ -27,6 +27,8 @@ function createModal(options) {
 
     const modal = document.createElement('div');
     modal.className = overlayClass;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
 
     const widthStyle = width ? `width: ${width};` : '';
 
@@ -49,10 +51,42 @@ function createModal(options) {
         </div>
     `;
 
+    const previouslyFocused = document.activeElement;
+
+    let closed = false;
     const closeModal = () => {
+        if (closed) return;
+        closed = true;
+        document.removeEventListener('keydown', escapeHandler);
         modal.remove();
+        if (previouslyFocused && previouslyFocused.focus) {
+            previouslyFocused.focus();
+        }
         if (onClose) onClose();
     };
+
+    const escapeHandler = (e) => {
+        if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', escapeHandler);
+
+    // Focus trap: keep Tab/Shift+Tab within modal
+    modal.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        const focusable = modal.querySelectorAll(
+            'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    });
 
     // Try to find close button by common class names
     const closeBtn = modal.querySelector('.close-modal, .tl-modal-close');
@@ -65,6 +99,12 @@ function createModal(options) {
     });
 
     document.body.appendChild(modal);
+
+    // Autofocus first focusable element
+    const firstFocusable = modal.querySelector(
+        'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    );
+    if (firstFocusable) firstFocusable.focus();
 
     // Return modal object with close method
     return {
