@@ -100,16 +100,8 @@
     display: none;
 }
 
-.capture-view-option {
-    display: none;
-}
-
 @media (max-width: 768px) {
     .capture-view {
         display: flex;
-    }
-
-    .capture-view-option {
-        display: block;
     }
 }
