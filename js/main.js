@@ -951,10 +951,9 @@ const App = {
         const isRecentMode = currentSort?.clauses?.[0]?.field === 'lastAccessed';
 
         if (isRecentMode) {
-            if (this._preRecentSort) {
-                Store.updateSortConfig('document', { clauses: this._preRecentSort });
-                this._preRecentSort = null;
-            }
+            const restore = this._preRecentSort || Store.getDefaultViewPreferences()?.document?.sort?.clauses || [];
+            Store.updateSortConfig('document', { clauses: restore });
+            this._preRecentSort = null;
         } else {
             this._preRecentSort = currentSort?.clauses ? JSON.parse(JSON.stringify(currentSort.clauses)) : null;
             Store.updateSortConfig('document', {
