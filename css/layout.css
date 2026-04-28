@@ -460,7 +460,13 @@
     #sidebarOverlay.active { display: block; }
 
     #main { overflow-y: auto; }
+    #main:has(.capture-view) { overflow: hidden; }
+    #main:has(.capture-page) { overflow: hidden; }
+    #main:has(.capture-view) .content-toolbar,
+    #main:has(.capture-page) .content-toolbar { display: none; }
     #viewContainer { padding: 1rem; overflow: visible; }
+    #main:has(.capture-view) > #viewContainer,
+    #main:has(.capture-page) > #viewContainer { padding: 0; }
 
     .content-toolbar {
         padding: 0.25rem 0.5rem;

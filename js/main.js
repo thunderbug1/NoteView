@@ -1638,6 +1638,12 @@ const App = {
 
     handleNewNote() {
         if (document.querySelector('.content-modal')) return;
+        const isMobile = window.matchMedia('(max-width: 768px)').matches
+            || ('ontouchstart' in window && window.innerWidth <= 900);
+        if (isMobile && Store.currentView !== 'capture') {
+            this.setView('capture');
+            return;
+        }
         this.showNewNoteModal('type');
     },
 

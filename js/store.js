@@ -473,7 +473,7 @@ const Store = {
     },
 
     setCurrentView(view) {
-        const allowedViews = new Set(['document', 'timeline', 'kanban', 'settings']);
+        const allowedViews = new Set(['document', 'timeline', 'kanban', 'settings', 'capture']);
         console.log('[Store] setCurrentView:before', {
             requestedView: view,
             currentView: this.currentView

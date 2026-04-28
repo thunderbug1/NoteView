@@ -2,16 +2,44 @@
    NoteView - Capture View (mobile-first)
    ============================================ */
 
+/* ─── Grid (default) ─────────────────────────── */
+
 .capture-view {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .capture-view {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+        padding: 1.5rem;
+        padding-bottom: 4rem;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+}
+
+.capture-vault-btn {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
-    min-height: 100vh;
-    padding: 1.5rem;
-    padding-bottom: 3rem;
-    max-width: 400px;
-    margin: 0 auto;
+    gap: 0.4rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: auto;
+    margin-top: 0.5rem;
+}
+
+.capture-vault-btn svg {
+    opacity: 0.6;
 }
 
 .capture-grid {
@@ -34,16 +62,16 @@
     cursor: pointer;
     transition: all 0.15s ease;
     color: var(--text-primary);
+    min-height: 80px;
 }
 
 .capture-card:hover {
     background: var(--bg-tertiary);
     border-color: var(--accent);
-    transform: translateY(-1px);
 }
 
 .capture-card:active {
-    transform: translateY(0);
+    transform: scale(0.97);
 }
 
 .capture-card svg {
@@ -77,16 +105,380 @@
     color: var(--text-primary);
 }
 
-/* Hidden on desktop — only shown on mobile */
-.capture-view {
+/* ─── Shared Page Layout ─────────────────────── */
+
+.capture-page {
     display: none;
 }
 
 @media (max-width: 768px) {
-    .capture-view {
+    .capture-page {
         display: flex;
-        overflow: hidden;
+        flex-direction: column;
         height: 100vh;
         height: 100dvh;
+        overflow: hidden;
     }
+}
+
+/* ─── Header Bar (in-flow) ───────────────────── */
+
+.capture-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.capture-header-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.capture-header-tag {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 0.375rem);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    min-height: 36px;
+    transition: all 0.15s;
+}
+
+.capture-header-tag svg {
+    color: var(--accent);
+}
+
+.capture-header-tag:active {
+    background: var(--bg-tertiary);
+}
+
+.capture-header-tag-count {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 99px;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* ─── Sticky Bottom Save Bar ─────────────────── */
+
+.capture-save-bar {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border);
+}
+
+.capture-save-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-lg, 0.75rem);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    min-height: 48px;
+    transition: opacity 0.15s;
+}
+
+.capture-save-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* ─── Write Page ─────────────────────────────── */
+
+.capture-write-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    min-height: 0;
+}
+
+.capture-write-body .codemirror-container {
+    height: 100%;
+}
+
+.capture-write-body .cm-editor {
+    height: 100%;
+}
+
+.capture-write-body .cm-scroller {
+    overflow-y: auto;
+}
+
+/* ─── Dictate Page ───────────────────────────── */
+
+.capture-dictate-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.25rem 1rem;
+    gap: 1rem;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.capture-mic-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.capture-mic-btn.recording {
+    border-color: var(--accent);
+    animation: capture-mic-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes capture-mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb, 59,130,246), 0.4); }
+    50% { box-shadow: 0 0 0 12px rgba(var(--accent-rgb, 59,130,246), 0); }
+}
+
+.capture-mic-sparkle {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    font-size: 0.9rem;
+}
+
+.capture-mic-status {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.capture-dictate-edit {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 0.75rem);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: none;
+    flex: 1;
+    min-height: 120px;
+    max-height: none;
+}
+
+.capture-dictate-edit:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* ─── AI Process Buttons ─────────────────────── */
+
+.capture-ai-btns {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.capture-ai-process-btn {
+    flex: 1;
+    padding: 0.65rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-lg, 0.75rem);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    min-height: 44px;
+}
+
+.capture-ai-process-btn:disabled {
+    opacity: 0.5;
+}
+
+/* ─── Task Page ──────────────────────────────── */
+
+.capture-task-form {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    padding-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-height: 0;
+}
+
+.capture-task-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 0.75rem);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 48px;
+    line-height: 1.5;
+}
+
+.capture-task-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.capture-task-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.capture-task-field label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.capture-task-priority {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.capture-priority-btn {
+    flex: 1;
+    padding: 0.6rem 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 0.375rem);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-height: 44px;
+}
+
+.capture-priority-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.capture-task-date {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 0.375rem);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    min-height: 44px;
+}
+
+/* ─── Template Picker ────────────────────────── */
+
+.capture-template-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+}
+
+.capture-template-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 0.75rem);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    min-height: 72px;
+}
+
+.capture-template-card:hover {
+    border-color: var(--accent);
+    background: var(--bg-tertiary);
+}
+
+.capture-template-card:active {
+    transform: scale(0.98);
+}
+
+.capture-template-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.capture-template-preview {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: pre-line;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.capture-template-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: var(--text-muted);
+    padding: 2rem;
+}
+
+.capture-template-empty p {
+    font-size: 0.9rem;
+}
+
+.capture-template-empty-btn {
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 0.75rem);
+    color: var(--accent);
+    font-size: 0.85rem;
+    cursor: pointer;
 }
