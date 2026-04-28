@@ -2184,9 +2184,6 @@ const DocumentView = {
                 color: 'var(--accent)',
                 backgroundColor: 'var(--bg-hover, #f1f5f9)'
             },
-            ".cm-focused .cm-line:hover .md-add-deadline, .cm-focused .cm-line:hover .md-add-action": {
-                display: 'inline-flex'
-            },
         });
         return this._editorTheme;
     },

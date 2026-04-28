@@ -246,6 +246,21 @@
     text-decoration: underline;
 }
 
+/* Add-field buttons on task lines (due, assignee, priority) */
+@media (hover: hover) {
+    .codemirror-container .cm-editor .cm-line:hover .md-add-deadline,
+    .codemirror-container .cm-editor .cm-line:hover .md-add-action {
+        display: inline-flex !important;
+    }
+}
+
+@media (hover: none) {
+    .codemirror-container .cm-editor.cm-focused .cm-line .md-add-deadline,
+    .codemirror-container .cm-editor.cm-focused .cm-line .md-add-action {
+        display: inline-flex !important;
+    }
+}
+
 @media (max-width: 768px) {
     .block-split-marker {
         right: auto;
