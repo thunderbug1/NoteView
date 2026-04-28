@@ -42,14 +42,8 @@ const CaptureView = {
             <span class="capture-card-label">Template</span>
         </button>`;
 
-        const noteCount = blocks ? blocks.length : 0;
-
         container.innerHTML = `
             <div class="capture-view">
-                <div class="capture-header">
-                    <h2>Capture</h2>
-                    ${noteCount > 0 ? `<span class="capture-note-count">${noteCount} note${noteCount !== 1 ? 's' : ''}</span>` : ''}
-                </div>
                 <div class="capture-grid">
                     ${methods}
                 </div>

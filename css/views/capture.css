@@ -6,30 +6,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    min-height: 60vh;
-    padding: 2rem 1.5rem;
+    justify-content: flex-end;
+    min-height: 100vh;
+    padding: 1.5rem;
+    padding-bottom: 3rem;
     max-width: 400px;
     margin: 0 auto;
-}
-
-.capture-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.capture-header h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.capture-note-count {
-    display: block;
-    margin-top: 0.35rem;
-    font-size: 0.8rem;
-    color: var(--text-muted);
 }
 
 .capture-grid {
@@ -103,5 +85,8 @@
 @media (max-width: 768px) {
     .capture-view {
         display: flex;
+        overflow: hidden;
+        height: 100vh;
+        height: 100dvh;
     }
 }
