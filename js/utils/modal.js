@@ -146,13 +146,13 @@ function createConfirm(options) {
         });
 
         modal.querySelector('.modal-confirm-btn').addEventListener('click', () => {
-            modal.close();
             resolve(true);
+            modal.close();
         });
 
         modal.querySelector('.modal-cancel-btn').addEventListener('click', () => {
-            modal.close();
             resolve(false);
+            modal.close();
         });
     });
 }
@@ -193,21 +193,21 @@ function createPrompt(options) {
 
         const submit = () => {
             const value = input.value.trim();
-            modal.close();
             resolve(value || null);
+            modal.close();
         };
 
         modal.querySelector('.modal-confirm-btn').addEventListener('click', submit);
         modal.querySelector('.modal-cancel-btn').addEventListener('click', () => {
-            modal.close();
             resolve(null);
+            modal.close();
         });
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') submit();
             if (e.key === 'Escape') {
-                modal.close();
                 resolve(null);
+                modal.close();
             }
         });
     });
