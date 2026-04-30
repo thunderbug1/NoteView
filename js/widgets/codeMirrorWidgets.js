@@ -8,7 +8,7 @@
  * The start date row is collapsible — expanded if a start value exists.
  * Works on both desktop and mobile (touch-friendly).
  */
-function showDatePopover(event, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue) {
+function showDatePopover(event, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue, fallbackPos) {
     event.stopPropagation();
     document.querySelector('.date-popover')?.remove();
 
@@ -141,7 +141,7 @@ function showDatePopover(event, view, dueFrom, dueTo, dueValue, startFrom, start
 
         // Append new badges that don't have an existing position
         // Use the reference position (dueFrom or this.from) for line lookup
-        const refPos = dueFrom != null ? dueFrom : (startFrom != null ? startFrom : 0);
+        const refPos = dueFrom != null ? dueFrom : (startFrom != null ? startFrom : (fallbackPos || 0));
         if (dueInput.value && dueFrom == null) {
             documentView.appendInlineField(view, refPos, refPos, 'due', dueInput.value);
         }
@@ -583,7 +583,7 @@ function createCodeMirrorWidgets(documentView) {
                 e.preventDefault();
                 e.stopPropagation();
                 // No existing badges — open unified popover with empty fields
-                showDatePopover(e, view, null, null, '', null, null, '');
+                showDatePopover(e, view, null, null, '', null, null, '', this.from);
             };
 
             wrap.onmousedown = handleClick;
