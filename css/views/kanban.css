@@ -78,6 +78,28 @@
     background: var(--bg-hover);
 }
 
+.kanban-column-filter-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 2px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    opacity: 0;
+    transition: all 0.15s ease;
+}
+
+.kanban-column:hover .kanban-column-filter-btn {
+    opacity: 1;
+}
+
+.kanban-column-filter-btn:hover {
+    color: var(--accent);
+    background: var(--bg-hover);
+}
+
 .kanban-column.drag-over {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--accent-light);
@@ -348,6 +370,40 @@
     background: var(--bg-hover, #f1f5f9);
 }
 
+/* Done column lookback menu */
+.kanban-lookback-menu {
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 150px;
+}
+
+.kanban-lookback-option {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 0.85rem;
+    border-radius: 4px;
+    font-family: inherit;
+    color: var(--text-primary);
+}
+
+.kanban-lookback-option:hover {
+    background: var(--bg-hover, #f1f5f9);
+}
+
+.kanban-lookback-option--active {
+    color: var(--accent);
+    font-weight: 600;
+}
+
 @keyframes kanban-card-flash {
     0% {
         box-shadow: 0 0 0 0 var(--accent), var(--shadow-md);
@@ -368,6 +424,29 @@
     position: relative;
 }
 
+/* Column expand button */
+.kanban-column-expand-btn {
+    display: block;
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.kanban-column-expand-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--bg-hover);
+}
+
 @media (max-width: 768px) {
     .kanban-column {
         flex: 0 0 250px;
@@ -378,6 +457,10 @@
     }
 
     .kanban-add-task-btn {
+        opacity: 1;
+    }
+
+    .kanban-column-filter-btn {
         opacity: 1;
     }
 }

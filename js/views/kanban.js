@@ -6,6 +6,10 @@ const KanbanView = {
     collapsedGroups: new Map(),
     showUpcoming: false,
     UPCOMING_STORAGE_KEY: 'noteview-kanban-show-upcoming',
+    doneLookbackDays: 30,
+    DONE_LOOKBACK_STORAGE_KEY: 'noteview-kanban-done-lookback',
+    MAX_VISIBLE_CARDS: 10,
+    expandedColumns: new Set(),
 
     loadShowUpcoming() {
         try {
@@ -16,6 +20,19 @@ const KanbanView = {
     saveShowUpcoming(val) {
         try {
             localStorage.setItem(this.UPCOMING_STORAGE_KEY, String(val));
+        } catch {}
+    },
+
+    loadDoneLookback() {
+        try {
+            const val = localStorage.getItem(this.DONE_LOOKBACK_STORAGE_KEY);
+            return val !== null ? parseInt(val, 10) : 30;
+        } catch { return 30; }
+    },
+
+    saveDoneLookback(days) {
+        try {
+            localStorage.setItem(this.DONE_LOOKBACK_STORAGE_KEY, String(days));
         } catch {}
     },
 
@@ -84,6 +101,7 @@ const KanbanView = {
 
         // Start-date filtering
         this.showUpcoming = this.loadShowUpcoming();
+        this.doneLookbackDays = this.loadDoneLookback();
         const notStartedIds = new Set(
             tasks.filter(t => TaskParser.isNotStarted(t)).map(t => t.id)
         );
@@ -136,12 +154,31 @@ const KanbanView = {
                 }
             }
 
-            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds, col.state);
+            const isExpanded = this.expandedColumns.has(col.id);
+            const maxCards = isExpanded ? Infinity : this.MAX_VISIBLE_CARDS;
+            const { html: colHtml, lookbackHiddenCount, rootCount } = this.renderColumnTasks(
+                colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds, col.state, maxCards
+            );
+
+            const countText = (col.state === 'x' && lookbackHiddenCount > 0)
+                ? `(${colTasks.length}, ${lookbackHiddenCount} hidden)`
+                : `(${colTasks.length})`;
+
+            const filterBtn = col.state === 'x' ? `
+                <button class="kanban-column-filter-btn" data-action="done-lookback" title="Filter completed tasks">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                </button>` : '';
+
+            const overflowCount = rootCount - (isExpanded ? rootCount : Math.min(rootCount, this.MAX_VISIBLE_CARDS));
+            const overflowBtn = overflowCount > 0
+                ? `<button class="kanban-column-expand-btn" data-column-id="${col.id}">Show ${overflowCount} more</button>`
+                : '';
 
             html += `
                 <div class="kanban-column" data-column-id="${col.id}">
                     <div class="kanban-column-header">
-                        <h4>${col.label} <span class="count">(${colTasks.length})</span></h4>
+                        <h4>${col.label} <span class="count">${countText}</span></h4>
+                        ${filterBtn}
                         <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
@@ -149,6 +186,7 @@ const KanbanView = {
                     <div class="blocks">
                         ${colHtml}
                     </div>
+                    ${overflowBtn}
                 </div>
             `;
         });
@@ -213,12 +251,31 @@ const KanbanView = {
                 }
             }
 
-            const colHtml = this.renderColumnTasks(colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds, col.state);
+            const isExpanded = this.expandedColumns.has(col.id);
+            const maxCards = isExpanded ? Infinity : this.MAX_VISIBLE_CARDS;
+            const { html: colHtml, lookbackHiddenCount, rootCount } = this.renderColumnTasks(
+                colTasks, fullHierarchy, tasksById, colTaskIds, orphanedIds, col.state, maxCards
+            );
+
+            const countText = (col.state === 'x' && lookbackHiddenCount > 0)
+                ? `(${colTasks.length}, ${lookbackHiddenCount} hidden)`
+                : `(${colTasks.length})`;
+
+            const filterBtn = col.state === 'x' ? `
+                <button class="kanban-column-filter-btn" data-action="done-lookback" title="Filter completed tasks">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                </button>` : '';
+
+            const overflowCount = rootCount - (isExpanded ? rootCount : Math.min(rootCount, this.MAX_VISIBLE_CARDS));
+            const overflowBtn = overflowCount > 0
+                ? `<button class="kanban-column-expand-btn" data-column-id="${col.id}">Show ${overflowCount} more</button>`
+                : '';
 
             columnsHtml += `
                 <div class="kanban-column" data-column-id="${col.id}">
                     <div class="kanban-column-header">
-                        <h4>${col.label} <span class="count">(${colTasks.length})</span></h4>
+                        <h4>${col.label} <span class="count">${countText}</span></h4>
+                        ${filterBtn}
                         <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
@@ -226,6 +283,7 @@ const KanbanView = {
                     <div class="blocks">
                         ${colHtml}
                     </div>
+                    ${overflowBtn}
                 </div>
             `;
         });
@@ -353,14 +411,27 @@ const KanbanView = {
      * Only root tasks (those without a parent in this column) are sorted;
      * children maintain document order under their parent.
      */
-    renderColumnTasks(colTasks, hierarchy, tasksById, colTaskIds, orphanedIds = new Set(), columnState = null) {
+    renderColumnTasks(colTasks, hierarchy, tasksById, colTaskIds, orphanedIds = new Set(), columnState = null, maxCards = Infinity) {
         // Roots: parentId is null OR parent not in this column
         const rootTasks = colTasks.filter(t => {
             const entry = hierarchy.get(t.id);
             return !entry.parentId || !colTaskIds.has(entry.parentId);
         });
 
-        let sortedRoots = SortManager.sortItems('kanban', rootTasks);
+        // Done column lookback filter
+        let filteredRoots = rootTasks;
+        let lookbackHiddenCount = 0;
+        if (columnState === 'x' && this.doneLookbackDays > 0) {
+            const cutoff = Date.now() - this.doneLookbackDays * 86400000;
+            filteredRoots = rootTasks.filter(t => {
+                const completed = t.badges?.find(bg => bg.type === 'completed')?.value;
+                if (!completed) return true;
+                return new Date(completed).getTime() >= cutoff;
+            });
+            lookbackHiddenCount = rootTasks.length - filteredRoots.length;
+        }
+
+        let sortedRoots = SortManager.sortItems('kanban', filteredRoots);
 
         // Done column: sort by completion time (newest first)
         if (columnState === 'x') {
@@ -375,10 +446,13 @@ const KanbanView = {
         }
 
         let html = '';
+        let renderedCount = 0;
         for (const root of sortedRoots) {
+            if (renderedCount >= maxCards) break;
             html += this.renderTaskWithChildren(root, hierarchy, tasksById, colTaskIds, 0, orphanedIds);
+            renderedCount++;
         }
-        return html;
+        return { html, lookbackHiddenCount, rootCount: sortedRoots.length };
     },
 
     /**
@@ -666,6 +740,23 @@ const KanbanView = {
             });
         });
 
+        // Done lookback filter
+        container.querySelectorAll('.kanban-column-filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                KanbanView.showLookbackMenu(btn);
+            });
+        });
+
+        // Column expand
+        container.querySelectorAll('.kanban-column-expand-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                KanbanView.expandedColumns.add(btn.dataset.columnId);
+                App.render();
+            });
+        });
+
         KanbanView.setupColumnDropTargets(columns);
     },
 
@@ -884,6 +975,58 @@ const KanbanView = {
         const commitMessage = `${action} ${fieldName} for '${task.text}'`;
         App.saveBlockContent(block.id, newContent, { commit: true, commitMessage }).then(() => {
             App.render();
+        });
+    },
+
+    /**
+     * Show a floating menu to set the done column lookback period.
+     */
+    showLookbackMenu(btn) {
+        const existing = document.querySelector('.kanban-lookback-menu');
+        if (existing) existing.remove();
+
+        const options = [
+            { days: 7, label: 'Last 7 days' },
+            { days: 30, label: 'Last 30 days' },
+            { days: 90, label: 'Last 90 days' },
+            { days: 0, label: 'All time' }
+        ];
+
+        const currentDays = this.doneLookbackDays;
+
+        const menu = document.createElement('div');
+        menu.className = 'kanban-lookback-menu';
+        menu.innerHTML = options.map(opt => {
+            const active = opt.days === currentDays ? ' kanban-lookback-option--active' : '';
+            return `<button class="kanban-lookback-option${active}" data-days="${opt.days}">${opt.label}</button>`;
+        }).join('');
+
+        const rect = btn.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.left = rect.left + 'px';
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.zIndex = '1000';
+
+        document.body.appendChild(menu);
+
+        const close = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', close);
+            }
+        };
+        document.addEventListener('click', close);
+
+        menu.querySelectorAll('.kanban-lookback-option').forEach(opt => {
+            opt.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const days = parseInt(opt.dataset.days, 10);
+                KanbanView.doneLookbackDays = days;
+                KanbanView.saveDoneLookback(days);
+                menu.remove();
+                document.removeEventListener('click', close);
+                App.render();
+            });
         });
     },
 
