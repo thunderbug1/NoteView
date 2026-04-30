@@ -27,6 +27,14 @@ const SyncManager = {
     // --- Initialization ---
 
     async init() {
+        this._stopIntervalSync();
+        this._status = 'idle';
+        this._statusDetail = null;
+        this._pendingCommits = 0;
+        this._lastSyncTime = null;
+        this._lastError = null;
+        this._syncing = false;
+
         await this._loadConfig();
         this._isOnline = navigator.onLine;
         this._setupNetworkListeners();
