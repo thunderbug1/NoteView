@@ -167,6 +167,8 @@ const App = {
         });
         if (this.isInitialized) {
             AppSettings.invalidate();
+            await GitRemote.init();
+            await SyncManager.init();
             await AIAssistant.init();
             SelectionManager.init();
             SelectionManager.updateTagCounts();

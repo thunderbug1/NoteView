@@ -199,7 +199,8 @@ const Store = {
             try {
                 const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(this.STORE_NAME);
-                const request = store.put(config, 'remoteConfig');
+                const key = this.directoryHandle ? `remoteConfig:${this.directoryHandle.name}` : 'remoteConfig';
+                const request = store.put(config, key);
 
                 request.onsuccess = () => resolve();
                 request.onerror = () => {
@@ -226,7 +227,8 @@ const Store = {
             try {
                 const transaction = this.db.transaction([this.STORE_NAME], 'readonly');
                 const store = transaction.objectStore(this.STORE_NAME);
-                const request = store.get('remoteConfig');
+                const key = this.directoryHandle ? `remoteConfig:${this.directoryHandle.name}` : 'remoteConfig';
+                const request = store.get(key);
 
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => {
