@@ -28,7 +28,7 @@ const CaptureView = {
     _navigateTo(page) {
         this._cleanup();
         this.currentPage = page;
-        this._currentTags = [...SelectionManager.getActiveTags()];
+        this._currentTags = [...SelectionManager.getTagsForNewNote()];
         this.render(this._blocks);
     },
 

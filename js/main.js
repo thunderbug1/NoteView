@@ -1711,7 +1711,7 @@ const App = {
 
     showNewNoteModal(method = 'type') {
         const modalBlockId = 'new-modal';
-        let modalTags = SelectionManager.getActiveTags();
+        let modalTags = SelectionManager.getTagsForNewNote();
         let createdBlockId = null;
         let isCreating = false;
 

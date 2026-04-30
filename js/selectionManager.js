@@ -482,6 +482,24 @@ const SelectionManager = {
     },
 
     /**
+     * Get tags to assign to a new note based on current selection.
+     * For group path selections, includes the group name as a tag.
+     */
+    getTagsForNewNote() {
+        const result = new Set();
+
+        for (const item of this.selections.context) {
+            if (this.isComputedContextTag(item)) continue;
+            if (item.startsWith('path:')) {
+                result.add(item.slice(5).toLowerCase());
+            } else {
+                result.add(item);
+            }
+        }
+        return Array.from(result);
+    },
+
+    /**
      * Get display name for a tag
      * @param {string} tag - Tag to get display name for
      * @returns {string} Display name
@@ -528,7 +546,7 @@ const SelectionManager = {
         if (!userContainer) return;
 
         const selectedCustomTags = Array.from(this.selections.context)
-            .filter(tag => !this.isComputedContextTag(tag));
+            .filter(tag => !this.isComputedContextTag(tag) && !tag.startsWith('path:'));
         const userTags = Array.from(new Set([
             ...this.getAllContextTags(),
             ...selectedCustomTags
@@ -588,16 +606,14 @@ const SelectionManager = {
             groupTags.forEach(tag => {
                 const directlySelected = this.selections.context.has(tag);
                 const isExcluded = this.selections.excluded.has(tag);
-                const coveredByGroup = !isComputedSection && !directlySelected && groupSelected;
                 const isSelected = isComputedSection
                     ? this.selections.context.has(tag)
-                    : (directlySelected || coveredByGroup);
+                    : directlySelected;
                 const selClass = isSelected ? 'selected' : '';
                 const exclClass = isExcluded ? 'excluded' : '';
-                const groupMatchClass = coveredByGroup ? 'group-match' : '';
                 const computedClass = isComputedSection ? 'computed' : '';
 
-                html += `<div class="tag-radio-option ${selClass} ${exclClass} ${groupMatchClass} ${computedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
+                html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
                 html += `<span class="tag-badge">${escapeHtml(this.getTagDisplayName(tag))}</span>`;
                 html += `</div>`;
             });
@@ -755,14 +771,6 @@ const SelectionManager = {
                 const directlySelected = this.selections.context.has(tag);
                 isExcluded = this.selections.excluded.has(tag);
                 isSelected = directlySelected;
-                // Also check if a parent group path covers this tag
-                if (!directlySelected && !this.isComputedContextTag(tag)) {
-                    const { segments } = Common.parseHierarchicalTag(tag);
-                    if (segments.length > 0 && this.selections.context.has('path:' + segments[0])) {
-                        isSelected = true;
-                        isGroupMatch = true;
-                    }
-                }
             } else if (group === 'contact') {
                 isSelected = this.selections.contact === tag;
             } else if (group === 'view') {
@@ -770,7 +778,6 @@ const SelectionManager = {
             }
 
             option.classList.toggle('selected', isSelected);
-            option.classList.toggle('group-match', isGroupMatch);
             option.classList.toggle('excluded', isExcluded);
         });
 

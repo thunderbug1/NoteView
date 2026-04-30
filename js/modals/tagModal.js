@@ -183,10 +183,17 @@ const TagModal = {
             }
 
             autocomplete.innerHTML = suggestions.map((s, i) => {
-                const display = s.isGroup
-                    ? `<span class="ac-group-icon">&#9654;</span> ${Common.capitalizeFirst(s.text)}`
-                    : Common.capitalizeFirst(s.text);
-                const hint = s.isGroup ? ' <span class="ac-hint">group</span>' : '';
+                let display, hint;
+                if (s.isGroup) {
+                    display = `<span class="ac-group-icon">&#9654;</span> ${Common.capitalizeFirst(s.text)}`;
+                    hint = ' <span class="ac-hint">group</span>';
+                } else if (s.isBareGroup) {
+                    display = `${Common.capitalizeFirst(s.text)}`;
+                    hint = ' <span class="ac-hint">tag</span>';
+                } else {
+                    display = Common.capitalizeFirst(s.text);
+                    hint = '';
+                }
                 return `<div class="ac-item" data-index="${i}" data-completed="${s.completed}">${display}${hint}</div>`;
             }).join('');
             autocomplete.style.display = 'block';
@@ -268,6 +275,16 @@ const TagModal = {
                             completed: groupName + '.',
                             isGroup: true
                         });
+                        // Also offer bare group name as assignable tag
+                        const existsAsFlat = treeData.flat.some(t => t.toLowerCase() === groupName.toLowerCase());
+                        if (!existsAsFlat) {
+                            suggestions.push({
+                                text: groupName,
+                                completed: groupName.toLowerCase(),
+                                isGroup: false,
+                                isBareGroup: true
+                            });
+                        }
                     }
                 });
 
@@ -795,10 +812,17 @@ const TagModal = {
                 return;
             }
             autocomplete.innerHTML = suggestions.map((s, i) => {
-                const display = s.isGroup
-                    ? `<span class="ac-group-icon">&#9654;</span> ${Common.capitalizeFirst(s.text)}`
-                    : Common.capitalizeFirst(s.text);
-                const hint = s.isGroup ? ' <span class="ac-hint">group</span>' : '';
+                let display, hint;
+                if (s.isGroup) {
+                    display = `<span class="ac-group-icon">&#9654;</span> ${Common.capitalizeFirst(s.text)}`;
+                    hint = ' <span class="ac-hint">group</span>';
+                } else if (s.isBareGroup) {
+                    display = `${Common.capitalizeFirst(s.text)}`;
+                    hint = ' <span class="ac-hint">tag</span>';
+                } else {
+                    display = Common.capitalizeFirst(s.text);
+                    hint = '';
+                }
                 return `<div class="ac-item" data-index="${i}" data-completed="${s.completed}">${display}${hint}</div>`;
             }).join('');
             autocomplete.style.display = 'block';
@@ -850,6 +874,16 @@ const TagModal = {
                 treeData.groups.forEach((_, groupName) => {
                     if (groupName.toLowerCase().startsWith(val)) {
                         suggestions.push({ text: groupName, completed: groupName + '.', isGroup: true });
+                        // Also offer bare group name as assignable tag
+                        const existsAsFlat = treeData.flat.some(t => t.toLowerCase() === groupName.toLowerCase());
+                        if (!existsAsFlat) {
+                            suggestions.push({
+                                text: groupName,
+                                completed: groupName.toLowerCase(),
+                                isGroup: false,
+                                isBareGroup: true
+                            });
+                        }
                     }
                 });
                 treeData.flat.forEach(tag => {

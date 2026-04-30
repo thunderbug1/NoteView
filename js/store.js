@@ -907,7 +907,7 @@ const Store = {
         const block = {
             id,
             content,
-            tags: extraMetadata.tags || SelectionManager.getActiveTags(),
+            tags: extraMetadata.tags || SelectionManager.getTagsForNewNote(),
             creationDate: extraMetadata.creationDate || new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
             ...extraMetadata

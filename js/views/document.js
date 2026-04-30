@@ -350,7 +350,7 @@ const DocumentView = {
     },
 
     getSelectedContextBadge() {
-        const selectedTags = SelectionManager.getActiveTags();
+        const selectedTags = SelectionManager.getTagsForNewNote();
         if (selectedTags.length === 0) return '';
 
         return selectedTags
