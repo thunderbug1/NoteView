@@ -539,6 +539,20 @@ const DocumentView = {
             if (existingEditor) {
                 cmContainer.textContent = '';
                 cmContainer.appendChild(existingEditor.dom);
+
+                // Sync editor content with Store if changed externally (e.g., kanban drag)
+                const block = Store.blocks.find(b => b.id === blockId);
+                if (block) {
+                    const freshContent = block.content || '';
+                    const normalizedFresh = freshContent.endsWith('\n') ? freshContent : freshContent + '\n';
+                    const currentContent = existingEditor.state.doc.toString();
+                    if (normalizedFresh !== currentContent) {
+                        existingEditor.dispatch({
+                            changes: { from: 0, to: existingEditor.state.doc.length, insert: normalizedFresh }
+                        });
+                    }
+                }
+
                 // Force hidden-line StateField to rebuild for the current filter state
                 const effect = getFilterChangedEffect();
                 if (effect) existingEditor.dispatch({ effects: effect.of(undefined) });
