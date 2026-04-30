@@ -398,7 +398,8 @@ const KanbanView = {
                     <div class="kanban-card-footer">
                         ${task.badges.map(b => {
                             const dueUrgencyCls = (b.type === 'due' && urgency) ? ` badge-due-${urgency}` : '';
-                            return `<span class="badge badge-${b.type} kanban-badge${dueUrgencyCls}" data-type="${b.type}" data-value="${escapeHtml(b.value)}"${b.type === 'priority' ? ` data-priority="${escapeHtml(b.value.toLowerCase())}"` : ''}>${escapeHtml(b.type)}: ${escapeHtml(b.value)}</span>`;
+                            const displayValue = b.type === 'completed' ? Common.formatRelativeDate(b.value) : escapeHtml(b.value);
+                            return `<span class="badge badge-${b.type} kanban-badge${dueUrgencyCls}" data-type="${b.type}" data-value="${escapeHtml(b.value)}"${b.type === 'priority' ? ` data-priority="${escapeHtml(b.value.toLowerCase())}"` : ''}>${escapeHtml(b.type)}: ${displayValue}</span>`;
                         }).join('')}
                     </div>
                 </div>

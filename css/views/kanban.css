@@ -501,6 +501,10 @@
     border-top: none;
 }
 
+.kanban-swimlane-collapsed .kanban-board {
+    display: none;
+}
+
 .kanban-swimlane-label {
     cursor: pointer;
 }
