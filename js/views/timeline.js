@@ -41,6 +41,7 @@ const TimelineView = {
         headOid: null,
         commitCount: 0,
         commitSnapshots: [],
+        events: [],
     },
 
     /**
@@ -67,6 +68,7 @@ const TimelineView = {
         this._rawDataCache.headOid = null;
         this._rawDataCache.commitCount = 0;
         this._rawDataCache.commitSnapshots = [];
+        this._rawDataCache.events = [];
     },
 
     /**
@@ -391,6 +393,7 @@ const TimelineView = {
         if (canIncrement) {
             // Incremental: reuse existing snapshots, process only new commits
             commitSnapshots = [...rawCache.commitSnapshots];
+            allEvents = [...rawCache.events];
             prevAllTasks = commitSnapshots[commitSnapshots.length - 1].tasks;
             prevFileSet = commitSnapshots[commitSnapshots.length - 1].fileSet || new Map();
 
@@ -430,6 +433,10 @@ const TimelineView = {
 
         // Return newest first
         allEvents.reverse();
+
+        // Persist events for incremental rebuilds
+        this._rawDataCache.events = allEvents;
+
         // Tag unpushed events
         for (const event of allEvents) {
             event.unpushed = unpushedOids.has(event.oid);
