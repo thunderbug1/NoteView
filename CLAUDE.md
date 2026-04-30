@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Always update documentation** (`docs/` directory and this file) when making changes that affect documented behavior, architecture, or data flow. Documentation should stay in sync with the code.
 
+never use the find command with the -exec flag in bash commands.
+
 ## Coding Rules
 
 - **Escape all user-controlled values in HTML.** Any value from blocks, tags, contacts, vault names, or AI output that gets inserted into `innerHTML` or HTML attributes must go through `escapeHtml()`. This includes `data-*` attributes, `value=""` attributes, and visible text inside template literals. The `Modal.create({title, content})` `content` parameter is raw HTML — callers are responsible for escaping dynamic parts.

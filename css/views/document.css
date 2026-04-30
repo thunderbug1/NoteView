@@ -199,6 +199,64 @@
     flex-wrap: wrap;
 }
 
+.tag-modal.media-url-modal {
+    width: 560px;
+    max-width: calc(100vw - 2rem);
+}
+
+.media-url-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.media-url-summary p {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.media-url-preview {
+    margin: 0;
+    max-height: 100px;
+    overflow: auto;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.media-url-insert-preview {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.media-url-insert-label {
+    white-space: nowrap;
+}
+
+.media-url-insert-preview code {
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.media-url-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
 .content-modal .tag-modal-body {
     flex: 1;
     min-height: 0;

@@ -1340,6 +1340,30 @@ const DocumentView = {
         return this._cmWidgets;
     },
 
+    detectMediaUrl(text) {
+        if (!text || typeof text !== 'string') return null;
+        const trimmed = text.trim();
+        if (trimmed.includes('\n') || /\s/.test(trimmed)) return null;
+        if (!/^https?:\/\//i.test(trimmed)) return null;
+
+        const url = trimmed;
+
+        if (/\.(jpe?g|png|gif|webp|svg|bmp|ico|avif)(\?.*)?$/i.test(url)) {
+            return { type: 'image', url, label: 'Image' };
+        }
+        if (/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url)) {
+            return { type: 'video', url, label: 'Video' };
+        }
+        if (/^https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)[\w-]+/i.test(url)) {
+            return { type: 'youtube', url, label: 'YouTube Video' };
+        }
+        if (/^https?:\/\/(www\.)?vimeo\.com\/\d+/i.test(url)) {
+            return { type: 'vimeo', url, label: 'Vimeo Video' };
+        }
+
+        return null;
+    },
+
     shouldPromptForLargePaste(text) {
         if (!text || typeof text !== 'string') {
             return false;
@@ -1410,6 +1434,55 @@ const DocumentView = {
         });
     },
 
+    showMediaUrlModal(mediaInfo) {
+        const { type, url, label } = mediaInfo;
+
+        return new Promise((resolve) => {
+            let resolved = false;
+            const finish = (value) => {
+                if (resolved) return;
+                resolved = true;
+                resolve(value);
+            };
+
+            let insertPreview;
+            if (type === 'image') {
+                insertPreview = `![image](${url})`;
+            } else if (type === 'video') {
+                insertPreview = `<video src="${url}" controls></video>`;
+            } else {
+                insertPreview = url;
+            }
+
+            const modal = Modal.create({
+                title: `${label} URL Detected`,
+                modalClass: 'tag-modal media-url-modal',
+                content: `
+                    <div class="media-url-summary">
+                        <p>A ${escapeHtml(label.toLowerCase())} URL was detected. How would you like to insert it?</p>
+                        <pre class="media-url-preview">${escapeHtml(url)}</pre>
+                        <div class="media-url-insert-preview">
+                            <span class="media-url-insert-label">Will insert:</span>
+                            <code>${escapeHtml(insertPreview)}</code>
+                        </div>
+                    </div>
+                    <div class="media-url-actions">
+                        <button class="settings-btn secondary" data-action="text">Paste as Text</button>
+                        <button class="settings-btn primary" data-action="embed">Embed</button>
+                    </div>
+                `,
+                onClose: () => finish(null)
+            });
+
+            modal.querySelectorAll('[data-action]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    finish(button.dataset.action);
+                    modal.close();
+                });
+            });
+        });
+    },
+
     normalizePastedText(text) {
         return text.replace(/\r\n/g, '\n').replace(/\u0000/g, '');
     },
@@ -1438,6 +1511,33 @@ const DocumentView = {
         if (annotations) dispatch.annotations = annotations;
         view.dispatch(dispatch);
         view.focus();
+    },
+
+    async handleMediaUrlPaste(view, mediaInfo) {
+        const action = await this.showMediaUrlModal(mediaInfo);
+        if (!action) {
+            view.focus();
+            return;
+        }
+
+        if (action === 'text') {
+            this.insertTextAtSelection(view, mediaInfo.url);
+            return;
+        }
+
+        let insertText;
+        switch (mediaInfo.type) {
+            case 'image':
+                insertText = `![image](${mediaInfo.url})`;
+                break;
+            case 'video':
+                insertText = `<video src="${mediaInfo.url}" controls></video>`;
+                break;
+            default:
+                insertText = mediaInfo.url;
+        }
+
+        this.insertTextAtSelection(view, insertText);
     },
 
     async handleLargePaste(view, text) {
@@ -2711,6 +2811,14 @@ const DocumentView = {
             },
             paste: (event, view) => {
                 const pastedText = event.clipboardData?.getData('text/plain');
+
+                const mediaInfo = self.detectMediaUrl(pastedText);
+                if (mediaInfo) {
+                    event.preventDefault();
+                    self.handleMediaUrlPaste(view, mediaInfo);
+                    return true;
+                }
+
                 if (!self.shouldPromptForLargePaste(pastedText)) {
                     return false;
                 }
