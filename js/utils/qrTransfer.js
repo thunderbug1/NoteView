@@ -13,6 +13,7 @@ const QRTransfer = {
         const syncCfg = { ...SyncManager._config };
 
         const data = { v: 1 };
+        if (Store.directoryHandle) data.n = Store.directoryHandle.name;
 
         // Git remote
         if (remoteConfig) {
@@ -106,6 +107,7 @@ const QRTransfer = {
 
     _describePayload(data) {
         const parts = [];
+        if (data.n) parts.push('Vault: ' + escapeHtml(data.n));
         if (data.g) {
             const url = data.g.u || '(unknown)';
             parts.push('Git remote: ' + escapeHtml(url.length > 50 ? url.slice(0, 47) + '...' : url));
@@ -328,7 +330,7 @@ const QRTransfer = {
         const newBrowserBtn = modal.querySelector('#qrNewBrowserBtn');
         if (newBrowserBtn) {
             newBrowserBtn.addEventListener('click', async () => {
-                const name = window.prompt('Browser vault name:', data.g?.u ? this._repoNameFromUrl(data.g.u) : 'New Vault');
+                const name = window.prompt('Browser vault name:', data.n || (data.g?.u ? this._repoNameFromUrl(data.g.u) : 'New Vault'));
                 if (!name) return;
                 modal.close();
                 try {
