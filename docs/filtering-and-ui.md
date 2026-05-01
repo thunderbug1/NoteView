@@ -127,6 +127,14 @@ The `tags` field is parsed as JSON. Stored as `block.tags` (string array).
 | Filter logic | `block.tags.includes(tag)` | Custom per-tag logic |
 | Detection | `!isComputedContextTag(tag)` | `computedContextTags.includes(tag)` |
 
+### Untagged indicator
+
+Blocks without tags (`tags` array empty or undefined) get a visual indicator in document view:
+
+- **Left border**: a thin `border-left` in `var(--text-muted)` on the `<article>` element (class `block-untagged`)
+- **Badge**: a dashed "untagged" badge (`badge-untagged`) rendered inline where tags normally appear
+- **Live updates**: `DocumentView.updateBlockTags()` toggles both the class and badge when tags are added/removed
+
 ---
 
 ## Contact System

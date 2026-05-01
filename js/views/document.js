@@ -226,7 +226,7 @@ const DocumentView = {
 
     renderBlockHtml(block) {
         return `
-            <article class="block ${block.pinned ? 'block-pinned' : ''}" data-id="${escapeHtml(block.id)}">
+            <article class="block ${block.pinned ? 'block-pinned' : ''} ${(!block.tags || block.tags.length === 0) ? 'block-untagged' : ''}" data-id="${escapeHtml(block.id)}">
                 ${this.renderCollapseButton(block)}
                 <div class="block-split-marker" data-id="${escapeHtml(block.id)}" title="Split note here" role="button" tabindex="0" aria-label="Split note here">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
@@ -454,9 +454,14 @@ const DocumentView = {
             return a.localeCompare(b);
         });
 
+        const untaggedBadge = tags.length === 0
+            ? '<span class="badge badge-untagged">untagged</span>'
+            : '';
+
         return `
             <div class="block-tags">
                 ${sortedTags.map(tag => TagModal._renderBadge(tag)).join('')}
+                ${untaggedBadge}
                 <button class="add-tag-btn" data-id="${escapeHtml(block.id)}" title="Edit tags" aria-label="Edit tags"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
             </div>
         `;
@@ -468,6 +473,8 @@ const DocumentView = {
 
         const block = Store.blocks.find(b => b.id === blockId);
         if (!block) return false;
+
+        article.classList.toggle('block-untagged', !block.tags || block.tags.length === 0);
 
         const tagsDiv = article.querySelector('.block-tags');
         if (!tagsDiv) return false;

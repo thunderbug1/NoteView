@@ -700,8 +700,13 @@ const SelectionManager = {
                     this.saveSelectionState();
                 }
 
-                this.renderContextSidebar();
-                App.render();
+                if (this.isComputedContextTag(tag)) {
+                    option.classList.toggle('selected', this.selections.context.has(tag));
+                    App.render();
+                } else {
+                    this.renderContextSidebar();
+                    App.render();
+                }
             });
         });
 
@@ -879,6 +884,11 @@ const SelectionManager = {
             const newOpacity = (!hasBlocks && !option.classList.contains('selected')) ? '0.4' : '1';
             if (option.style.opacity !== newOpacity) {
                 option.style.opacity = newOpacity;
+            }
+
+            // Highlight untagged filter when untagged blocks exist
+            if (tag === 'Status.untagged') {
+                option.classList.toggle('has-untagged', hasBlocks);
             }
         });
 
