@@ -301,8 +301,8 @@ const AIAssistant = {
             if (this._abortController) this._abortController.abort();
         });
 
-        modal.querySelector('#aiAcceptBtn').addEventListener('click', () => {
-            this._acceptChanges(blockId);
+        modal.querySelector('#aiAcceptBtn').addEventListener('click', async () => {
+            await this._acceptChanges(blockId);
         });
 
         modal.querySelector('#aiRejectBtn').addEventListener('click', () => {
@@ -727,11 +727,15 @@ const AIAssistant = {
             if (idx !== -1) this._rejectBatchNote(idx, modal);
         });
 
-        modal.querySelector('#batchAcceptAll').addEventListener('click', () => {
+        modal.querySelector('#batchAcceptAll').addEventListener('click', async () => {
+            const promises = [];
             for (let i = 0; i < this._batchResults.length; i++) {
-                if (this._batchResults[i].status === 'pending') this._acceptBatchNote(i, modal);
+                if (this._batchResults[i].status === 'pending') {
+                    promises.push(this._acceptBatchNote(i, modal));
+                }
             }
-            this._finalizeBatch();
+            await Promise.all(promises);
+            await this._finalizeBatch();
             this._closeBatchOverlay();
         });
 
@@ -1188,7 +1192,7 @@ const AIAssistant = {
             // Check if any remain
             const remaining = this._batchResults.filter(r => r.status === 'pending');
             if (remaining.length === 0) {
-                this._finalizeBatch();
+                await this._finalizeBatch();
                 this._closeBatchOverlay();
                 return;
             }
@@ -1309,11 +1313,15 @@ const AIAssistant = {
             const idx = this._getSelectedReviewIndex(modal);
             if (idx !== -1) this._rejectBatchNote(idx, modal);
         });
-        modal.querySelector('#batchAcceptAll').addEventListener('click', () => {
+        modal.querySelector('#batchAcceptAll').addEventListener('click', async () => {
+            const promises = [];
             for (let i = 0; i < this._batchResults.length; i++) {
-                if (this._batchResults[i]?.status === 'pending') this._acceptBatchNote(i, modal);
+                if (this._batchResults[i]?.status === 'pending') {
+                    promises.push(this._acceptBatchNote(i, modal));
+                }
             }
-            this._finalizeBatch();
+            await Promise.all(promises);
+            await this._finalizeBatch();
             this._closeBatchOverlay();
         });
         modal.querySelector('#batchRejectAll').addEventListener('click', () => {
