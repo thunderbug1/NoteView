@@ -544,6 +544,10 @@
     .md-gfm-table {
         min-width: 300px;
     }
+    .md-fenced-block-body {
+        white-space: pre;
+        overflow-x: auto;
+    }
 }
 
 

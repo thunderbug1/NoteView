@@ -360,31 +360,32 @@
 @keyframes untagged-pulse {
     0% {
         transform: scale(1);
-        opacity: 0.7;
+        opacity: 0.8;
     }
-    60% {
-        transform: scale(1.3);
-        opacity: 0.3;
+    70% {
+        transform: scale(1.35);
+        opacity: 0;
     }
     100% {
-        transform: scale(1.4);
+        transform: scale(1.35);
         opacity: 0;
     }
 }
 
 .tag-radio-option.has-untagged .tag-badge {
     position: relative;
+    overflow: visible;
 }
 
 .tag-radio-option.has-untagged .tag-badge::before {
     content: '';
     position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
     border-radius: var(--radius-full);
-    border: 2px solid var(--text-muted);
+    border: 2px solid var(--text-secondary);
     animation: untagged-pulse 2s ease-in-out infinite;
     pointer-events: none;
 }
