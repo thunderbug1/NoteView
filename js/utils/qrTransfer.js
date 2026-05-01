@@ -25,7 +25,7 @@ const QRTransfer = {
                 if (remoteConfig.auth.username) g.un = remoteConfig.auth.username;
                 if (remoteConfig.auth.password) g.pw = remoteConfig.auth.password;
             }
-            if (remoteConfig.corsProxy) g.c = remoteConfig.corsProxy;
+            if (remoteConfig.corsProxy || syncCfg.corsProxy) g.c = remoteConfig.corsProxy || syncCfg.corsProxy;
             if (Object.keys(g).length) data.g = g;
         }
 
@@ -94,12 +94,17 @@ const QRTransfer = {
         }
 
         // Apply sync settings
-        if (hasSync) {
-            await SyncManager.saveConfig({
-                autoSync: data.s.a,
-                syncInterval: data.s.i,
-                commitThreshold: data.s.t
-            });
+        if (hasSync || hasGit) {
+            const updates = {};
+            if (hasSync) {
+                updates.autoSync = data.s.a;
+                updates.syncInterval = data.s.i;
+                updates.commitThreshold = data.s.t;
+            }
+            if (hasGit && data.g.c !== undefined) {
+                updates.corsProxy = data.g.c;
+            }
+            await SyncManager.saveConfig(updates);
         }
 
         return { hasGit, hasAI, hasSync };
