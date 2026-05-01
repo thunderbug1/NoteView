@@ -41,8 +41,8 @@ const SortManager = {
                         asc: 'Oldest viewed first'
                     },
                     compare: (a, b) => this.compareDates(
-                        RecentAccessTracker.get(a?.id),
-                        RecentAccessTracker.get(b?.id)
+                        RecentAccessTracker.get(a?.id) || 0,
+                        RecentAccessTracker.get(b?.id) || 0
                     )
                 }
             ],

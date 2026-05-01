@@ -1138,6 +1138,8 @@ const App = {
         const block = Store.blocks.find(b => b.id === blockId);
         if (!block) return;
 
+        RecentAccessTracker.touch(blockId);
+
         const content = `
             ${DocumentView.renderBlockMetadata(block)}
             <div class="block-editor">
