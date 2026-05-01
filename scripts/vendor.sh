@@ -19,4 +19,10 @@ curl -sL https://unpkg.com/isomorphic-git@1.24.5/index.umd.min.js -o vendor/isom
 # isomorphic-git HTTP client is maintained locally (no UMD build available upstream)
 # See vendor/isomorphic-git-http.js — adapted from isomorphic-git/http/web/index.js
 
+echo "Downloading qrcode-generator..."
+curl -sL https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js -o vendor/qrcode-generator.js
+
+echo "Downloading jsQR..."
+curl -sL https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js -o vendor/jsQR.js
+
 echo "Done! Vendor files are ready."

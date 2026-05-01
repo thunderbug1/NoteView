@@ -119,6 +119,24 @@ const SettingsView = {
                 </div>
 
                 <div class="settings-section">
+                    <h3>Transfer Settings</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Transfer to Another Device</label>
+                            <p class="settings-item-hint">Generate a QR code with vault settings (git remote, AI profiles, API keys, sync config) to scan on another device.</p>
+                        </div>
+                        <button id="generateQRBtn" class="settings-btn secondary">Generate QR Code</button>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Import from Another Device</label>
+                            <p class="settings-item-hint">Scan a QR code from another device to import vault settings.</p>
+                        </div>
+                        <button id="scanQRBtn" class="settings-btn secondary">Scan QR Code</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Tag Management</h3>
                     <div class="settings-item">
                         <div class="settings-item-info">
@@ -221,6 +239,16 @@ const SettingsView = {
         const manageTagsBtn = document.getElementById('manageTagsBtn');
         if (manageTagsBtn) {
             manageTagsBtn.addEventListener('click', () => this.openTagModal());
+        }
+
+        const generateQRBtn = document.getElementById('generateQRBtn');
+        if (generateQRBtn) {
+            generateQRBtn.addEventListener('click', () => QRTransfer.showExportModal());
+        }
+
+        const scanQRBtn = document.getElementById('scanQRBtn');
+        if (scanQRBtn) {
+            scanQRBtn.addEventListener('click', () => QRTransfer.showImportModal());
         }
 
         // Git sync: remote configuration

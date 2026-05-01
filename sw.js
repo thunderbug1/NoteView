@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v20';
+const CACHE_NAME = 'noteview-v21';
 
 const PRECACHE_URLS = [
   './',
@@ -17,9 +17,12 @@ const PRECACHE_URLS = [
   './css/views/deadline.css',
   './css/views/ai.css',
   './css/views/capture.css',
+  './css/views/qr-transfer.css',
   './vendor/marked.js',
   './vendor/isomorphic-git.js',
   './vendor/isomorphic-git-http.js',
+  './vendor/qrcode-generator.js',
+  './vendor/jsQR.js',
   './vendor/codemirror.js',
   './js/gitFs.js',
   './js/gitStore.js',
@@ -42,6 +45,7 @@ const PRECACHE_URLS = [
   './js/utils/timeFilter.js',
   './js/utils/sortManager.js',
   './js/utils/appSettings.js',
+  './js/utils/qrTransfer.js',
   './js/utils/deadlinePanel.js',
   './js/utils/backlinksPanel.js',
   './js/utils/groupManager.js',
