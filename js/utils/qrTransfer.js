@@ -30,11 +30,13 @@ const QRTransfer = {
 
         // AI settings
         if (AIAssistant.enabled || AIAssistant.profiles.length || AIAssistant.presets.length) {
-            const a = {
-                e: !!AIAssistant.enabled,
-                p: AIAssistant.profiles.map(p => ({ i: p.id, n: p.name, u: p.endpointUrl, m: p.model })),
-                pr: AIAssistant.presets.map(pr => ({ i: pr.id, t: pr.title, s: pr.instruction }))
-            };
+            const a = { e: !!AIAssistant.enabled };
+            if (AIAssistant.profiles.length) {
+                a.p = AIAssistant.profiles.map(p => ({ i: p.id, n: p.name, u: p.endpointUrl, m: p.model }));
+            }
+            if (AIAssistant.presets.length) {
+                a.pr = AIAssistant.presets.map(pr => ({ i: pr.id, t: pr.title }));
+            }
             if (AIAssistant._apiKeys && Object.keys(AIAssistant._apiKeys).length) {
                 a.k = { ...AIAssistant._apiKeys };
             }
@@ -85,7 +87,7 @@ const QRTransfer = {
             await AIAssistant.applyImport({
                 enabled: data.a.e,
                 profiles: (data.a.p || []).map(p => ({ id: p.i, name: p.n, endpointUrl: p.u, model: p.m })),
-                presets: (data.a.pr || []).map(pr => ({ id: pr.i, title: pr.t, instruction: pr.s })),
+                presets: (data.a.pr || []).map(pr => ({ id: pr.i, title: pr.t, instruction: pr.s || '' })),
                 keys: data.a.k || {}
             });
         }
@@ -112,7 +114,7 @@ const QRTransfer = {
             const profiles = (data.a.p || []).length;
             const presets = (data.a.pr || []).length;
             const keys = Object.keys(data.a.k || {}).length;
-            parts.push(`AI: ${profiles} profile${profiles !== 1 ? 's' : ''}, ${presets} preset${presets !== 1 ? 's' : ''}, ${keys} API key${keys !== 1 ? 's' : ''}`);
+            parts.push(`AI: ${profiles} profile${profiles !== 1 ? 's' : ''}, ${presets} preset${presets !== 1 ? 's' : ''} (titles only), ${keys} API key${keys !== 1 ? 's' : ''}`);
         }
         if (data.s) {
             parts.push(`Sync: ${data.s.a ? 'auto' : 'manual'}, interval ${data.s.i}m`);
@@ -123,10 +125,10 @@ const QRTransfer = {
     // --- QR generation ---
 
     _generateQR(text) {
-        const qr = qrcode(0, 'M');
+        const qr = qrcode(0, 'L');
         qr.addData(text);
         qr.make();
-        return qr.createDataURL(8, 0);
+        return qr.createDataURL(4, 4);
     },
 
     // --- Export modal ---
@@ -180,11 +182,6 @@ const QRTransfer = {
     // --- Import modal ---
 
     showImportModal() {
-        if (!Store.directoryHandle) {
-            showToast('Open a vault first to import settings.');
-            return;
-        }
-
         const modal = Modal.create({
             title: 'Scan QR Code',
             content: `
@@ -250,6 +247,33 @@ const QRTransfer = {
         }
 
         const summary = this._describePayload(data);
+        const hasVault = !!Store.directoryHandle;
+        const hasLocalPicker = 'showDirectoryPicker' in window;
+
+        let vaultActions = '';
+        if (!hasVault) {
+            vaultActions = `
+                <div class="qr-vault-setup" style="margin-top:0.75rem">
+                    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem">Choose where to store the new vault:</p>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        ${hasLocalPicker ? '<button class="settings-btn secondary" id="qrNewFolderBtn">Select Folder...</button>' : ''}
+                        <button class="settings-btn secondary" id="qrNewBrowserBtn">Browser Vault...</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            vaultActions = `
+                <div class="qr-vault-setup" style="margin-top:0.75rem">
+                    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem">Apply to current vault or create a new one:</p>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+                        <button class="settings-btn" id="qrApplyCurrentBtn">Apply to Current Vault</button>
+                        ${hasLocalPicker ? '<button class="settings-btn secondary" id="qrNewFolderBtn">New Folder...</button>' : ''}
+                        <button class="settings-btn secondary" id="qrNewBrowserBtn">New Browser Vault...</button>
+                    </div>
+                </div>
+            `;
+        }
+
         const modal = Modal.create({
             title: 'Import Settings',
             content: `
@@ -259,25 +283,105 @@ const QRTransfer = {
                     </div>
                     ${data.g && (data.g.pw || data.g.un) ? '<div class="qr-transfer-warning">This includes git credentials that will be stored locally.</div>' : ''}
                     ${data.a && data.a.k && Object.keys(data.a.k).length ? '<div class="qr-transfer-warning">This includes API keys that will be stored locally.</div>' : ''}
+                    ${vaultActions}
                     <div class="qr-import-actions">
                         <button class="settings-btn secondary" id="qrImportCancel">Cancel</button>
-                        <button class="settings-btn" id="qrImportConfirm">Import</button>
                     </div>
                 </div>
             `
         });
 
         modal.querySelector('#qrImportCancel').addEventListener('click', () => modal.close());
-        modal.querySelector('#qrImportConfirm').addEventListener('click', async () => {
-            try {
-                await this.importSettings(data);
+
+        // Apply to current vault
+        const applyCurrentBtn = modal.querySelector('#qrApplyCurrentBtn');
+        if (applyCurrentBtn) {
+            applyCurrentBtn.addEventListener('click', async () => {
+                try {
+                    await this.importSettings(data);
+                    modal.close();
+                    showToast('Settings imported successfully.');
+                    if (typeof App !== 'undefined' && App.render) App.render();
+                } catch (e) {
+                    showToast('Failed to import settings.');
+                }
+            });
+        }
+
+        // New folder vault
+        const newFolderBtn = modal.querySelector('#qrNewFolderBtn');
+        if (newFolderBtn) {
+            newFolderBtn.addEventListener('click', async () => {
                 modal.close();
-                showToast('Settings imported successfully.');
-                if (typeof App !== 'undefined' && App.render) App.render();
-            } catch (e) {
-                showToast('Failed to import settings.');
-            }
-        });
+                try {
+                    const handle = await window.showDirectoryPicker();
+                    await this._createVaultAndImport(handle, data);
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        showToast('Failed to create vault.');
+                    }
+                }
+            });
+        }
+
+        // New browser vault
+        const newBrowserBtn = modal.querySelector('#qrNewBrowserBtn');
+        if (newBrowserBtn) {
+            newBrowserBtn.addEventListener('click', async () => {
+                const name = window.prompt('Browser vault name:', data.g?.u ? this._repoNameFromUrl(data.g.u) : 'New Vault');
+                if (!name) return;
+                modal.close();
+                try {
+                    await Store.createOPFSVault(name);
+                    await this.importSettings(data);
+                    await this._pullIfAvailable(data);
+                    showToast('Vault created and settings imported.');
+                    VaultModal.updateVaultSwitcherName();
+                    App.render();
+                } catch (e) {
+                    showToast('Failed to create browser vault.');
+                }
+            });
+        }
+    },
+
+    async _createVaultAndImport(handle, data) {
+        const container = document.getElementById('viewContainer');
+        if (container) container.innerHTML = '<div class="loading">Setting up vault...</div>';
+
+        await Store.switchToVault(handle);
+        await this.importSettings(data);
+        await this._pullIfAvailable(data);
+
+        VaultModal.updateVaultSwitcherName();
+        await App.completeInitialization();
+        showToast('Vault created and settings imported.');
+    },
+
+    async _pullIfAvailable(data) {
+        if (!data.g || !data.g.u) return;
+        try {
+            await GitRemote.setRemote(
+                data.g.n || 'origin',
+                data.g.u,
+                { username: data.g.un || '', password: data.g.pw || '' }
+            );
+            const container = document.getElementById('viewContainer');
+            if (container) container.innerHTML = '<div class="loading">Pulling notes from remote...</div>';
+            await GitRemote.pull();
+            await Store.loadBlocks();
+        } catch (e) {
+            // Pull may fail if repo is empty or auth is wrong — non-fatal
+        }
+    },
+
+    _repoNameFromUrl(url) {
+        try {
+            const parts = url.replace(/\.git$/, '').split('/');
+            return parts[parts.length - 1] || 'New Vault';
+        } catch {
+            return 'New Vault';
+        }
     },
 
     // --- Camera lifecycle ---

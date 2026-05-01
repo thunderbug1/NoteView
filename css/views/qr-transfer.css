@@ -9,10 +9,12 @@
 }
 
 .qr-transfer-display img {
-    max-width: 320px;
+    max-width: 200px;
     width: 100%;
-    image-rendering: pixelated;
     border-radius: var(--radius-md, 8px);
+    background: #fff;
+    padding: 8px;
+    box-sizing: content-box;
 }
 
 .qr-transfer-summary {

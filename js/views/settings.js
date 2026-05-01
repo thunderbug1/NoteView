@@ -130,7 +130,7 @@ const SettingsView = {
                     <div class="settings-item">
                         <div class="settings-item-info">
                             <label>Import from Another Device</label>
-                            <p class="settings-item-hint">Scan a QR code from another device to import vault settings.</p>
+                            <p class="settings-item-hint">Scan a QR code to import settings and optionally create a new vault.</p>
                         </div>
                         <button id="scanQRBtn" class="settings-btn secondary">Scan QR Code</button>
                     </div>
