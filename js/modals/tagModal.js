@@ -626,6 +626,13 @@ const TagModal = {
 
             await Store.renameTag(oldTag, newTag);
 
+            // Carry archive status to new tag name
+            if (SelectionManager._archivedTags.has(oldTag)) {
+                SelectionManager._archivedTags.delete(oldTag);
+                SelectionManager._archivedTags.add(newTag);
+                AppSettings.setArchivedTags(Array.from(SelectionManager._archivedTags));
+            }
+
             if (selectedTags && selectedTags.has(oldTag)) {
                 selectedTags.delete(oldTag);
                 selectedTags.add(newTag);

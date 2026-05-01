@@ -405,6 +405,29 @@
     color: var(--text-muted);
 }
 
+/* Archived tags */
+.tag-radio-option.archived-tag .tag-badge {
+    opacity: 0.55;
+    border-style: dashed;
+}
+
+.tag-radio-option.archived-tag.selected .tag-badge {
+    opacity: 1;
+    border-style: solid;
+}
+
+.archive-section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.archive-section-toggle .tag-group-toggle {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 0.6rem;
+}
+
 .delete-tag-btn {
     display: none;
     background: transparent;

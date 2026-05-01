@@ -116,6 +116,17 @@ const AppSettings = {
         await this.save(settings);
     },
 
+    async getArchivedTags() {
+        const settings = await this.load();
+        return settings.archivedTags || [];
+    },
+
+    async setArchivedTags(tags) {
+        const settings = await this.load();
+        settings.archivedTags = [...tags].sort();
+        await this.save(settings);
+    },
+
     async _ensureGitignore(dir) {
         try {
             const handle = await dir.getFileHandle('.gitignore', { create: true });

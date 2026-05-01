@@ -31,6 +31,10 @@ const SelectionManager = {
         ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked']
     ],
 
+    // Archived tags state
+    _archivedTags: new Set(),
+    _archiveExpanded: false,
+
     /**
      * Initialize the selection manager
      */
@@ -43,6 +47,10 @@ const SelectionManager = {
         this.updateSelectionUI();
         this.initHistory();
         this.initClearContextBtn();
+        this.loadArchivedTags().then(() => {
+            this.renderContextSidebar();
+            this.initArchiveToggle();
+        });
         console.log('[SelectionManager] init:complete', {
             restoredContext: Array.from(this.selections.context)
         });
@@ -537,6 +545,108 @@ const SelectionManager = {
         this.renderContextSidebar();
     },
 
+    // --- Archived tag management ---
+
+    async loadArchivedTags() {
+        const tags = await AppSettings.getArchivedTags();
+        this._archivedTags = new Set(tags);
+    },
+
+    initArchiveToggle() {
+        const header = document.querySelector('.archive-section-toggle');
+        if (!header) return;
+        header.addEventListener('click', () => {
+            this._archiveExpanded = !this._archiveExpanded;
+            const container = document.getElementById('archivedTags');
+            const toggle = header.querySelector('.tag-group-toggle');
+            if (this._archiveExpanded) {
+                container.style.display = '';
+                if (toggle) toggle.textContent = '▼';
+            } else {
+                container.style.display = 'none';
+                if (toggle) toggle.textContent = '▶';
+            }
+        });
+    },
+
+    async _toggleTagArchive(tag) {
+        if (this._archivedTags.has(tag)) {
+            this._archivedTags.delete(tag);
+        } else {
+            this._archivedTags.add(tag);
+        }
+        await AppSettings.setArchivedTags(Array.from(this._archivedTags));
+        this.renderContextSidebar();
+    },
+
+    _showTagContextMenu(e, tag) {
+        this._closeTagContextMenu();
+
+        if (this.isComputedContextTag(tag)) return;
+
+        const isArchived = this._archivedTags.has(tag);
+        const label = isArchived ? 'Unarchive tag' : 'Archive tag';
+
+        const menu = document.createElement('div');
+        menu.className = 'task-context-menu tag-context-menu';
+        menu.setAttribute('role', 'menu');
+        menu.innerHTML = `
+            <div class="menu-item" data-action="archive" role="menuitem" tabindex="-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem">
+                    ${isArchived
+                        ? '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>'
+                        : '<path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/>'
+                    }
+                </svg>
+                ${label}
+            </div>
+        `;
+
+        menu.style.left = `${Math.min(e.clientX, window.innerWidth - 220)}px`;
+        menu.style.top = `${Math.min(e.clientY, window.innerHeight - 60)}px`;
+        document.body.appendChild(menu);
+
+        requestAnimationFrame(() => {
+            const menuRect = menu.getBoundingClientRect();
+            if (menuRect.bottom > window.innerHeight) {
+                menu.style.top = `${e.clientY - menuRect.height - 4}px`;
+            }
+            const firstItem = menu.querySelector('[role="menuitem"]');
+            if (firstItem) firstItem.focus();
+        });
+
+        const closeHandler = (evt) => {
+            if (!menu.contains(evt.target)) {
+                this._closeTagContextMenu();
+            }
+        };
+
+        const handleAction = async (evt) => {
+            const item = evt.target.closest('.menu-item');
+            if (!item) return;
+            if (item.dataset.action === 'archive') {
+                await this._toggleTagArchive(tag);
+            }
+            this._closeTagContextMenu();
+        };
+
+        menu.addEventListener('click', handleAction);
+        document.addEventListener('click', closeHandler);
+
+        menu._cleanup = () => {
+            menu.removeEventListener('click', handleAction);
+            document.removeEventListener('click', closeHandler);
+        };
+    },
+
+    _closeTagContextMenu() {
+        const existing = document.querySelector('.tag-context-menu');
+        if (existing) {
+            if (existing._cleanup) existing._cleanup();
+            existing.remove();
+        }
+    },
+
     /**
      * Render the vault-derived context tags in the sidebar
      */
@@ -560,11 +670,27 @@ const SelectionManager = {
             selectedContext: Array.from(this.selections.context)
         });
 
-        // Render user tags
-        this._renderTagList(userContainer, userTags, false);
+        // Split user tags into active and archived
+        const activeUserTags = userTags.filter(tag => !this._archivedTags.has(tag));
+        const archivedUserTags = userTags.filter(tag => this._archivedTags.has(tag));
+
+        // Render active user tags
+        this._renderTagList(userContainer, activeUserTags, false);
         // Render computed tags
         if (computedContainer) {
             this._renderTagList(computedContainer, computedTags, true);
+        }
+
+        // Render archived tags
+        const archivedContainer = document.getElementById('archivedTags');
+        const archivedGroup = document.getElementById('archivedTagGroup');
+        if (archivedContainer && archivedGroup) {
+            if (archivedUserTags.length > 0) {
+                archivedGroup.style.display = '';
+                this._renderTagList(archivedContainer, archivedUserTags, false, true);
+            } else {
+                archivedGroup.style.display = 'none';
+            }
         }
     },
 
@@ -574,9 +700,9 @@ const SelectionManager = {
      * @param {string[]} tags - Tags to render
      * @param {boolean} isComputedSection - Whether this is the computed tags section
      */
-    _renderTagList(container, tags, isComputedSection) {
+    _renderTagList(container, tags, isComputedSection, isArchivedSection = false) {
         if (tags.length === 0) {
-            container.innerHTML = isComputedSection
+            container.innerHTML = isComputedSection || isArchivedSection
                 ? ''
                 : '<div style="color:var(--text-muted); font-size:12px; padding:4px 8px;">No tags found in this vault</div>';
             return;
@@ -612,8 +738,9 @@ const SelectionManager = {
                 const selClass = isSelected ? 'selected' : '';
                 const exclClass = isExcluded ? 'excluded' : '';
                 const computedClass = isComputedSection ? 'computed' : '';
+                const archivedClass = isArchivedSection ? 'archived-tag' : '';
 
-                html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
+                html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass} ${archivedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
                 html += `<span class="tag-badge">${escapeHtml(this.getTagDisplayName(tag))}</span>`;
                 html += `</div>`;
             });
@@ -628,8 +755,9 @@ const SelectionManager = {
             const selClass = isSelected ? 'selected' : '';
             const exclClass = isExcluded ? 'excluded' : '';
             const computedClass = isComputedSection ? 'computed' : '';
+            const archivedClass = isArchivedSection ? 'archived-tag' : '';
 
-            html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
+            html += `<div class="tag-radio-option ${selClass} ${exclClass} ${computedClass} ${archivedClass}" data-group="context" data-tag="${escapeHtml(tag)}">`;
             html += `<span class="tag-badge">${escapeHtml(this.getTagDisplayName(tag))}</span>`;
             html += `</div>`;
         });
@@ -641,8 +769,11 @@ const SelectionManager = {
             let pressTimer = null;
             let longPressed = false;
 
-            // Suppress browser context menu on tag badges
-            option.addEventListener('contextmenu', (e) => e.preventDefault());
+            // Right-click: show tag context menu (archive/unarchive)
+            option.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this._showTagContextMenu(e, option.dataset.tag);
+            });
 
             option.addEventListener('pointerdown', (e) => {
                 if (e.button !== 0) return; // Only primary button
