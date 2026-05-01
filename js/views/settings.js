@@ -398,15 +398,19 @@ const SettingsView = {
 
         const tagListHtml = allTags.length === 0
             ? '<div class="tag-editor-empty">No tags found in this vault</div>'
-            : `<div class="tag-editor-list">${allTags.map(tag => `
-                <div class="tag-editor-row" data-tag="${escapeHtml(tag)}">
-                    <span class="tag-name">${escapeHtml(tag)}</span>
+            : `<div class="tag-editor-list">${allTags.map(tag => {
+                const isArchived = SelectionManager._archivedTags.has(tag);
+                return `
+                <div class="tag-editor-row${isArchived ? ' archived' : ''}" data-tag="${escapeHtml(tag)}">
+                    <span class="tag-name">${escapeHtml(tag)}${isArchived ? ' <span class="tag-archived-label">(archived)</span>' : ''}</span>
                     <span class="tag-count">${tagCounts[tag]} note${tagCounts[tag] !== 1 ? 's' : ''}</span>
                     <div class="tag-actions">
                         <button class="tag-action-btn rename" data-tag="${escapeHtml(tag)}">Rename</button>
+                        <button class="tag-action-btn archive" data-tag="${escapeHtml(tag)}">${isArchived ? 'Unarchive' : 'Archive'}</button>
                         <button class="tag-action-btn delete" data-tag="${escapeHtml(tag)}">Delete</button>
                     </div>
-                </div>`).join('')}</div>`;
+                </div>`;
+            }).join('')}</div>`;
 
         const modal = Modal.create({
             title: 'Manage Tags',
@@ -430,6 +434,10 @@ const SettingsView = {
 
             if (btn.classList.contains('rename')) {
                 this.startInlineRename(row, tag, modal);
+            } else if (btn.classList.contains('archive')) {
+                await SelectionManager._toggleTagArchive(tag);
+                modal.close();
+                this.openTagModal();
             } else if (btn.classList.contains('delete')) {
                 const count = Store.blocks.filter(b => b.tags?.includes(tag)).length;
                 if (confirm(`Remove "${tag}" from ${count} note${count !== 1 ? 's' : ''}?`)) {

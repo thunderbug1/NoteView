@@ -283,6 +283,17 @@
     color: var(--text-primary);
 }
 
+.tag-editor-row.archived {
+    opacity: 0.6;
+    border-style: dashed;
+}
+
+.tag-editor-row .tag-archived-label {
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 .tag-editor-row .tag-count {
     font-size: 0.8rem;
     color: var(--text-muted);
