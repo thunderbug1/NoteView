@@ -353,6 +353,11 @@ function createCodeMirrorWidgets(documentView) {
             };
             wrap.onmousedown = handleBadgeClick;
             wrap.onclick = handleBadgeClick;
+            wrap.ontouchend = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleBadgeClick(e);
+            };
             return wrap;
         }
         ignoreEvent() { return true; }
@@ -614,7 +619,7 @@ function createCodeMirrorWidgets(documentView) {
             wrap.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
             wrap.title = "Add Assignee";
 
-            wrap.onclick = (e) => {
+            const handleClick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 const blockId = view.dom.parentElement.dataset.id;
@@ -625,6 +630,13 @@ function createCodeMirrorWidgets(documentView) {
                         documentView.appendInlineField(view, this.from, this.to, 'assignee', user);
                     }
                 }, tags);
+            };
+            wrap.onmousedown = handleClick;
+            wrap.onclick = handleClick;
+            wrap.ontouchend = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClick(e);
             };
             return wrap;
         }
@@ -647,10 +659,19 @@ function createCodeMirrorWidgets(documentView) {
             wrap.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>`;
             wrap.title = "Add Priority";
 
-            wrap.onclick = (e) => {
+            const handleClick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                documentView.showPriorityMenu(e.pageX, e.pageY, view, this.from, this.to);
+                const tx = e.changedTouches?.[0]?.pageX ?? e.pageX;
+                const ty = e.changedTouches?.[0]?.pageY ?? e.pageY;
+                documentView.showPriorityMenu(tx, ty, view, this.from, this.to);
+            };
+            wrap.onmousedown = handleClick;
+            wrap.onclick = handleClick;
+            wrap.ontouchend = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleClick(e);
             };
             return wrap;
         }
