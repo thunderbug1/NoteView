@@ -302,6 +302,7 @@
 }
 
 /* Content Toolbar */
+#main:has(.settings-view) > .content-toolbar { display: none; }
 .content-toolbar {
     display: flex;
     align-items: center;
@@ -463,7 +464,8 @@
     #main:has(.capture-view) { overflow: hidden; }
     #main:has(.capture-page) { overflow: hidden; }
     #main:has(.capture-view) .content-toolbar,
-    #main:has(.capture-page) .content-toolbar { display: none; }
+    #main:has(.capture-page) .content-toolbar,
+    #main:has(.settings-view) .content-toolbar { display: none; }
     #viewContainer { padding: 1rem; overflow: visible; }
     #main:has(.capture-view) > #viewContainer,
     #main:has(.capture-page) > #viewContainer { padding: 0; }
