@@ -175,6 +175,7 @@ const QRTransfer = {
             content: `
                 <div class="qr-transfer-display">
                     <img src="${dataUrl}" alt="QR code with vault settings" />
+                    <button class="settings-btn secondary" id="qrCopyJsonBtn" style="margin-top:0.25rem">Copy JSON</button>
                     <div class="qr-transfer-warning">
                         This QR code contains API keys and git credentials. Only scan on a trusted device.
                     </div>
@@ -184,6 +185,18 @@ const QRTransfer = {
                 </div>
             `
         });
+
+        const copyBtn = modal.querySelector('#qrCopyJsonBtn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(json);
+                    showToast('Settings JSON copied to clipboard.');
+                } catch {
+                    showToast('Failed to copy to clipboard.');
+                }
+            });
+        }
     },
 
     // --- Import modal ---
