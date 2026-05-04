@@ -9,6 +9,7 @@ const GitRemote = {
         this.config = await Store.getRemoteConfig();
         if (this.config) {
             console.log('GitRemote initialized with config:', this.config.name);
+            window.GitHttp.setCredentials(this.config.auth);
         }
     },
 
@@ -34,6 +35,7 @@ const GitRemote = {
 
         // Only persist config after git operation succeeds
         this.config = { name, url, auth };
+        window.GitHttp.setCredentials(auth);
         await Store.saveRemoteConfig(this.config);
         return true;
     },

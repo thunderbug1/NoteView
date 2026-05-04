@@ -81,6 +81,7 @@ const QRTransfer = {
             if (data.g.c !== undefined) config.corsProxy = data.g.c;
             await Store.saveRemoteConfig(config);
             GitRemote.config = config;
+            window.GitHttp.setCredentials(config.auth);
         }
 
         // Apply AI settings

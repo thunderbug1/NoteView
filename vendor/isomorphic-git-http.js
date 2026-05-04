@@ -6,6 +6,12 @@
 (function () {
   'use strict';
 
+  let _auth = null;
+
+  function basicAuth({ username, password }) {
+    return 'Basic ' + btoa(username + ':' + (password || ''));
+  }
+
   function fromValue(value) {
     let queue = [value];
     return {
@@ -76,6 +82,9 @@
     if (body) {
       body = await collect(body);
     }
+    if (_auth && (_auth.username || _auth.password) && !headers['Authorization']) {
+      headers['Authorization'] = basicAuth(_auth);
+    }
     const res = await fetch(url, { method, headers, body });
     const iter =
       res.body && res.body.getReader
@@ -95,5 +104,9 @@
     };
   }
 
-  window.GitHttp = { request };
+  window.GitHttp = {
+    request,
+    setCredentials(auth) { _auth = auth || null; },
+    clearCredentials() { _auth = null; }
+  };
 })();
