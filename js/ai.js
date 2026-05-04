@@ -350,7 +350,22 @@ const AIAssistant = {
             </button>`;
         }).join('');
 
-        tabsEl.innerHTML = tabs + `<button class="ai-chat-tab-new" id="aiNewChatBtn" title="New chat">+</button>`;
+        tabsEl.innerHTML = tabs;
+
+        // Render expand footer outside scrollable area
+        const wrap = tabsEl.closest('.ai-session-list-wrap');
+        const isExpanded = wrap?.classList.contains('expanded');
+        const hiddenCount = Math.max(0, this._chats.length - 2);
+        const label = isExpanded ? 'Show less' : (hiddenCount > 0 ? hiddenCount + ' more…' : this._chats.length + ' sessions');
+        let expandEl = wrap?.querySelector('.ai-session-expand');
+        if (wrap) {
+            if (!expandEl) {
+                expandEl = document.createElement('button');
+                expandEl.className = 'ai-session-expand';
+                wrap.appendChild(expandEl);
+            }
+            expandEl.textContent = label;
+        }
 
         // Wire tab clicks
         tabsEl.querySelectorAll('.ai-chat-tab').forEach(tab => {
@@ -365,12 +380,13 @@ const AIAssistant = {
             });
         });
 
-        const newBtn = tabsEl.querySelector('#aiNewChatBtn');
-        if (newBtn) newBtn.addEventListener('click', () => {
-            this.createChat();
+        const activeTab = tabsEl.querySelector('.ai-chat-tab.active');
+        if (activeTab) activeTab.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+
+        if (expandEl) expandEl.onclick = () => {
+            wrap?.classList.toggle('expanded');
             this._renderTabs();
-            this._renderActiveChat();
-        });
+        };
 
         this._updateBadge();
     },
@@ -631,6 +647,13 @@ const AIAssistant = {
 
         const closeBtn = panel.querySelector('#aiPanelCloseBtn');
         if (closeBtn) closeBtn.addEventListener('click', () => this.closePanel());
+
+        const newChatBtn = panel.querySelector('#aiNewChatBtn');
+        if (newChatBtn) newChatBtn.addEventListener('click', () => {
+            this.createChat();
+            this._renderTabs();
+            this._renderActiveChat();
+        });
 
         // Escape to close (wired once)
         panel.addEventListener('keydown', (e) => {

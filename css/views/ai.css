@@ -64,6 +64,24 @@ body.ai-panel-open {
     animation: ai-tab-pulse 2s ease-in-out infinite;
 }
 
+.ai-panel-new-chat-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.ai-panel-new-chat-btn:hover {
+    color: var(--ai-accent);
+    background: var(--ai-accent-light);
+}
+
 .ai-panel-close-btn {
     background: transparent;
     border: none;
@@ -101,36 +119,83 @@ body.ai-panel-open {
     background: var(--bg-tertiary);
 }
 
-/* --- Chat Tabs --- */
+/* --- Session List (collapsible) --- */
+
+.ai-session-list-wrap {
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-primary);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.ai-session-list-wrap:not(.expanded) .ai-chat-tabs {
+    max-height: 90px;
+}
+
+.ai-session-list-wrap.expanded .ai-chat-tabs {
+    max-height: 40vh;
+}
+
+.ai-session-expand {
+    display: block;
+    width: 100%;
+    padding: 0.3rem 0;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+.ai-session-expand:hover {
+    color: var(--ai-accent);
+}
 
 .ai-chat-tabs {
     display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.4rem 0.6rem;
-    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    gap: 1px;
+    padding: 0.25rem 0.5rem;
     background: var(--bg-primary);
-    overflow-x: auto;
-    flex-shrink: 0;
-    scrollbar-width: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
 }
 
 .ai-chat-tabs::-webkit-scrollbar {
-    display: none;
+    width: 4px;
+}
+
+.ai-chat-tabs::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ai-chat-tabs::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
 }
 
 .ai-chat-tab {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.3rem 0.6rem;
+    gap: 0.4rem;
+    padding: 0.4rem 0.55rem;
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     font-size: 0.75rem;
     color: var(--text-secondary);
     cursor: pointer;
     white-space: nowrap;
-    max-width: 140px;
+    width: 100%;
+    box-sizing: border-box;
     transition: all 0.15s ease;
     position: relative;
     background: transparent;
@@ -146,12 +211,14 @@ body.ai-panel-open {
     border-color: var(--border);
     color: var(--text-primary);
     font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--ai-accent);
 }
 
 .ai-chat-tab-title {
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 90px;
+    flex: 1;
+    min-width: 0;
 }
 
 .ai-chat-tab-close {
@@ -165,7 +232,8 @@ body.ai-panel-open {
     line-height: 1;
 }
 
-.ai-chat-tab:hover .ai-chat-tab-close {
+.ai-chat-tab:hover .ai-chat-tab-close,
+.ai-chat-tab.active .ai-chat-tab-close {
     display: flex;
 }
 
@@ -200,29 +268,6 @@ body.ai-panel-open {
 
 .ai-chat-tab.awaiting-input {
     animation: ai-tab-pulse 2s ease-in-out infinite;
-}
-
-.ai-chat-tab-new {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border: 1px dashed var(--border);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: all 0.15s ease;
-    flex-shrink: 0;
-    font-family: inherit;
-}
-
-.ai-chat-tab-new:hover {
-    border-color: var(--ai-accent);
-    color: var(--ai-accent);
-    background: var(--ai-accent-light);
 }
 
 /* --- Chat Active Area --- */
@@ -1686,9 +1731,9 @@ body.ai-panel-open .fab {
 /* --- Focus Visible --- */
 
 .ai-panel-close-btn:focus-visible,
+.ai-panel-new-chat-btn:focus-visible,
 .ai-toolbar-settings-btn:focus-visible,
 .ai-chat-tab:focus-visible,
-.ai-chat-tab-new:focus-visible,
 .ai-preset-chip:focus-visible,
 .ai-send-btn:focus-visible,
 .ai-stop-btn:focus-visible,
