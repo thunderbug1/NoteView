@@ -47,6 +47,17 @@ const AIAssistant = {
         // Wire static header buttons once
         this._wirePanelHeader();
 
+        // Handle viewport resize across mobile breakpoint
+        window.addEventListener('resize', () => {
+            if (this._panelOpen) {
+                if (window.innerWidth <= 768) {
+                    document.body.classList.add('ai-panel-open');
+                } else {
+                    document.body.classList.remove('ai-panel-open');
+                }
+            }
+        });
+
         // Clear vault-specific state
         this._chats = [];
         this._activeChatId = null;
@@ -227,11 +238,14 @@ const AIAssistant = {
         this._panelOpen = true;
         this._panelElement.classList.add('open');
         this._panelElement.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('ai-panel-open');
 
-        // Mobile overlay
-        const overlay = document.getElementById('aiPanelOverlay');
-        if (overlay) overlay.classList.add('active');
+        // Mobile-only: scroll lock and overlay
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            document.body.classList.add('ai-panel-open');
+            const overlay = document.getElementById('aiPanelOverlay');
+            if (overlay) overlay.classList.add('active');
+        }
 
         this._renderTabs();
         this._renderActiveChat();

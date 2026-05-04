@@ -766,7 +766,8 @@ const App = {
         this._savedSidebarState = {
             leftOpen: sidebar?.classList.contains('sidebar-open') || false,
             rightOpen: sidebarRight?.classList.contains('sidebar-open') || false,
-            rightCollapsed: sidebarRight?.classList.contains('collapsed') || false
+            rightCollapsed: sidebarRight?.classList.contains('collapsed') || false,
+            aiPanelOpen: AIAssistant._panelOpen || false
         };
     },
 
@@ -822,6 +823,10 @@ const App = {
         if (state.leftOpen || state.rightOpen) {
             if (overlay) overlay.classList.add('active');
             document.body.classList.add('sidebar-open');
+        }
+
+        if (state.aiPanelOpen) {
+            AIAssistant.openPanel();
         }
 
         this._savedSidebarState = null;

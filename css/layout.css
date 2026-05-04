@@ -373,7 +373,8 @@
 #app.no-vault #sidebar,
 #app.no-vault #sidebarRight,
 #app.no-vault #sidebarRightToggle,
-#app.no-vault .sidebar-edge { display: none !important; }
+#app.no-vault .sidebar-edge,
+#app.no-vault #aiPanel { display: none !important; }
 
 /* Mobile Responsive */
 #sidebarOverlay { display: none; }
