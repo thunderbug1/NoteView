@@ -1037,6 +1037,173 @@ const SettingsView = {
                 alert('Failed to configure remote: ' + err.message);
             }
         });
+    },
+
+    openAISettingsModal() {
+        const profilesHtml = AIAssistant.profiles.length === 0
+            ? '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0">No model profiles configured.</div>'
+            : `<div class="ai-profile-list">${AIAssistant.profiles.map(p => `
+                <div class="ai-profile-item" data-profile-id="${escapeHtml(p.id)}">
+                    <div class="ai-profile-info">
+                        <div class="ai-profile-name">${escapeHtml(p.name)}</div>
+                        <div class="ai-profile-details">${escapeHtml(p.model)} · ${escapeHtml(p.endpointUrl)}</div>
+                    </div>
+                    <div class="ai-profile-actions">
+                        <button class="edit-profile-btn" data-profile-id="${escapeHtml(p.id)}">Edit</button>
+                        <button class="delete-profile-btn" data-profile-id="${escapeHtml(p.id)}">Delete</button>
+                    </div>
+                </div>`).join('')}</div>`;
+
+        const modal = Modal.create({
+            title: 'AI Settings',
+            content: `
+                <div class="settings-item" style="flex-direction:column;align-items:stretch;border:none;padding:0">
+                    <div class="settings-item" style="flex-direction:column;align-items:stretch;border:none;padding:0">
+                        <label style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.5rem">Model Profiles</label>
+                        ${profilesHtml}
+                        <button class="ai-add-profile-btn" id="modalAddProfileBtn" style="margin-top:0.5rem">+ Add Model Profile</button>
+                        <div id="modalProfileFormContainer"></div>
+                    </div>
+                    <div class="settings-item" style="border:none;padding:0.75rem 0 0">
+                        <button id="modalManagePresetsBtn" class="settings-btn secondary">Manage Presets...</button>
+                    </div>
+                    <div class="settings-item" style="border:none;padding:0.5rem 0 0">
+                        <button id="modalImportAIBtn" class="settings-btn secondary">Import from Vault...</button>
+                    </div>
+                </div>
+            `,
+            modalClass: 'tag-modal ai-modal',
+            width: '480px'
+        });
+
+        // Add profile
+        modal.querySelector('#modalAddProfileBtn').addEventListener('click', () => {
+            this._showProfileFormInContainer(modal.querySelector('#modalProfileFormContainer'), null, modal);
+        });
+
+        // Edit/delete profile
+        modal.querySelectorAll('.edit-profile-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const profile = AIAssistant.profiles.find(p => p.id === btn.dataset.profileId);
+                if (profile) this._showProfileFormInContainer(modal.querySelector('#modalProfileFormContainer'), profile, modal);
+            });
+        });
+
+        modal.querySelectorAll('.delete-profile-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await AIAssistant.deleteProfile(btn.dataset.profileId);
+                modal.close();
+                this.openAISettingsModal();
+            });
+        });
+
+        // Manage presets
+        modal.querySelector('#modalManagePresetsBtn').addEventListener('click', () => {
+            this._openPresetModal();
+        });
+
+        // Import from vault
+        const importBtn = modal.querySelector('#modalImportAIBtn');
+        if (importBtn) importBtn.addEventListener('click', () => {
+            this._openImportVaultPicker();
+        });
+    },
+
+    _showProfileFormInContainer(container, existingProfile, parentModal) {
+        const isEdit = !!existingProfile;
+        const p = existingProfile || { name: '', endpointUrl: '', model: '' };
+        const currentKey = isEdit ? (AIAssistant._apiKeys[existingProfile.id] || '') : '';
+
+        container.innerHTML = `
+            <div class="ai-profile-form" style="margin-top:0.5rem">
+                <div class="ai-form-row">
+                    <label>Name</label>
+                    <input type="text" id="modalProfileName" value="${escapeHtml(p.name)}" placeholder="e.g. GPT-4o">
+                </div>
+                <div class="ai-form-row">
+                    <label>Endpoint URL</label>
+                    <input type="url" id="modalProfileEndpoint" value="${escapeHtml(p.endpointUrl)}" placeholder="https://api.openai.com/v1">
+                </div>
+                <div class="ai-form-row">
+                    <label>API Key</label>
+                    <div class="ai-api-key-field">
+                        <input type="password" id="modalProfileApiKey" value="${escapeHtml(currentKey)}" placeholder="${isEdit ? 'Leave blank to keep current' : 'sk-...'}" autocomplete="off">
+                        <button class="ai-toggle-key-visibility" id="modalToggleKeyVisibility" type="button" title="Show/hide key">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="ai-form-row">
+                    <label>Model</label>
+                    <input type="text" id="modalProfileModel" value="${escapeHtml(p.model)}" placeholder="gpt-4o">
+                </div>
+                <div class="ai-form-actions">
+                    <button class="ai-form-cancel" id="modalProfileCancel">Cancel</button>
+                    <button class="ai-form-test" id="modalProfileTest">Test</button>
+                    <button class="ai-form-save" id="modalProfileSave">${isEdit ? 'Update' : 'Add'}</button>
+                </div>
+            </div>
+        `;
+
+        container.querySelector('#modalProfileCancel').addEventListener('click', () => {
+            container.innerHTML = '';
+        });
+
+        container.querySelector('#modalToggleKeyVisibility').addEventListener('click', () => {
+            const input = container.querySelector('#modalProfileApiKey');
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+        });
+
+        container.querySelector('#modalProfileSave').addEventListener('click', async () => {
+            const name = container.querySelector('#modalProfileName').value.trim();
+            const endpointUrl = container.querySelector('#modalProfileEndpoint').value.trim();
+            const apiKey = container.querySelector('#modalProfileApiKey').value;
+            const model = container.querySelector('#modalProfileModel').value.trim() || 'gpt-4o';
+
+            if (!name || !endpointUrl) return;
+
+            if (isEdit) {
+                await AIAssistant.updateProfile(existingProfile.id, { name, endpointUrl, apiKey, model });
+            } else {
+                await AIAssistant.createProfile({ name, endpointUrl, apiKey, model });
+            }
+
+            container.innerHTML = '';
+            parentModal.close();
+            this.openAISettingsModal();
+        });
+
+        container.querySelector('#modalProfileTest').addEventListener('click', async () => {
+            const endpointUrl = container.querySelector('#modalProfileEndpoint').value.trim();
+            const apiKey = container.querySelector('#modalProfileApiKey').value;
+            const model = container.querySelector('#modalProfileModel').value.trim() || 'gpt-4o';
+            const testBtn = container.querySelector('#modalProfileTest');
+
+            if (!endpointUrl || !apiKey) {
+                testBtn.textContent = 'Fill fields first';
+                testBtn.style.color = 'var(--danger)';
+                return;
+            }
+
+            testBtn.disabled = true;
+            testBtn.textContent = 'Testing...';
+            testBtn.style.color = '';
+
+            try {
+                const response = await fetch(endpointUrl.replace(/\/+$/, '') + '/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ model, messages: [{ role: 'user', content: 'ok' }], max_tokens: 1 })
+                });
+                testBtn.textContent = response.ok ? 'Connected' : `Failed: HTTP ${response.status}`;
+                testBtn.style.color = response.ok ? 'var(--success)' : 'var(--danger)';
+            } catch (err) {
+                testBtn.textContent = 'Failed: ' + err.message.slice(0, 30);
+                testBtn.style.color = 'var(--danger)';
+            }
+            testBtn.disabled = false;
+        });
     }
 };
 

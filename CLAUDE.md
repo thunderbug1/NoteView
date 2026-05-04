@@ -64,7 +64,7 @@ All core modules are plain objects on `window` — there are no ES module import
 - **`GitFSAdapter`** (`js/gitFs.js`) — Class exported as `window.GitFSAdapter`. Filesystem adapter that bridges the browser File System Access API with isomorphic-git's expected `fs.promises` interface.
 - **`GitRemote`** (`js/gitRemote.js`) — Push/pull to remote git repositories.
 - **`SyncManager`** (`js/syncManager.js`) — Orchestrates automatic git remote syncing. Handles triggers (interval, idle, commit threshold), network status tracking, toolbar indicator, and three-way merge conflict resolution with per-file UI. Delegates push/pull to `GitRemote`.
-- **`AIAssistant`** (`js/ai.js`) — OpenAI-compatible LLM integration for note transformation. Supports multiple model profiles, configurable presets, streaming responses, diff-based apply, and batch operations. API keys stored separately in `.noteview/keys.json`.
+- **`AIAssistant`** (`js/ai.js`) — Right-side chat panel with multiple concurrent chats, context management, and Transform/Ask modes. Integrates OpenAI-compatible LLM endpoints for note transformation and Q&A. Supports multiple model profiles, configurable presets, streaming responses, inline diff cards, batch review modals, and per-chat context (visible notes, selected notes). Chat state is vault-specific (cleared on vault switch). API keys stored separately in `.noteview/keys.json`. Settings accessible via gear icon in panel header or the Settings view. Capture view AI (format/interpret dictated text) operates independently of the chat panel.
 - **`BlockSelector`** (`js/blockSelector.js`) — Multi-select mode for bulk operations. Document view selects entire blocks; kanban view selects individual tasks.
 - **`SelectionManager`** (`js/selectionManager.js`) — Manages sidebar filter state: time selection, context tags (multi-select with exclusion), contact filter (single-select), and context navigation history. Updates tag counts and UI.
 - **`UndoRedoManager`** (`js/undoRedoManager.js`) — Command-pattern undo/redo for block operations, including batch commands. State persisted to IndexedDB per session.
@@ -85,7 +85,7 @@ Each view is a global object with a `render(blocks)` method called by `App.rende
 - **`KanbanView`** (`js/views/kanban.js`) — Drag-and-drop task board. Columns map to task states (`[ ]`, `[/]`, `[x]`, `[b]`, `[-]`). Event handling split into `setupCardDragDrop()`, `setupCardClickHandlers()`, `setupMobileInteractions()`, `setupColumnDropTargets()`.
 - **`TimelineView`** (`js/views/timeline.js`) — Git-history-based task timeline. Has its own cache that's invalidated on save/delete.
 - **`HistoryView`** (`js/views/history.js`) — Version browser with side-by-side diff using CodeMirror's merge view.
-- **`SettingsView`** (`js/views/settings.js`) — App configuration: vault info, sync settings, AI model profiles, keyboard shortcut customization.
+- **`SettingsView`** (`js/views/settings.js`) — App configuration: vault info, sync settings, AI model profiles, keyboard shortcut customization. Also provides `openAISettingsModal()` for the AI panel's gear icon (profiles CRUD, presets, import from vault, test connection).
 
 ### Data model
 
@@ -124,3 +124,4 @@ CodeMirror 6 is loaded as a vendored bundle from `vendor/codemirror.js`, which s
 - [Git Integration](docs/git-integration.md) — GitFSAdapter, init/commit/history/diff flow, remote operations, timeline data extraction
 - [Task System](docs/task-system.md) — Task syntax and states, parsing, kanban drag-and-drop, timeline, context menus, computed tags, dependencies
 - [Filtering & UI](docs/filtering-and-ui.md) — SelectionManager, filter groups, tag system, contacts, time filtering, modal factory, sidebar, theming, mobile
+- [AI Assistant System](docs/ai-system.md) — Chat panel architecture, multi-chat model, context management, Transform/Ask modes, streaming, diff cards, batch review, settings integration

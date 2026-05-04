@@ -429,27 +429,33 @@ const BlockSelector = {
     },
 
     bulkSendToAI() {
-        const ids = this.getSelectedIds();
-        if (ids.length === 0) return;
-
         if (!window.AIAssistant || !AIAssistant.isConfigured()) return;
 
+        let contextIds;
         if (this._isKanban()) {
-            // Collect task texts and open single AI overlay with them
-            const taskTexts = [];
-            for (const taskId of ids) {
-                const task = this._getTaskById(taskId);
-                if (task) taskTexts.push(task.text);
-            }
-            // Use a virtual block approach: open batch with the parent blocks, pre-filtered
             const blockIds = new Set();
-            for (const taskId of ids) {
+            for (const taskId of this.getSelectedIds()) {
                 const card = this._getTaskCard(taskId);
                 if (card) blockIds.add(card.dataset.blockId);
             }
-            AIAssistant.openBatchOverlay(blockIds);
+            contextIds = [...blockIds];
         } else {
-            AIAssistant.openBatchOverlay(this.selectedIds);
+            contextIds = [...this.selectedIds];
         }
+
+        if (contextIds.length === 0) return;
+
+        // Create a fresh chat with the selected notes as context, then open panel
+        const chat = AIAssistant.createChat({
+            contextBlockIds: contextIds,
+            mode: 'transform'
+        });
+
+        const firstBlock = Store.blocks.find(b => b.id === contextIds[0]);
+        chat.title = contextIds.length === 1 && firstBlock
+            ? AIAssistant._extractTitle(firstBlock)
+            : `${contextIds.length} notes`;
+
+        AIAssistant.openPanel();
     }
 };

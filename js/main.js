@@ -563,18 +563,33 @@ const App = {
                     const cmContainer = activeEditor?.closest('.codemirror-container');
                     const blockId = cmContainer?.dataset.id;
                     if (blockId && blockId !== 'new') {
-                        AIAssistant.openOverlay(blockId);
+                        AIAssistant.togglePanel(blockId);
+                    } else {
+                        AIAssistant.togglePanel();
                     }
                 }
             }
 
-            // Batch AI shortcut
+            // Batch AI shortcut — opens panel with all visible notes as context
             if (currentCombo === 'Ctrl+Shift+B') {
                 e.preventDefault();
                 if (!AIAssistant.isConfigured()) {
                     showToast('Enable AI Features in Settings first');
                 } else {
-                    AIAssistant.openBatchOverlay();
+                    const blocks = Store.getFilteredBlocks();
+                    const contextIds = blocks.map(b => b.id);
+                    if (AIAssistant._panelOpen) {
+                        AIAssistant.closePanel();
+                    } else if (contextIds.length > 0) {
+                        const chat = AIAssistant.createChat({
+                            contextBlockIds: contextIds,
+                            mode: 'transform',
+                            title: `${contextIds.length} notes`
+                        });
+                        AIAssistant.openPanel();
+                    } else {
+                        AIAssistant.openPanel();
+                    }
                 }
             }
 
@@ -641,12 +656,20 @@ const App = {
                     showToast('Enable AI Features in Settings first');
                     return;
                 }
-                AIAssistant.openBatchOverlay();
+                AIAssistant.togglePanel();
             });
         }
 
         // Toolbar sync button
         this._setupSyncStatusIndicator();
+
+        // AI panel overlay (mobile close)
+        const aiOverlay = document.getElementById('aiPanelOverlay');
+        if (aiOverlay) {
+            aiOverlay.addEventListener('click', () => {
+                AIAssistant.closePanel();
+            });
+        }
 
         this.setupSidebarTagListeners();
 
@@ -715,6 +738,7 @@ const App = {
         if (view === 'settings') {
             this._saveSidebarState();
             this._closeSidebars();
+            AIAssistant.closePanel();
         }
 
         // Note: Don't invalidate timeline cache when switching away

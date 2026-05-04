@@ -517,7 +517,7 @@ const DocumentView = {
                         return;
                     }
                     const id = btn.dataset.id;
-                    if (id && id !== 'new') AIAssistant.openOverlay(id);
+                    if (id && id !== 'new') AIAssistant.openPanel(id);
                 });
             });
         }
@@ -589,7 +589,7 @@ const DocumentView = {
                 }
                 const blockId = btn.dataset.id;
                 if (blockId && blockId !== 'new') {
-                    AIAssistant.openOverlay(blockId);
+                    AIAssistant.openPanel(blockId);
                 }
             });
         });
