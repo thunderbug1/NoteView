@@ -346,6 +346,12 @@
     cursor: pointer;
 }
 
+.ai-pernote-toggle.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* --- Context Section (per-chat) --- */
 
 .ai-context-section {
