@@ -58,10 +58,24 @@ const AIAssistant = {
             }
         });
 
-        // Clear vault-specific state
-        this._chats = [];
-        this._activeChatId = null;
-        this._chatIdCounter = 0;
+        // Load persisted chats for this vault
+        const vaultName = Store.directoryHandle?.name;
+        if (vaultName) {
+            const saved = await Store.loadChatHistory(vaultName);
+            if (saved && saved.length > 0) {
+                this._chats = this._deserializeChats(saved);
+                this._chatIdCounter = Math.max(...this._chats.map(c => {
+                    const num = parseInt(c.id.replace('chat-', ''));
+                    return isNaN(num) ? 0 : num;
+                }), 0);
+                this._activeChatId = this._chats[this._chats.length - 1].id;
+            } else {
+                this._chats = [];
+            }
+        } else {
+            this._chats = [];
+        }
+        this._activeChatId = this._activeChatId || null;
 
         if (this._panelOpen) {
             this.closePanel();
@@ -310,6 +324,7 @@ const AIAssistant = {
         this._activeChatId = chatId;
         this._renderTabs();
         this._renderActiveChat();
+        this.saveChats();
     },
 
     closeChat(chatId) {
@@ -330,6 +345,7 @@ const AIAssistant = {
         this._renderTabs();
         this._renderActiveChat();
         this._updateBadge();
+        this.saveChats();
     },
 
     _updateBadge() {
@@ -1021,6 +1037,7 @@ const AIAssistant = {
         this._renderActiveChat();
         this._renderTabs();
         this.showInlineDiffs();
+        this.saveChats();
     },
 
     async _readChatStream(response, chat, msgId) {
@@ -1184,6 +1201,7 @@ const AIAssistant = {
 
         this._renderMessages(chat);
         this._renderTabs();
+        this.saveChats();
     },
 
     _rejectDiff(chat, msgId) {
@@ -1197,6 +1215,43 @@ const AIAssistant = {
 
         this._renderMessages(chat);
         this._renderTabs();
+        this.saveChats();
+    },
+
+    // ==============================
+    // Chat Persistence
+    // ==============================
+
+    _serializeChats() {
+        return this._chats.map(chat => ({
+            ...chat,
+            contextBlockIds: [...chat.contextBlockIds],
+            abortController: undefined,
+            diffEditorView: undefined,
+            streamingResponse: '',
+            state: chat.state === 'streaming' ? 'idle' : chat.state
+        }));
+    },
+
+    _deserializeChats(data) {
+        return data.map(chat => ({
+            ...chat,
+            contextBlockIds: new Set(chat.contextBlockIds || []),
+            abortController: null,
+            diffEditorView: null,
+            streamingResponse: '',
+            state: chat.state || 'idle'
+        }));
+    },
+
+    async saveChats() {
+        const vaultName = Store.directoryHandle?.name;
+        if (!vaultName) return;
+        try {
+            await Store.saveChatHistory(vaultName, this._serializeChats());
+        } catch (e) {
+            console.warn('[AI] Failed to save chat history:', e);
+        }
     },
 
     // ==============================
@@ -1404,6 +1459,7 @@ const AIAssistant = {
         this._renderActiveChat();
         this._renderTabs();
         this.showInlineDiffs();
+        this.saveChats();
     },
 
     // ==============================
@@ -1704,6 +1760,7 @@ const AIAssistant = {
         const pending = chat.messages.filter(m => m.type === 'batch' && m.results.some(r => r.status === 'pending'));
         chat.state = pending.length > 0 ? 'awaiting_input' : 'idle';
         this._renderTabs();
+        this.saveChats();
     },
 
     // ==============================

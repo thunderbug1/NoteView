@@ -50,7 +50,7 @@ const Store = {
     // IndexedDB for persistence
     db: null,
     DB_NAME: 'NoteViewDB',
-    DB_VERSION: 2,
+    DB_VERSION: 3,
     STORE_NAME: 'handles',
     VIEW_PREFERENCES_STORAGE_KEY: 'noteview-view-preferences',
     CURRENT_VIEW_STORAGE_KEY: 'noteview-current-view',
@@ -100,6 +100,10 @@ const Store = {
                 }
             };
 
+            request.onblocked = () => {
+                console.warn('IndexedDB upgrade blocked — close other tabs');
+            };
+
             request.onsuccess = () => {
                 if (!completed) {
                     completed = true;
@@ -120,6 +124,10 @@ const Store = {
                 if (!db.objectStoreNames.contains('undoRedoState')) {
                     console.log('Creating undoRedoState object store');
                     db.createObjectStore('undoRedoState');
+                }
+                if (!db.objectStoreNames.contains('chatHistory')) {
+                    console.log('Creating chatHistory object store');
+                    db.createObjectStore('chatHistory');
                 }
             };
 
@@ -359,6 +367,50 @@ const Store = {
             } catch (e) {
                 // If object store doesn't exist yet (e.g., during DB upgrade), return null
                 console.warn('Exception in getUndoRedoState:', e.name, e.message);
+                resolve(null);
+            }
+        });
+    },
+
+    async saveChatHistory(vaultName, chats) {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return;
+        }
+        return new Promise((resolve, reject) => {
+            try {
+                if (!this.db.objectStoreNames.contains('chatHistory')) {
+                    return resolve();
+                }
+                const transaction = this.db.transaction(['chatHistory'], 'readwrite');
+                const store = transaction.objectStore('chatHistory');
+                const request = store.put(chats, `chatHistory::${vaultName}`);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+                transaction.onerror = () => reject(transaction.error);
+            } catch (e) {
+                console.warn('Exception in saveChatHistory:', e.name, e.message);
+                reject(e);
+            }
+        });
+    },
+
+    async loadChatHistory(vaultName) {
+        if (!this.db) await this.initDB();
+        if (!this.db) return null;
+        return new Promise((resolve) => {
+            try {
+                if (!this.db.objectStoreNames.contains('chatHistory')) {
+                    return resolve(null);
+                }
+                const transaction = this.db.transaction(['chatHistory'], 'readonly');
+                const store = transaction.objectStore('chatHistory');
+                const request = store.get(`chatHistory::${vaultName}`);
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => resolve(null);
+                transaction.onerror = () => resolve(null);
+            } catch (e) {
+                console.warn('Exception in loadChatHistory:', e.name, e.message);
                 resolve(null);
             }
         });

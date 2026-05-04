@@ -159,6 +159,16 @@ Accept/reject from either the inline overlay or the sidebar diff card calls the 
 | `wireInlineDiffEvents(article)` | DocumentView | Attaches toggle/accept/reject handlers |
 | `_createInlineDiffEditor(container, orig, mod)` | DocumentView | Lazy creates read-only merge view |
 
+## Chat Persistence
+
+Chat sessions are persisted to IndexedDB (`chatHistory` store in `NoteViewDB`) and restored on page reload.
+
+- **Storage key**: `chatHistory::{vaultName}` — per-vault isolation
+- **Serialization**: `contextBlockIds` (Set → Array), non-serializable fields (`abortController`, `diffEditorView`, `streamingResponse`) are stripped. Streaming chats are reset to `idle` on reload.
+- **Save triggers**: after `_sendToChat`, `_sendPerNote`, `_acceptDiff`, `_rejectDiff`, `_createChat`, `closeChat`, `switchChat`, `_finalizeBatchInChat`
+- **Load**: in `AIAssistant.init()`, after vault is known. Restores `_chats`, `_chatIdCounter`, and `_activeChatId`.
+- **Vault switch**: loads the new vault's chats (existing behavior — `init()` is called on vault switch).
+
 ## Settings
 
 Accessible via:

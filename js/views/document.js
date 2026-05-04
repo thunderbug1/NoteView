@@ -295,7 +295,6 @@ const DocumentView = {
     showPendingInlineDiffs() {
         if (!window.AIAssistant) return;
         const pendingIds = AIAssistant.getPendingDiffBlockIds();
-        console.log('[DocView] showPendingInlineDiffs, pending block IDs:', [...pendingIds]);
         for (const blockId of pendingIds) {
             const article = document.querySelector(`article.block[data-id="${CSS.escape(blockId)}"]`);
             if (!article || article.querySelector('.inline-diff-overlay')) continue;
@@ -309,6 +308,16 @@ const DocumentView = {
 
             editorDiv.insertAdjacentHTML('afterend', this.renderInlineDiffOverlay(blockId, pendingDiffs));
             this.wireInlineDiffEvents(article);
+
+            // Auto-create the diff editor for the expanded-by-default body
+            const body = article.querySelector('.inline-diff-body.visible');
+            if (body && !body.dataset.initialized) {
+                body.dataset.initialized = 'true';
+                const overlay = article.querySelector('.inline-diff-overlay');
+                const chat = AIAssistant._chats?.find(c => c.id === overlay?.dataset.chatId);
+                const msg = chat?.messages.find(m => m.id === overlay?.dataset.diffId);
+                if (msg) this._createInlineDiffEditor(body, msg.original, msg.modified);
+            }
         }
     },
 
