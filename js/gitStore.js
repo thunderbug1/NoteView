@@ -203,6 +203,20 @@ const GitStore = {
         }
     },
 
+    async getMergeBase(localOid, remoteOid) {
+        if (!this.git || !this.fs) return null;
+        try {
+            return await this.git.findMergeBase({
+                fs: this.fs,
+                dir: this.dir,
+                oids: [localOid, remoteOid]
+            });
+        } catch (err) {
+            console.warn('Failed to find merge base:', err);
+            return null;
+        }
+    },
+
     async getAllFilesAtCommit(oid) {
         if (!this.git || !this.fs) return {};
         

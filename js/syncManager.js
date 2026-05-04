@@ -127,11 +127,7 @@ const SyncManager = {
                 });
             } else if (this._isConflictError(err)) {
                 this._lastError = err.message;
-                this._setStatus('conflict', 'Merge conflict detected');
-                showToast('Sync conflict: remote has changes. Manual resolution needed.', {
-                    actionLabel: 'Details',
-                    action: () => this._showConflictHelp()
-                });
+                this._handleMergeConflict();
             } else {
                 this._lastError = err.message;
                 this._setStatus('error', err.message);
@@ -275,58 +271,484 @@ const SyncManager = {
         return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('type: failed');
     },
 
-    async _showConflictHelp() {
+    async _handleMergeConflict() {
+        this._setStatus('conflict', 'Analyzing conflicts...');
+
+        // The failed pull may have left the index/working tree in a dirty merged state.
+        // Reset to local HEAD so we can analyze cleanly.
+        try {
+            const { git, fs, dir } = GitStore;
+            const ref = this._config.branch || 'main';
+            await git.checkout({ fs, dir, ref, force: true });
+        } catch (resetErr) {
+            console.warn('[SyncManager] failed to reset working tree after failed pull:', resetErr);
+        }
+
+        try {
+            const conflictData = await this._detectConflicts();
+
+            if (conflictData.files.length === 0) {
+                // No actual file conflicts — try sync again
+                this._setStatus('idle', 'No conflicts found');
+                this.sync();
+                return;
+            }
+
+            if (conflictData.allAutoResolved) {
+                // All conflicts auto-resolvable — apply without modal
+                await this._applyMergeResolution(conflictData);
+                const count = conflictData.files.length;
+                showToast(`Sync resolved (${count} file${count !== 1 ? 's' : ''} merged automatically).`);
+                return;
+            }
+
+            // Show per-file resolution modal
+            this._setStatus('conflict', 'Merge conflict — manual resolution needed');
+            this._showConflictResolutionModal(conflictData);
+        } catch (err) {
+            console.error('[SyncManager] conflict detection failed:', err);
+            this._lastError = err.message;
+            this._setStatus('conflict', 'Conflict analysis failed: ' + err.message);
+            showToast('Conflict analysis failed: ' + err.message);
+        }
+    },
+
+    async _detectConflicts() {
+        const { git, fs, dir } = GitStore;
+        const ref = this._config.branch || 'main';
+        const remoteName = GitRemote.config.name;
+
+        // Resolve local and remote HEAD
+        const localOid = await git.resolveRef({ fs, dir, ref: 'HEAD' });
+        let remoteOid;
+        try {
+            remoteOid = await git.resolveRef({ fs, dir, ref: `refs/remotes/${remoteName}/${ref}` });
+        } catch (e) {
+            // Remote ref not available — fetch first
+            await git.fetch({
+                fs, dir, http: window.GitHttp,
+                remote: remoteName, ref,
+                corsProxy: GitRemote._getCorsProxy(),
+                onAuth: () => GitRemote.config.auth
+            });
+            remoteOid = await git.resolveRef({ fs, dir, ref: `refs/remotes/${remoteName}/${ref}` });
+        }
+
+        if (localOid === remoteOid) {
+            return { localOid, remoteOid, baseOid: localOid, files: [], allAutoResolved: true };
+        }
+
+        // Find merge base
+        const baseOid = await GitStore.getMergeBase(localOid, remoteOid);
+
+        let localChanges, remoteChanges;
+        if (baseOid) {
+            localChanges = await GitStore.getChangedFilesBetween(baseOid, localOid);
+            remoteChanges = await GitStore.getChangedFilesBetween(baseOid, remoteOid);
+
+            // Fallback when TREE walker fails: read full file trees and diff manually
+            if (!localChanges || !remoteChanges) {
+                console.warn('[SyncManager] getChangedFilesBetween failed, using full tree comparison');
+                const baseFiles = await GitStore.getAllFilesAtCommit(baseOid);
+                const localFiles = !localChanges ? await GitStore.getAllFilesAtCommit(localOid) : null;
+                const remoteFiles = !remoteChanges ? await GitStore.getAllFilesAtCommit(remoteOid) : null;
+
+                if (!localChanges) {
+                    localChanges = {};
+                    const lf = localFiles || {};
+                    for (const fp of new Set([...Object.keys(baseFiles), ...Object.keys(lf)])) {
+                        if (baseFiles[fp] !== lf[fp]) {
+                            localChanges[fp] = fp in lf ? lf[fp] : null;
+                        }
+                    }
+                }
+                if (!remoteChanges) {
+                    remoteChanges = {};
+                    const rf = remoteFiles || {};
+                    for (const fp of new Set([...Object.keys(baseFiles), ...Object.keys(rf)])) {
+                        if (baseFiles[fp] !== rf[fp]) {
+                            remoteChanges[fp] = fp in rf ? rf[fp] : null;
+                        }
+                    }
+                }
+            }
+        } else {
+            // No common ancestor — compare full file trees
+            localChanges = await GitStore.getAllFilesAtCommit(localOid);
+            remoteChanges = await GitStore.getAllFilesAtCommit(remoteOid);
+        }
+
+        if (!localChanges && !remoteChanges) {
+            return { localOid, remoteOid, baseOid, files: [], allAutoResolved: true };
+        }
+
+        localChanges = localChanges || {};
+        remoteChanges = remoteChanges || {};
+
+        // Build union of all changed files and categorize
+        const allPaths = new Set([...Object.keys(localChanges), ...Object.keys(remoteChanges)]);
+        const files = [];
+        let allAutoResolved = true;
+
+        for (const filepath of allPaths) {
+            const inLocal = filepath in localChanges;
+            const inRemote = filepath in remoteChanges;
+            const localContent = localChanges[filepath];   // null = deleted locally (undefined = not changed)
+            const remoteContent = remoteChanges[filepath]; // null = deleted remotely
+
+            let category, resolution;
+
+            if (inLocal && !inRemote) {
+                category = 'local-only';
+                resolution = 'local';
+            } else if (!inLocal && inRemote) {
+                category = 'remote-only';
+                resolution = 'remote';
+            } else if (localContent === null && remoteContent === null) {
+                category = 'both-delete';
+                resolution = 'remote'; // accept deletion
+            } else if (localContent !== null && remoteContent === null) {
+                category = 'local-edit-remote-delete';
+                resolution = null;
+                allAutoResolved = false;
+            } else if (localContent === null && remoteContent !== null) {
+                category = 'local-delete-remote-edit';
+                resolution = null;
+                allAutoResolved = false;
+            } else if (localContent === remoteContent) {
+                // Both changed to same content — auto-resolve
+                category = 'same-change';
+                resolution = 'local';
+            } else {
+                category = 'both-changed';
+                resolution = null;
+                allAutoResolved = false;
+            }
+
+            // Load base content for files needing manual resolution
+            let baseContent = null;
+            if (!resolution && baseOid) {
+                baseContent = await GitStore.getFileAtCommit(filepath, baseOid);
+            }
+
+            files.push({
+                filepath,
+                category,
+                localContent: inLocal ? localContent : undefined,
+                remoteContent: inRemote ? remoteContent : undefined,
+                baseContent,
+                resolution
+            });
+        }
+
+        return { localOid, remoteOid, baseOid, files, allAutoResolved };
+    },
+
+    async _applyMergeResolution(conflictData) {
+        const { git, fs, dir } = GitStore;
+        const { files, localOid, remoteOid } = conflictData;
+        const ref = this._config.branch || 'main';
+        const remoteName = GitRemote.config.name;
+
+        // Write resolved files to working directory
+        for (const f of files) {
+            const choice = f.resolution || 'local';
+
+            if (choice === 'local') {
+                // Keep local version — file is already on disk (or already deleted)
+                // If file was deleted locally, ensure it's removed
+                if (f.localContent === null || f.localContent === undefined) {
+                    if (f.category === 'local-delete-remote-edit' || f.category === 'both-delete') {
+                        try { await fs.unlink(f.filepath); } catch (e) { /* already gone */ }
+                        await git.remove({ fs, dir, filepath: f.filepath }).catch(() => {});
+                    }
+                } else {
+                    // File exists locally with correct content — just stage it
+                    await git.add({ fs, dir, filepath: f.filepath });
+                }
+            } else {
+                // Take remote version
+                if (f.remoteContent === null || f.remoteContent === undefined) {
+                    // Remote deleted this file — remove it locally
+                    try { await fs.unlink(f.filepath); } catch (e) { /* already gone */ }
+                    await git.remove({ fs, dir, filepath: f.filepath }).catch(() => {});
+                } else {
+                    // Write remote content to file
+                    await fs.writeFile(f.filepath, new TextEncoder().encode(f.remoteContent));
+                    await git.add({ fs, dir, filepath: f.filepath });
+                }
+            }
+        }
+
+        // Create merge commit with both parents
+        await git.commit({
+            fs, dir,
+            author: GitStore.author,
+            message: 'Merge: resolved sync conflicts',
+            parent: [localOid, remoteOid]
+        });
+
+        // Push normally (merge commit has remote HEAD as parent, so no force needed)
+        await git.push({
+            fs, dir,
+            http: window.GitHttp,
+            remote: remoteName,
+            ref,
+            corsProxy: GitRemote._getCorsProxy(),
+            onAuth: () => GitRemote.config.auth
+        });
+
+        // Post-merge cleanup
+        this._pendingCommits = 0;
+        this._lastError = null;
+        this._setStatus('idle', 'Merge resolved');
+
+        if (window.App && typeof App.render === 'function') {
+            await Store.loadBlocks();
+            Store._filteredBlocksCache.invalidate();
+            SelectionManager.updateTagCounts();
+            TimelineView.invalidateRawDataCache();
+            TimelineView.invalidateCache();
+            App.render();
+        }
+    },
+
+    async _showConflictResolutionModal(conflictData) {
+        const { files, localOid, remoteOid } = conflictData;
+        const autoResolved = files.filter(f => f.resolution);
+        const needsResolution = files.filter(f => !f.resolution);
+
+        // Auto-resolved section HTML
+        let autoHtml = '';
+        if (autoResolved.length > 0) {
+            const autoItems = autoResolved.map(f => {
+                const label = f.resolution === 'local' ? 'kept local' : 'took remote';
+                const icon = f.category === 'both-delete' ? 'deleted' :
+                             f.category === 'local-only' ? 'kept local' :
+                             f.category === 'same-change' ? 'identical changes' : 'took remote';
+                return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.85rem">
+                    <span style="color:var(--color-success,#10b981);font-size:0.75rem">&#10003;</span>
+                    <span style="color:var(--text-secondary)">${escapeHtml(f.filepath)}</span>
+                    <span style="color:var(--text-muted);font-size:0.8rem;margin-left:auto">${escapeHtml(icon)}</span>
+                </div>`;
+            }).join('');
+
+            autoHtml = `
+                <div style="margin-bottom:0.75rem">
+                    <button id="autoResolvedToggle" style="
+                        display:flex;align-items:center;gap:0.4rem;width:100%;padding:0.5rem 0.75rem;
+                        background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm,6px);
+                        cursor:pointer;font-size:0.85rem;color:var(--text-secondary);text-align:left;font-family:inherit
+                    ">
+                        <span style="color:var(--color-success,#10b981)">&#10003;</span>
+                        Auto-resolved (${autoResolved.length} file${autoResolved.length !== 1 ? 's' : ''})
+                        <span style="margin-left:auto;font-size:0.7rem">&#9662;</span>
+                    </button>
+                    <div id="autoResolvedList" style="display:none;padding:0.5rem 0.75rem;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm,6px) var(--radius-sm,6px)">
+                        ${autoItems}
+                    </div>
+                </div>`;
+        }
+
+        // Per-file conflict cards
+        const conflictCardsHtml = needsResolution.map((f, i) => {
+            const localLabel = f.category === 'local-delete-remote-edit' ? 'Keep Deletion' :
+                               f.category === 'local-edit-remote-delete' ? 'Keep Local' : 'Keep Local';
+            const remoteLabel = f.category === 'local-edit-remote-delete' ? 'Accept Deletion' :
+                                f.category === 'local-delete-remote-edit' ? 'Take Remote' : 'Take Remote';
+
+            // Build preview snippets (first 3 non-empty lines of each version)
+            const localSnippet = f.localContent
+                ? f.localContent.split('\n').filter(l => l.trim()).slice(0, 3).map(l => escapeHtml(l)).join('<br>')
+                : '<em style="color:var(--text-muted)">deleted</em>';
+            const remoteSnippet = f.remoteContent
+                ? f.remoteContent.split('\n').filter(l => l.trim()).slice(0, 3).map(l => escapeHtml(l)).join('<br>')
+                : '<em style="color:var(--text-muted)">deleted</em>';
+
+            // Diff preview
+            let diffPreviewHtml = '';
+            if (f.localContent !== null && f.localContent !== undefined &&
+                f.remoteContent !== null && f.remoteContent !== undefined) {
+                const diffLines = this._computeLineDiff(f.localContent, f.remoteContent);
+                const changedCount = diffLines.filter(l => l.type === 'added' || l.type === 'removed').length;
+                const diffBodyId = 'mergeDiff_' + i;
+                const diffLinesHtml = diffLines.map(l => {
+                    const escaped = escapeHtml(l.text);
+                    if (l.type === 'removed') return `<div style="background:rgba(244,63,94,0.15);color:var(--color-danger,#f44);padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all">- ${escaped}</div>`;
+                    if (l.type === 'added') return `<div style="background:rgba(16,185,129,0.15);color:var(--color-success,#10b981);padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all">+ ${escaped}</div>`;
+                    return `<div style="padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all;color:var(--text-secondary)">&nbsp; ${escaped}</div>`;
+                }).join('');
+
+                diffPreviewHtml = `
+                    <button class="merge-diff-toggle" data-target="${diffBodyId}" style="
+                        display:block;width:100%;padding:0.4rem 0.75rem;background:none;border:none;
+                        cursor:pointer;font-size:0.8rem;color:var(--text-muted);text-align:left;font-family:inherit
+                    ">Show diff (${changedCount} line${changedCount !== 1 ? 's' : ''} changed)</button>
+                    <div id="${diffBodyId}" style="display:none;max-height:200px;overflow-y:auto;border-top:1px solid var(--border);padding:0.25rem 0">
+                        ${diffLinesHtml}
+                    </div>`;
+            } else if (f.localContent === null || f.localContent === undefined) {
+                diffPreviewHtml = `<div style="padding:0.4rem 0.75rem;font-size:0.8rem;color:var(--text-muted)">Deleted locally, edited remotely</div>`;
+            } else {
+                diffPreviewHtml = `<div style="padding:0.4rem 0.75rem;font-size:0.8rem;color:var(--text-muted)">Edited locally, deleted remotely</div>`;
+            }
+
+            const cardId = `conflictCard_${i}`;
+            return `
+            <div id="${cardId}" class="merge-conflict-card" data-filepath="${escapeHtml(f.filepath)}" style="
+                border:1px solid var(--border);border-radius:var(--radius-sm,6px);overflow:hidden;margin-bottom:0.5rem
+            ">
+                <div style="padding:0.6rem 0.85rem;background:var(--bg-secondary);display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-weight:500;font-size:0.9rem">${escapeHtml(f.filepath)}</span>
+                    <span style="font-size:0.75rem;color:var(--color-danger,#f44)">conflict</span>
+                </div>
+                ${diffPreviewHtml}
+                <div style="display:flex;gap:0;border-top:1px solid var(--border)">
+                    <button class="conflict-choice-btn" data-filepath="${escapeHtml(f.filepath)}" data-choice="local" style="
+                        flex:1;padding:0.65rem;border:none;background:var(--bg-primary);cursor:pointer;
+                        font-size:0.85rem;color:var(--text-primary);font-family:inherit;
+                        border-right:1px solid var(--border);min-height:44px;text-align:center
+                    ">
+                        <div style="font-weight:500">${escapeHtml(localLabel)}</div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;max-height:2.4em;overflow:hidden;line-height:1.2">${localSnippet}</div>
+                    </button>
+                    <button class="conflict-choice-btn" data-filepath="${escapeHtml(f.filepath)}" data-choice="remote" style="
+                        flex:1;padding:0.65rem;border:none;background:var(--bg-primary);cursor:pointer;
+                        font-size:0.85rem;color:var(--text-primary);font-family:inherit;min-height:44px;text-align:center
+                    ">
+                        <div style="font-weight:500">${escapeHtml(remoteLabel)}</div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;max-height:2.4em;overflow:hidden;line-height:1.2">${remoteSnippet}</div>
+                    </button>
+                </div>
+                <div class="merge-result-preview" style="display:none;padding:0.5rem 0.85rem;border-top:1px solid var(--border);background:var(--bg-secondary);font-size:0.8rem"></div>
+            </div>`;
+        }).join('');
+
         const modal = Modal.create({
-            title: 'Sync Conflict',
+            title: 'Merge Conflict',
             content: `
                 <div style="font-size:0.9rem;line-height:1.6">
-                    <p>The remote repository has changes that conflict with your local edits.</p>
-                    <p style="margin-top:0.75rem"><strong>Your local changes are safe.</strong> Nothing has been lost.</p>
-                    <div style="margin-top:1rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius-sm);border:1px solid var(--border)">
-                        <p style="margin:0 0 0.5rem;font-weight:500">Options:</p>
-                        <ul style="margin:0;padding-left:1.25rem">
-                            <li>Open your vault folder with a git client and resolve the merge conflict manually</li>
-                            <li>Force push to overwrite the remote <span style="color:var(--color-danger,#f44)">(loses remote changes)</span></li>
-                        </ul>
-                    </div>
+                    <p>Your local changes and remote changes diverged. Resolve each conflicting file below.</p>
+                    <p style="margin-top:0.25rem;font-size:0.85rem;color:var(--text-secondary)"><strong>Nothing has been changed yet.</strong></p>
+                    <div style="margin-top:0.75rem">${autoHtml}</div>
+                    ${needsResolution.length > 0 ? `<div style="margin-bottom:0.5rem;font-size:0.85rem;font-weight:500;color:var(--text-primary)">Needs resolution (${needsResolution.length}):</div>` : ''}
+                    <div style="max-height:400px;overflow-y:auto">${conflictCardsHtml}</div>
                     <div style="margin-top:1rem;display:flex;gap:0.5rem;justify-content:flex-end">
-                        <button id="conflictDismissBtn" class="settings-btn secondary">Dismiss</button>
-                        <button id="conflictForceBtn" class="settings-btn" style="background:var(--color-danger,#f44);color:#fff;border-color:var(--color-danger,#f44)">Force Push</button>
+                        <button id="conflictCancelBtn" class="settings-btn secondary">Cancel</button>
+                        <button id="conflictResolveBtn" class="settings-btn" style="opacity:0.5;pointer-events:none">Resolve &amp; Sync</button>
                     </div>
                 </div>
             `,
-            width: '480px'
+            width: '520px'
         });
 
-        modal.querySelector('#conflictDismissBtn').addEventListener('click', () => modal.close());
-        modal.querySelector('#conflictForceBtn').addEventListener('click', async () => {
-            if (!confirm('Force push will overwrite the remote history. Are you sure?')) return;
-            const btn = modal.querySelector('#conflictForceBtn');
-            btn.disabled = true;
-            btn.textContent = 'Pushing...';
-            try {
-                const { git, fs, dir } = GitStore;
-                const ref = this._config.branch || 'main';
-                await git.push({
-                    fs, dir,
-                    remote: GitRemote.config.name,
-                    ref,
-                    force: true,
-                    http: window.GitHttp,
-                    onAuth: () => GitRemote.config.auth
+        // Track resolutions
+        const resolutions = {};
+        const totalConflicts = needsResolution.length;
+
+        const updateResolveButton = () => {
+            const resolved = Object.keys(resolutions).length;
+            const btn = modal.querySelector('#conflictResolveBtn');
+            if (resolved >= totalConflicts) {
+                btn.style.opacity = '1';
+                btn.style.pointerEvents = 'auto';
+            } else {
+                btn.style.opacity = '0.5';
+                btn.style.pointerEvents = 'none';
+            }
+        };
+
+        // Auto-resolved toggle
+        const autoToggle = modal.querySelector('#autoResolvedToggle');
+        if (autoToggle) {
+            autoToggle.addEventListener('click', () => {
+                const list = modal.querySelector('#autoResolvedList');
+                if (list) list.style.display = list.style.display === 'none' ? 'block' : 'none';
+            });
+        }
+
+        // Diff toggles
+        modal.querySelectorAll('.merge-diff-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const body = modal.querySelector('#' + btn.dataset.target);
+                if (body) {
+                    const showing = body.style.display === 'block';
+                    body.style.display = showing ? 'none' : 'block';
+                    btn.textContent = showing
+                        ? btn.textContent.replace('Hide', 'Show')
+                        : btn.textContent.replace('Show', 'Hide');
+                }
+            });
+        });
+
+        // Choice buttons
+        modal.querySelectorAll('.conflict-choice-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filepath = btn.dataset.filepath;
+                const choice = btn.dataset.choice;
+                resolutions[filepath] = choice;
+
+                // Update visual state of both buttons in this card
+                const card = btn.closest('.merge-conflict-card');
+                card.querySelectorAll('.conflict-choice-btn').forEach(b => {
+                    if (b.dataset.choice === choice) {
+                        b.style.background = 'var(--color-success,#10b981)';
+                        b.style.color = '#fff';
+                        b.style.fontWeight = '600';
+                    } else {
+                        b.style.background = 'var(--bg-primary)';
+                        b.style.color = 'var(--text-primary)';
+                        b.style.fontWeight = '400';
+                    }
                 });
-                this._pendingCommits = 0;
-                this._lastError = null;
-                this._setStatus('idle', 'Force push succeeded');
-                showToast('Force push succeeded.');
+
+                // Show result preview
+                const fileData = needsResolution.find(f => f.filepath === filepath);
+                const resultDiv = card.querySelector('.merge-result-preview');
+                if (resultDiv && fileData) {
+                    const chosenContent = choice === 'local' ? fileData.localContent : fileData.remoteContent;
+                    if (chosenContent) {
+                        const preview = chosenContent.split('\n').filter(l => l.trim()).slice(0, 3).map(l => escapeHtml(l)).join('<br>');
+                        resultDiv.innerHTML = `<span style="font-size:0.75rem;color:var(--text-muted)">Will use:</span><br><span style="font-size:0.8rem;color:var(--text-primary);font-family:monospace">${preview}</span>`;
+                    } else {
+                        resultDiv.innerHTML = `<span style="font-size:0.8rem;color:var(--text-muted)"><em>File will be deleted</em></span>`;
+                    }
+                    resultDiv.style.display = 'block';
+                }
+
+                updateResolveButton();
+            });
+        });
+
+        // Cancel
+        modal.querySelector('#conflictCancelBtn').addEventListener('click', () => modal.close());
+
+        // Resolve & Sync
+        modal.querySelector('#conflictResolveBtn').addEventListener('click', async () => {
+            const btn = modal.querySelector('#conflictResolveBtn');
+            const cancelBtn = modal.querySelector('#conflictCancelBtn');
+            btn.disabled = true;
+            cancelBtn.disabled = true;
+            btn.textContent = 'Resolving...';
+
+            // Apply resolutions to conflictData
+            for (const f of needsResolution) {
+                f.resolution = resolutions[f.filepath] || 'local';
+            }
+
+            try {
+                await this._applyMergeResolution(conflictData);
+                showToast('Merge resolved and synced.');
                 modal.close();
             } catch (err) {
                 btn.disabled = false;
-                btn.textContent = 'Force Push';
-                alert('Force push failed: ' + err.message);
+                cancelBtn.disabled = false;
+                btn.textContent = 'Resolve & Sync';
+                alert('Failed to resolve merge: ' + err.message);
             }
         });
     },
+
 
     async _showOverwriteHelp(err) {
         const filepaths = err.data?.filepaths || [];

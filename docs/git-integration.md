@@ -20,7 +20,7 @@ Store (block save/delete)
 
 | Module | File | Responsibility |
 |--------|------|----------------|
-| `GitStore` | `js/gitStore.js` | High-level git operations (init, commit, log, diff) |
+| `GitStore` | `js/gitStore.js` | High-level git operations (init, commit, log, diff, merge base) |
 | `GitFSAdapter` | `js/gitFs.js` | Filesystem adapter implementing `fs.promises` for isomorphic-git |
 | `GitRemote` | `js/gitRemote.js` | Push/pull to remote repositories |
 | `Store` | `js/store.js` | Orchestrates git via GitStore during block mutations |
@@ -166,6 +166,10 @@ const commits = await git.log({ fs, dir, depth: maxCount });
 2. Iterates tree entries, filters `.md` blobs
 3. Returns `{ filename: content }` map
 
+### Merge base
+
+`GitStore.getMergeBase(localOid, remoteOid)` finds the common ancestor of two commits using `git.findMergeBase()`. Returns the base commit OID or `null` if no common ancestor exists (independent histories).
+
 ---
 
 ## Restore/Revert
@@ -194,6 +198,17 @@ Remote config (URL, branch) is persisted in IndexedDB via `Store.saveRemoteConfi
 - **Pull**: `git.pull({ fs, dir, remote, ref, author })` — pulls and merges
 
 Remote operations are user-initiated from the Settings view.
+
+### Sync conflict resolution
+
+When `SyncManager.sync()` detects a non-fast-forward error (diverged histories), it performs three-way merge resolution:
+
+1. **Detection** (`_detectConflicts()`): Finds merge base via `GitStore.getMergeBase()`, diffs base→local and base→remote using `GitStore.getChangedFilesBetween()`, categorizes each changed file
+2. **Auto-resolve**: Files changed on only one side are resolved automatically (local-only → keep local, remote-only → take remote)
+3. **Manual resolution** (`_showConflictResolutionModal()`): For files changed on both sides, shows per-file cards with diff previews and "Keep Local" / "Take Remote" buttons
+4. **Application** (`_applyMergeResolution()`): Writes resolved files to working directory, stages all, creates a merge commit with `parent: [localOid, remoteOid]`, pushes normally
+
+This avoids writing `<<<<<<<` conflict markers into note files. The merge commit preserves both histories.
 
 ---
 

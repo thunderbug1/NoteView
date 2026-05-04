@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Always update documentation** (`docs/` directory and this file) when making changes that affect documented behavior, architecture, or data flow. Documentation should stay in sync with the code.
 
-never use the find command with the -exec flag in bash commands.
+never use the find command with the -exec flag in bash commands, use fdfind instead.
 
 ## Coding Rules
 
@@ -60,10 +60,10 @@ All core modules are plain objects on `window` — there are no ES module import
 
 - **`App`** (`js/main.js`) — Top-level controller. Initializes the app, handles routing between views, manages event listeners. Also contains `ThemeManager`. Delegates modal logic to dedicated modules.
 - **`Store`** (`js/store.js`) — Central state and file I/O. Manages `blocks` array, IndexedDB persistence, directory handle, file read/write, git commit on save, contact/mention tracking. Filtering logic lives in `Store.getFilteredBlocks()`.
-- **`GitStore`** (`js/gitStore.js`) — Git operations abstraction over isomorphic-git. Init, commit, log, diff.
+- **`GitStore`** (`js/gitStore.js`) — Git operations abstraction over isomorphic-git. Init, commit, log, diff, merge base.
 - **`GitFSAdapter`** (`js/gitFs.js`) — Class exported as `window.GitFSAdapter`. Filesystem adapter that bridges the browser File System Access API with isomorphic-git's expected `fs.promises` interface.
 - **`GitRemote`** (`js/gitRemote.js`) — Push/pull to remote git repositories.
-- **`SyncManager`** (`js/syncManager.js`) — Orchestrates automatic git remote syncing. Handles triggers (interval, idle, commit threshold), network status tracking, and toolbar indicator. Delegates push/pull to `GitRemote`.
+- **`SyncManager`** (`js/syncManager.js`) — Orchestrates automatic git remote syncing. Handles triggers (interval, idle, commit threshold), network status tracking, toolbar indicator, and three-way merge conflict resolution with per-file UI. Delegates push/pull to `GitRemote`.
 - **`AIAssistant`** (`js/ai.js`) — OpenAI-compatible LLM integration for note transformation. Supports multiple model profiles, configurable presets, streaming responses, diff-based apply, and batch operations. API keys stored separately in `.noteview/keys.json`.
 - **`BlockSelector`** (`js/blockSelector.js`) — Multi-select mode for bulk operations. Document view selects entire blocks; kanban view selects individual tasks.
 - **`SelectionManager`** (`js/selectionManager.js`) — Manages sidebar filter state: time selection, context tags (multi-select with exclusion), contact filter (single-select), and context navigation history. Updates tag counts and UI.
