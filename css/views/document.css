@@ -1461,3 +1461,119 @@
     font-style: italic;
     opacity: 0.8;
 }
+
+/* --- Inline AI Diff Overlay --- */
+
+.document-view .block-has-pending-diff {
+    border-left: 3px solid var(--ai-accent, #8b5cf6);
+}
+
+.block-editor-diff-hidden {
+    display: none;
+}
+
+.inline-diff-overlay {
+    background: var(--bg-primary);
+    border: 1px solid var(--ai-accent, #8b5cf6);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.inline-diff-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: color-mix(in srgb, var(--ai-accent, #8b5cf6) 8%, var(--bg-tertiary));
+    border-bottom: 1px solid color-mix(in srgb, var(--ai-accent, #8b5cf6) 20%, var(--border));
+    font-size: 0.78rem;
+}
+
+.inline-diff-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    background: color-mix(in srgb, var(--ai-accent, #8b5cf6) 15%, transparent);
+    color: var(--ai-accent, #8b5cf6);
+    white-space: nowrap;
+}
+
+.inline-diff-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.inline-diff-toggle {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.2rem;
+    display: flex;
+    align-items: center;
+    transition: transform 0.2s;
+}
+
+.inline-diff-toggle.expanded {
+    transform: rotate(180deg);
+}
+
+.inline-diff-body {
+    display: none;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.inline-diff-body.visible {
+    display: block;
+}
+
+.inline-diff-body .cm-editor {
+    height: 100%;
+}
+
+.inline-diff-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
+    justify-content: flex-end;
+    border-top: 1px solid var(--border);
+}
+
+.inline-diff-actions .ai-accept-btn,
+.inline-diff-actions .ai-reject-btn {
+    padding: 0.3rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+}
+
+.inline-diff-actions .ai-accept-btn {
+    background: var(--success);
+    color: white;
+    border: none;
+}
+
+.inline-diff-actions .ai-accept-btn:hover {
+    opacity: 0.9;
+}
+
+.inline-diff-actions .ai-reject-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.inline-diff-actions .ai-reject-btn:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+}

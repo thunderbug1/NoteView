@@ -123,6 +123,42 @@ Multi-note transforms show a batch result card in the chat. Clicking "Review all
 - New notes: accepted via `Store.createBlock()`
 - Undo: batch operations create atomic undo commands via `UndoRedoManager`
 
+## Inline Diff View (Document View)
+
+When AI produces a diff for a note, an inline diff overlay appears directly on the block in the document view — not just in the sidebar chat panel. This lets users review changes in context.
+
+### Pending Diff Registry
+
+`AIAssistant` exposes two query methods used by the document view:
+
+- `getPendingDiffsForBlock(blockId)` — returns `[{ chatId, msg }]` for all unresolved diffs on a block
+- `getPendingDiffBlockIds()` — returns `Set` of all block IDs with pending diffs
+
+After creating a diff (in `_sendToChat` or `_sendPerNote`), `AIAssistant.showInlineDiffs()` triggers targeted DOM injection via `DocumentView.showPendingInlineDiffs()`.
+
+### Overlay Structure
+
+For each block with a pending diff, the document view inserts a collapsible overlay below the `.block-editor` div:
+
+- **Header**: "AI Change" badge, note title, expand/collapse toggle
+- **Body** (collapsed by default): CodeMirror `unifiedMergeView` diff (lazy-created on expand)
+- **Actions**: Accept/Reject buttons
+
+The existing block editor is hidden (CSS `display: none`, not destroyed) while the overlay is visible. The block gets a `block-has-pending-diff` class with a colored left border accent.
+
+### State Synchronization
+
+Accept/reject from either the inline overlay or the sidebar diff card calls the same `_acceptDiff()`/`_rejectDiff()` methods, which call `App.render()`. The re-render cycle checks the pending diff registry in `renderBlockHtml()`, so resolved diffs naturally disappear from both locations.
+
+### Key Methods
+
+| Method | Location | Purpose |
+|--------|----------|---------|
+| `renderInlineDiffOverlay(blockId, diffs)` | DocumentView | Generates overlay HTML |
+| `showPendingInlineDiffs()` | DocumentView | Targeted DOM injection without full re-render |
+| `wireInlineDiffEvents(article)` | DocumentView | Attaches toggle/accept/reject handlers |
+| `_createInlineDiffEditor(container, orig, mod)` | DocumentView | Lazy creates read-only merge view |
+
 ## Settings
 
 Accessible via:

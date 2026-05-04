@@ -612,15 +612,16 @@ const AIAssistant = {
             </div>`
             : '';
 
+        const isPending = status === 'pending';
         return `<div class="ai-diff-card" data-diff-id="${msg.id}">
             <div class="ai-diff-card-header">
                 <span class="ai-diff-card-title">${escapeHtml(msg.noteTitle || 'Note')}</span>
                 ${statusBadge}
-                <button class="ai-diff-card-toggle" data-toggle-diff="${msg.id}">
+                <button class="ai-diff-card-toggle ${isPending ? 'expanded' : ''}" data-toggle-diff="${msg.id}">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
             </div>
-            <div class="ai-diff-card-body" id="diffBody-${msg.id}"></div>
+            <div class="ai-diff-card-body ${isPending ? 'visible' : ''}" id="diffBody-${msg.id}"></div>
             ${actions}
         </div>`;
     },
@@ -800,6 +801,17 @@ const AIAssistant = {
     _wireDiffCardEvents(chat) {
         const panel = this._panelElement;
 
+        // Auto-create diff editors for pending (expanded-by-default) cards
+        panel.querySelectorAll('.ai-diff-card-body.visible').forEach(body => {
+            if (body.dataset.initialized) return;
+            const msgId = body.id.replace('diffBody-', '');
+            const msg = chat.messages.find(m => m.id === msgId);
+            if (msg) {
+                body.dataset.initialized = 'true';
+                this._createDiffEditor(body, msg.original, msg.modified);
+            }
+        });
+
         // Toggle diff body
         panel.querySelectorAll('.ai-diff-card-toggle').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -807,7 +819,6 @@ const AIAssistant = {
                 btn.classList.toggle('expanded');
                 const body = panel.querySelector(`#diffBody-${msgId}`);
                 if (body) body.classList.toggle('visible');
-                // Lazy-create CodeMirror diff
                 const msg = chat.messages.find(m => m.id === msgId);
                 if (msg && !body.dataset.initialized) {
                     body.dataset.initialized = 'true';
@@ -1009,6 +1020,7 @@ const AIAssistant = {
         chat.state = chat.state === 'streaming' ? 'idle' : chat.state;
         this._renderActiveChat();
         this._renderTabs();
+        this.showInlineDiffs();
     },
 
     async _readChatStream(response, chat, msgId) {
@@ -1188,6 +1200,40 @@ const AIAssistant = {
     },
 
     // ==============================
+    // Pending Diff Registry (used by DocumentView for inline diffs)
+    // ==============================
+
+    getPendingDiffsForBlock(blockId) {
+        const results = [];
+        for (const chat of this._chats) {
+            for (const msg of chat.messages) {
+                if (msg.type === 'diff' && msg.accepted === null && msg.blockId === blockId) {
+                    results.push({ chatId: chat.id, msg });
+                }
+            }
+        }
+        return results;
+    },
+
+    getPendingDiffBlockIds() {
+        const ids = new Set();
+        for (const chat of this._chats) {
+            for (const msg of chat.messages) {
+                if (msg.type === 'diff' && msg.accepted === null && msg.blockId) {
+                    ids.add(msg.blockId);
+                }
+            }
+        }
+        return ids;
+    },
+
+    showInlineDiffs() {
+        if (typeof DocumentView !== 'undefined' && DocumentView.showPendingInlineDiffs) {
+            DocumentView.showPendingInlineDiffs();
+        }
+    },
+
+    // ==============================
     // Per-Note Processing
     // ==============================
 
@@ -1357,6 +1403,7 @@ const AIAssistant = {
 
         this._renderActiveChat();
         this._renderTabs();
+        this.showInlineDiffs();
     },
 
     // ==============================

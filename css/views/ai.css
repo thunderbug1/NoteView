@@ -1672,9 +1672,6 @@
         overflow: hidden;
     }
 
-    body.ai-panel-open .fab {
-        display: none !important;
-    }
 
     #aiPanelOverlay {
         position: fixed;

@@ -225,19 +225,128 @@ const DocumentView = {
     },
 
     renderBlockHtml(block) {
+        const pendingDiffs = window.AIAssistant?.getPendingDiffsForBlock(block.id) || [];
+        const hasPendingDiff = pendingDiffs.length > 0;
         return `
-            <article class="block ${block.pinned ? 'block-pinned' : ''} ${(!block.tags || block.tags.length === 0) ? 'block-untagged' : ''}" data-id="${escapeHtml(block.id)}">
+            <article class="block ${block.pinned ? 'block-pinned' : ''} ${(!block.tags || block.tags.length === 0) ? 'block-untagged' : ''} ${hasPendingDiff ? 'block-has-pending-diff' : ''}" data-id="${escapeHtml(block.id)}">
                 ${this.renderCollapseButton(block)}
                 <div class="block-split-marker" data-id="${escapeHtml(block.id)}" title="Split note here" role="button" tabindex="0" aria-label="Split note here">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
                 </div>
                 ${this.renderBlockMetadata(block)}
-                <div class="block-editor">
+                <div class="block-editor ${hasPendingDiff ? 'block-editor-diff-hidden' : ''}">
                     <div class="codemirror-container" data-id="${escapeHtml(block.id)}">${escapeHtml(block.content || '')}</div>
                     <span class="save-indicator" data-id="${escapeHtml(block.id)}">saved</span>
                 </div>
+                ${hasPendingDiff ? this.renderInlineDiffOverlay(block.id, pendingDiffs) : ''}
             </article>
         `;
+    },
+
+    // --- Inline AI Diff Overlay ---
+
+    renderInlineDiffOverlay(blockId, pendingDiffs) {
+        const latest = pendingDiffs[pendingDiffs.length - 1];
+        const msg = latest.msg;
+        return `
+            <div class="inline-diff-overlay" data-block-id="${escapeHtml(blockId)}" data-diff-id="${escapeHtml(msg.id)}" data-chat-id="${escapeHtml(latest.chatId)}">
+                <div class="inline-diff-header">
+                    <span class="inline-diff-badge">AI Change</span>
+                    <span class="inline-diff-title">${escapeHtml(msg.noteTitle || blockId)}</span>
+                    <button class="inline-diff-toggle expanded" data-toggle-inline-diff="${escapeHtml(msg.id)}" title="Toggle diff view">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                </div>
+                <div class="inline-diff-body visible" id="inlineDiffBody-${escapeHtml(msg.id)}"></div>
+                <div class="inline-diff-actions">
+                    <button class="ai-reject-btn" data-reject-inline-diff="${escapeHtml(msg.id)}">Reject</button>
+                    <button class="ai-accept-btn" data-accept-inline-diff="${escapeHtml(msg.id)}">Accept</button>
+                </div>
+            </div>
+        `;
+    },
+
+    _createInlineDiffEditor(container, original, modified) {
+        const create = () => {
+            const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
+            const existingView = container._cmView;
+            if (existingView) { try { existingView.destroy(); } catch { /* */ } }
+
+            new EditorView({
+                doc: modified,
+                extensions: [
+                    basicSetup,
+                    unifiedMergeView({ original, mergeControls: false }),
+                    EditorView.theme({
+                        '&': { height: '100%', width: '100%' },
+                        '.cm-merge-deleted': { backgroundColor: 'rgba(244, 63, 94, 0.2)', textDecoration: 'line-through' },
+                        '.cm-merge-inserted': { backgroundColor: 'rgba(16, 185, 129, 0.2)', outline: 'none' }
+                    }),
+                    EditorView.editable.of(false),
+                    EditorState.readOnly.of(true)
+                ],
+                parent: container
+            });
+        };
+        if (window.CodeMirror?.basicSetup) create();
+        else window.addEventListener('CodeMirrorReady', create, { once: true });
+    },
+
+    showPendingInlineDiffs() {
+        if (!window.AIAssistant) return;
+        const pendingIds = AIAssistant.getPendingDiffBlockIds();
+        console.log('[DocView] showPendingInlineDiffs, pending block IDs:', [...pendingIds]);
+        for (const blockId of pendingIds) {
+            const article = document.querySelector(`article.block[data-id="${CSS.escape(blockId)}"]`);
+            if (!article || article.querySelector('.inline-diff-overlay')) continue;
+
+            const pendingDiffs = AIAssistant.getPendingDiffsForBlock(blockId);
+            if (pendingDiffs.length === 0) continue;
+
+            const editorDiv = article.querySelector('.block-editor');
+            if (editorDiv) editorDiv.classList.add('block-editor-diff-hidden');
+            article.classList.add('block-has-pending-diff');
+
+            editorDiv.insertAdjacentHTML('afterend', this.renderInlineDiffOverlay(blockId, pendingDiffs));
+            this.wireInlineDiffEvents(article);
+        }
+    },
+
+    wireInlineDiffEvents(article) {
+        const overlay = article.querySelector('.inline-diff-overlay');
+        if (!overlay) return;
+
+        const toggle = overlay.querySelector('.inline-diff-toggle');
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                const body = overlay.querySelector('.inline-diff-body');
+                if (!body) return;
+                toggle.classList.toggle('expanded');
+                body.classList.toggle('visible');
+                if (!body.dataset.initialized) {
+                    body.dataset.initialized = 'true';
+                    const chat = AIAssistant._chats.find(c => c.id === overlay.dataset.chatId);
+                    const msg = chat?.messages.find(m => m.id === overlay.dataset.diffId);
+                    if (msg) this._createInlineDiffEditor(body, msg.original, msg.modified);
+                }
+            });
+        }
+
+        const acceptBtn = overlay.querySelector('[data-accept-inline-diff]');
+        if (acceptBtn) {
+            acceptBtn.addEventListener('click', () => {
+                const chat = AIAssistant._chats.find(c => c.id === overlay.dataset.chatId);
+                if (chat) AIAssistant._acceptDiff(chat, acceptBtn.dataset.acceptInlineDiff);
+            });
+        }
+
+        const rejectBtn = overlay.querySelector('[data-reject-inline-diff]');
+        if (rejectBtn) {
+            rejectBtn.addEventListener('click', () => {
+                const chat = AIAssistant._chats.find(c => c.id === overlay.dataset.chatId);
+                if (chat) AIAssistant._rejectDiff(chat, rejectBtn.dataset.rejectInlineDiff);
+            });
+        }
     },
 
     _saveScrollAnchor() {
@@ -569,6 +678,17 @@ const DocumentView = {
             const initialContent = cmContainer.textContent;
             cmContainer.textContent = '';
             this.createEditor(cmContainer, blockId, initialContent);
+        });
+
+        // Initialize inline diff editors for blocks with pending AI changes
+        container.querySelectorAll('.inline-diff-overlay').forEach(overlay => {
+            const body = overlay.querySelector('.inline-diff-body');
+            if (!body || body.dataset.initialized) return;
+            body.dataset.initialized = 'true';
+            const chat = AIAssistant._chats?.find(c => c.id === overlay.dataset.chatId);
+            const msg = chat?.messages.find(m => m.id === overlay.dataset.diffId);
+            if (msg) this._createInlineDiffEditor(body, msg.original, msg.modified);
+            this.wireInlineDiffEvents(overlay.closest('article'));
         });
 
         // Clean up orphaned editors (blocks no longer in the DOM)
