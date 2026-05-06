@@ -1005,8 +1005,8 @@
     padding: 0.3rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    color: var(--text-muted);
-    opacity: 0.35;
+    color: var(--text-primary);
+    opacity: 0;
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
@@ -1015,7 +1015,7 @@
 
 .document-view .block:hover .ai-btn,
 .document-view .block:focus-within .ai-btn {
-    opacity: 0.5;
+    opacity: 1;
 }
 
 .ai-btn:hover {
