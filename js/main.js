@@ -1553,6 +1553,7 @@ const App = {
         }
 
         const transcript = (this._aiTranscript || '').trim();
+        this._aiTranscript = '';
         this._aiRecognition = null;
 
         if (transcript) {
@@ -1574,12 +1575,16 @@ const App = {
     },
 
     async processDictationWithAI(transcript, targetBlockId) {
+        if (this._aiIsProcessing) return;
+        this._aiIsProcessing = true;
+
         if (this._aiDictationBtn) {
             this._setAIButtonState(this._aiDictationBtn, 'processing');
         }
         if (!AIAssistant.isConfigured()) {
             Common.showToast('AI is not configured. Please set up an API key in Settings.');
             this._insertAIContent(transcript + '\n', targetBlockId);
+            this._aiIsProcessing = false;
             return;
         }
 
@@ -1666,9 +1671,18 @@ const App = {
             if (this._aiDictationBtn) {
                 this._setAIButtonState(this._aiDictationBtn, 'error');
             }
+            // Ensure editor is unlocked even if button was detached from DOM
+            const fallbackView = DocumentView.editors.get(targetBlockId);
+            if (fallbackView && fallbackView.dom) {
+                try {
+                    const { EditorView, EditorState } = window.CodeMirror;
+                    fallbackView.dispatch({ effects: [EditorView.editable.of(true), EditorState.readOnly.of(false)] });
+                } catch (e) { /* ignore */ }
+            }
             if (thinkingPreview) thinkingPreview.remove();
             this._insertAIContent(transcript + '\n', targetBlockId);
         } finally {
+            this._aiIsProcessing = false;
             this._aiIsStreaming = false;
             if (this._aiDictationBtn && !this._aiDictationBtn.classList.contains('ai-error')) {
                 this._cleanupAIDictation();
@@ -1682,7 +1696,12 @@ const App = {
     _insertAIContent(content, modalBlockId) {
         if (!modalBlockId) return;
 
-        const modal = this._aiDictationBtn && this._aiDictationBtn.closest('.tag-modal');
+        // Try to find modal via button first, fallback to editor's DOM
+        let modal = this._aiDictationBtn && this._aiDictationBtn.closest('.tag-modal');
+        if (!modal) {
+            const fallbackView = DocumentView.editors.get(modalBlockId);
+            if (fallbackView && fallbackView.dom) modal = fallbackView.dom.closest('.tag-modal');
+        }
         const preview = modal && modal.querySelector('.ai-transcript-preview');
         if (preview) preview.remove();
 
@@ -2034,7 +2053,7 @@ const App = {
                     actionsDiv.remove();
                 } else if (action === 'ai-dictate') {
                     this.handleAIMicClick(modalBlockId, btn);
-                    if (!this._aiDictationActive) actionsDiv.remove();
+                    if (!this._aiDictationActive && !this._aiIsProcessing) actionsDiv.remove();
                 }
             });
         }
