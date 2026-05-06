@@ -189,6 +189,8 @@ const App = {
         await AIAssistant.init();
         this.updateVaultSwitcherName();
         this.render();
+        // Collapse right sidebar on initial load when there are no deadlines
+        this._collapseRightIfNoDeadlines();
         console.log('[App] completeInitialization:done', {
             currentView: Store.currentView,
             context: Array.from(SelectionManager.selections.context)
@@ -835,6 +837,16 @@ const App = {
         }
 
         this._savedSidebarState = null;
+    },
+
+    _collapseRightIfNoDeadlines() {
+        const hasDeadlines = typeof TaskParser !== 'undefined'
+            && TaskParser.getTasksWithUrgency(Store.blocks).length > 0;
+        if (hasDeadlines) return;
+        const sidebarRight = document.getElementById('sidebarRight');
+        const sidebarRightToggle = document.getElementById('sidebarRightToggle');
+        if (sidebarRight) sidebarRight.classList.add('collapsed');
+        if (sidebarRightToggle) sidebarRightToggle.classList.add('shifted', 'rotated');
     },
 
     render() {
