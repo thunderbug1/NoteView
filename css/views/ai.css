@@ -26,7 +26,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.6rem 0.75rem;
+    padding: 0.7rem 0.85rem;
     border-bottom: 1px solid var(--border);
     background: var(--bg-secondary);
     flex-shrink: 0;
@@ -37,13 +37,13 @@
     align-items: center;
     gap: 0.4rem;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: var(--ai-accent);
     flex: 1;
 }
 
 .ai-panel-badge {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 600;
     background: var(--ai-accent);
     color: #fff;
@@ -133,7 +133,7 @@
     border: none;
     border-top: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
     font-family: inherit;
@@ -175,10 +175,10 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.4rem 0.55rem;
+    padding: 0.45rem 0.6rem;
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
-    font-size: 0.75rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
     cursor: pointer;
     white-space: nowrap;
@@ -274,7 +274,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
+    padding: 0.5rem 0.7rem;
     border-top: 1px solid var(--border);
     background: var(--bg-primary);
     flex-shrink: 0;
@@ -283,12 +283,12 @@
 .ai-model-select {
     flex: 1;
     min-width: 0;
-    padding: 0.25rem 0.5rem;
+    padding: 0.35rem 0.6rem;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     font-family: inherit;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     color: var(--text-primary);
     cursor: pointer;
     transition: border-color 0.2s;
@@ -308,11 +308,11 @@
 }
 
 .ai-mode-option {
-    padding: 0.3rem 0.55rem;
+    padding: 0.35rem 0.6rem;
     border: none;
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -333,7 +333,7 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
     cursor: pointer;
     white-space: nowrap;
@@ -367,7 +367,7 @@
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     cursor: pointer;
     width: 100%;
     font-family: inherit;
@@ -417,7 +417,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.15s;
@@ -441,7 +441,7 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.2rem 0.35rem;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
     border-radius: var(--radius-sm);
 }
@@ -495,7 +495,7 @@
 /* Message bubbles */
 
 .ai-msg {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     line-height: 1.55;
 }
 
@@ -508,7 +508,7 @@
 .ai-msg-user-text {
     background: var(--ai-accent-light);
     color: var(--text-primary);
-    padding: 0.5rem 0.65rem;
+    padding: 0.55rem 0.75rem;
     border-radius: var(--radius-md);
     border-top-right-radius: var(--radius-sm);
     white-space: pre-wrap;
@@ -560,7 +560,7 @@
 .ai-msg-meta {
     display: flex;
     gap: 0.5rem;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 0.2rem;
 }
@@ -573,7 +573,7 @@
 .ai-msg-system {
     padding: 0.5rem 0.65rem;
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
+    font-size: 0.85rem;
 }
 
 .ai-msg-system.error {
@@ -620,7 +620,7 @@
     padding: 0.4rem 0.6rem;
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border);
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
 }
 
@@ -679,7 +679,7 @@
 .ai-diff-card-actions .ai-reject-btn {
     padding: 0.3rem 0.75rem;
     border-radius: var(--radius-sm);
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
@@ -845,9 +845,9 @@
 .ai-preset-chip {
     display: inline-flex;
     align-items: center;
-    padding: 0.2rem 0.5rem;
+    padding: 0.3rem 0.6rem;
     border-radius: var(--radius-full);
-    font-size: 0.7rem;
+    font-size: 0.78rem;
     font-weight: 600;
     background: var(--bg-tertiary);
     color: var(--text-secondary);
@@ -879,14 +879,14 @@
 
 .ai-input-row textarea {
     flex: 1;
-    min-height: 36px;
+    min-height: 42px;
     max-height: 120px;
-    padding: 0.4rem 0.6rem;
+    padding: 0.5rem 0.7rem;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     font-family: inherit;
-    font-size: 0.82rem;
+    font-size: 0.9rem;
     color: var(--text-primary);
     resize: none;
     line-height: 1.45;
@@ -903,8 +903,8 @@
 }
 
 .ai-action-btn {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: var(--radius-sm);
     border: none;
     background: var(--ai-accent);
