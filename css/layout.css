@@ -118,6 +118,28 @@
     opacity: 1;
 }
 
+.context-nav-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    line-height: 1;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    padding: 0;
+}
+.context-nav-btn:hover:not(:disabled) {
+    opacity: 1;
+}
+.context-nav-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
 /* Sidebar Sections */
 .sidebar-section {
     padding: 1rem 1.25rem;

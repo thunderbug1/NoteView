@@ -21,7 +21,7 @@ const SelectionManager = {
     _historyIndex: -1,
     _historyDebounceTimer: null,
     _isHistoryNavigating: false,
-    HISTORY_DEBOUNCE_MS: 500,
+    HISTORY_DEBOUNCE_MS: 3000,
     HISTORY_MAX_ENTRIES: 50,
 
     computedContextTags: ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
@@ -47,6 +47,7 @@ const SelectionManager = {
         this.updateSelectionUI();
         this.initHistory();
         this.initClearContextBtn();
+        this.initContextNavBtns();
         this.loadArchivedTags().then(() => {
             this.renderContextSidebar();
             this.initArchiveToggle();
@@ -277,6 +278,17 @@ const SelectionManager = {
                 this.clearContextTags();
                 App.render();
             });
+        }
+    },
+
+    initContextNavBtns() {
+        const backBtn = document.getElementById('contextBackBtn');
+        const forwardBtn = document.getElementById('contextForwardBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => this.historyBack());
+        }
+        if (forwardBtn) {
+            forwardBtn.addEventListener('click', () => this.historyForward());
         }
     },
 
@@ -921,6 +933,11 @@ const SelectionManager = {
         if (clearBtn) {
             clearBtn.disabled = this.selections.context.size === 0;
         }
+
+        const backBtn = document.getElementById('contextBackBtn');
+        const forwardBtn = document.getElementById('contextForwardBtn');
+        if (backBtn) backBtn.disabled = !this.canGoBack();
+        if (forwardBtn) forwardBtn.disabled = !this.canGoForward();
     },
 
     /**
