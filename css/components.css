@@ -56,14 +56,21 @@
 
 /* Buttons */
 .block-action-btn {
-    padding: 0.35rem 0.75rem;
+    padding: 0.5rem 1rem;
     background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border: none;
+    border-radius: var(--radius-md);
     color: var(--text-secondary);
     font-size: 0.75rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s ease;
+    box-shadow: var(--neu-flat);
+    transition: all 0.2s ease;
+}
+
+.block-action-btn:active {
+    box-shadow: var(--neu-pressed);
+    transform: scale(0.98);
 }
 
 .block-action-btn:hover {
@@ -74,11 +81,12 @@
 .block-action-btn.primary {
     background: var(--accent);
     color: white;
-    border-color: var(--accent);
+    box-shadow: 0 4px 10px var(--accent-light);
 }
 
 .block-action-btn.primary:hover {
     background: var(--accent-hover);
+    box-shadow: 0 6px 14px var(--accent-light);
 }
 
 /* Tag Groups (Radio Behavior) */
@@ -91,12 +99,13 @@
 }
 
 .section-header .property-select {
-    padding: 0.2rem 0.5rem;
+    padding: 0.3rem 0.6rem;
     background: var(--bg-primary);
-    border: 1px solid var(--border);
+    border: none;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     font-size: 0.7rem;
+    box-shadow: var(--neu-pressed);
     cursor: pointer;
 }
 

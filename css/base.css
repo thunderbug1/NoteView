@@ -33,6 +33,15 @@
     --border: #e2e8f0;
     --border-light: #cbd5e1;
 
+    /* Shadows - Disabled for Flat Design */
+    --neu-upper: none;
+    --neu-lower: none;
+    --neu-inset-upper: none;
+    --neu-inset-lower: none;
+    
+    --neu-flat: none;
+    --neu-pressed: none;
+
     /* CodeMirror colors */
     --code-bg: #f1f5f9;
     --code-color: #0f172a;
@@ -98,6 +107,12 @@
 
     --border: #334155;
     --border-light: #475569;
+
+    /* Neumorphic Shadows - Disabled/Subtle */
+    --neu-upper: none;
+    --neu-lower: none;
+    --neu-inset-upper: none;
+    --neu-inset-lower: none;
 
     /* CodeMirror colors */
     --code-bg: #1e293b;

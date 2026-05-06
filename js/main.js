@@ -939,17 +939,22 @@ const App = {
         const block = Store.blocks.find(b => b.id === id);
         if (!block) return;
 
-        // Pass new content in options to allow Store.saveBlock to correctly capture before/after state
-        await Store.saveBlock(block, { ...options, content });
+        try {
+            // Pass new content in options to allow Store.saveBlock to correctly capture before/after state
+            await Store.saveBlock(block, { ...options, content });
 
-        // Invalidate timeline cache after saving
-        TimelineView.invalidateCache();
-        // Update tag counts to refresh contacts sidebar
-        SelectionManager.updateTagCounts();
-        // Update deadline panel after content changes
-        DeadlinePanel.render(Store.blocks);
-        // Update backlinks panel after content changes
-        BacklinksPanel.render(Store.blocks, DocumentView.getFocusedBlockId());
+            // Invalidate timeline cache after saving
+            TimelineView.invalidateCache();
+            // Update tag counts to refresh contacts sidebar
+            SelectionManager.updateTagCounts();
+            // Update deadline panel after content changes
+            DeadlinePanel.render(Store.blocks);
+            // Update backlinks panel after content changes
+            BacklinksPanel.render(Store.blocks, DocumentView.getFocusedBlockId());
+        } catch (err) {
+            Common.showToast('Save failed: ' + (err.message || 'Unknown error'));
+            console.error('Save failed:', err);
+        }
     },
 
     async deleteBlock(id, options = {}) {
@@ -1086,17 +1091,22 @@ const App = {
             ? { commit: true, commitMessage, [property]: value }
             : { ...commitMessage, [property]: value };
 
-        await Store.saveBlock(block, options);
+        try {
+            await Store.saveBlock(block, options);
 
-        // Invalidate timeline cache after saving
-        TimelineView.invalidateCache();
-        // Update tag counts to refresh contacts sidebar
-        SelectionManager.updateTagCounts();
+            // Invalidate timeline cache after saving
+            TimelineView.invalidateCache();
+            // Update tag counts to refresh contacts sidebar
+            SelectionManager.updateTagCounts();
 
-        // Fast path: surgical metadata update without full re-render
-        if (this._canSurgicalPropertyUpdate(property, id)) {
-            if (property === 'tags' && DocumentView.updateBlockTags(id)) return;
-            if (DocumentView.updateBlockMetadata(id)) return;
+            // Fast path: surgical metadata update without full re-render
+            if (this._canSurgicalPropertyUpdate(property, id)) {
+                if (property === 'tags' && DocumentView.updateBlockTags(id)) return;
+                if (DocumentView.updateBlockMetadata(id)) return;
+            }
+        } catch (err) {
+            Common.showToast('Update failed: ' + (err.message || 'Unknown error'));
+            console.error('Update failed:', err);
         }
 
         // Skip full render if block's editor is outside the view container (e.g. in a modal)

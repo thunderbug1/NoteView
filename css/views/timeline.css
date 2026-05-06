@@ -65,15 +65,15 @@
 
 .tl-date-header span {
     display: inline-block;
-    padding: 0.3rem 0.75rem;
-    background: var(--accent);
-    color: white;
+    padding: 0.4rem 1rem;
+    background: var(--bg-primary);
+    color: var(--accent);
     font-size: 0.7rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border-radius: var(--radius-sm);
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+    letter-spacing: 0.08em;
+    border-radius: var(--radius-full);
+    box-shadow: var(--neu-flat);
 }
 
 .tl-date-count {
@@ -173,17 +173,21 @@
 
 .tl-card {
     flex: 1;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 0.75rem 1rem;
-    transition: all 0.15s;
+    background: var(--bg-primary);
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--neu-flat);
+    transition: all 0.2s ease;
 }
 
 .tl-card:hover {
-    border-color: var(--border-light);
     box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+}
+
+.tl-card:active {
+    box-shadow: var(--neu-pressed);
+    transform: scale(0.99);
 }
 
 .tl-card-header {

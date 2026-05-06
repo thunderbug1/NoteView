@@ -12,7 +12,7 @@
 #sidebar {
     width: 280px;
     background: var(--bg-secondary);
-    border-right: 1px solid var(--border);
+    z-index: 10;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -22,7 +22,6 @@
 #sidebarRight {
     width: 280px;
     background: var(--bg-secondary);
-    border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     position: relative;
@@ -74,10 +73,10 @@
 
 .app-header {
     padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: var(--bg-secondary);
 }
 
 .app-logo-icon {
@@ -231,7 +230,7 @@
     width: 100%;
     padding: 0.6rem 0.75rem;
     background: var(--bg-primary);
-    border: 1px solid var(--border);
+    border: none;
     border-radius: var(--radius-sm);
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -407,7 +406,7 @@
         top: 0;
         height: 100vh;
         height: 100dvh;
-        width: 8px;
+        width: 24px;
         z-index: 50;
         pointer-events: auto;
         transition: background 0.2s;

@@ -7,15 +7,14 @@
         max-width: 800px;
         margin-left: auto;
         margin-right: auto;
-        background: transparent;
+        background: var(--bg-primary);
         border: none;
-        border-bottom: 1px solid var(--bg-tertiary);
-        border-radius: 0;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        box-shadow: none;
+        border-radius: var(--radius-lg);
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        box-shadow: var(--neu-flat);
         position: relative;
-        transition: border-color 0.2s;
+        transition: all 0.3s ease;
         overflow: visible;
         margin-top: 1.5rem;
 }
@@ -78,13 +77,23 @@
     overflow: hidden;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     position: absolute;
-    bottom: calc(100% - 1px);
-    left: -1px;
-    width: calc(100% + 2px);
+    bottom: calc(100% - 10px);
+    left: 0;
+    width: 100%;
     z-index: 5;
-    border: 1px solid var(--border);
-    border-bottom: none;
+    border: none;
     border-radius: var(--radius-md) var(--radius-md) 0 0;
+    box-shadow: none;
+    pointer-events: none;
+}
+
+.document-view .block:hover .block-metadata,
+.document-view .block:focus-within .block-metadata {
+    opacity: 1;
+    height: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    pointer-events: auto;
 }
 
 .block-title {
@@ -98,14 +107,7 @@
     flex-shrink: 0;
 }
 
-.document-view .block:hover .block-metadata,
-.document-view .block:focus-within .block-metadata {
-    opacity: 1;
-    height: auto;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-}
+/* Removed hover shadow as Neumorphism uses base shadows */
 
 .document-view .block-tags {
     padding: 0;

@@ -26,6 +26,8 @@ function createTaskMenus(documentView) {
         const menu = document.createElement('div');
         menu.id = 'taskContextMenu';
         menu.className = 'task-context-menu';
+        menu.setAttribute('role', 'menu');
+        menu.setAttribute('aria-label', 'Task state menu');
 
         // Ensure menu stays within viewport
         const viewportWidth = window.innerWidth;
@@ -57,7 +59,7 @@ function createTaskMenus(documentView) {
         let html = '<div class="menu-section"><div class="menu-title">State</div>';
         states.forEach(s => {
             const isActive = (currentState.toLowerCase() === s.val || (currentState === ' ' && s.val === ' ')) ? 'active' : '';
-            html += `<div class="menu-item ${isActive}" data-action="state" data-val="${s.val}">
+            html += `<div class="menu-item ${isActive}" data-action="state" data-val="${s.val}" role="menuitem" tabindex="0">
                 <span class="icon">${s.icon}</span> ${s.label}
             </div>`;
         });
@@ -65,7 +67,7 @@ function createTaskMenus(documentView) {
 
         // Copy task section
         html += '<div class="menu-section">';
-        html += `<div class="menu-item" data-action="copy-task">
+        html += `<div class="menu-item" data-action="copy-task" role="menuitem" tabindex="0">
             <span class="icon">${copyIcon}</span> Copy Task
         </div>`;
         html += '</div>';
@@ -101,6 +103,33 @@ function createTaskMenus(documentView) {
             menu.remove();
             document.removeEventListener('click', closeMenu);
         });
+
+        // Keyboard navigation for menu
+        menu.addEventListener('keydown', (evt) => {
+            const items = [...menu.querySelectorAll('.menu-item')];
+            const idx = items.indexOf(document.activeElement);
+            if (evt.key === 'Escape') {
+                menu.remove();
+                view.focus();
+            } else if (evt.key === 'ArrowDown') {
+                evt.preventDefault();
+                const next = idx < items.length - 1 ? idx + 1 : 0;
+                items[next].focus();
+            } else if (evt.key === 'ArrowUp') {
+                evt.preventDefault();
+                const prev = idx > 0 ? idx - 1 : items.length - 1;
+                items[prev].focus();
+            } else if (evt.key === 'Enter' || evt.key === ' ') {
+                evt.preventDefault();
+                if (items[idx]) items[idx].click();
+            }
+        });
+
+        // Focus first item
+        requestAnimationFrame(() => {
+            const first = menu.querySelector('.menu-item');
+            if (first) first.focus();
+        });
     }
 
     /**
@@ -118,6 +147,8 @@ function createTaskMenus(documentView) {
         const menu = document.createElement('div');
         menu.id = 'taskContextMenu';
         menu.className = 'task-context-menu';
+        menu.setAttribute('role', 'menu');
+        menu.setAttribute('aria-label', 'Task priority menu');
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
 
@@ -130,12 +161,12 @@ function createTaskMenus(documentView) {
 
         let html = '<div class="menu-section"><div class="menu-title">Set Priority</div>';
         priorities.forEach(p => {
-            html += `<div class="menu-item" data-action="set-priority" data-val="${p.label}">
+            html += `<div class="menu-item" data-action="set-priority" data-val="${p.label}" role="menuitem" tabindex="0">
                 <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${p.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg></span> ${p.label}
             </div>`;
         });
         html += '<div class="menu-divider"></div>';
-        html += `<div class="menu-item" data-action="set-priority" data-val="">
+        html += `<div class="menu-item" data-action="set-priority" data-val="" role="menuitem" tabindex="0">
             <span class="icon">&times;</span> Clear Priority
         </div>`;
         html += '</div>';
@@ -177,6 +208,33 @@ function createTaskMenus(documentView) {
             }
             menu.remove();
             document.removeEventListener('click', closeMenu);
+        });
+
+        // Keyboard navigation for menu
+        menu.addEventListener('keydown', (evt) => {
+            const items = [...menu.querySelectorAll('.menu-item')];
+            const idx = items.indexOf(document.activeElement);
+            if (evt.key === 'Escape') {
+                menu.remove();
+                view.focus();
+            } else if (evt.key === 'ArrowDown') {
+                evt.preventDefault();
+                const next = idx < items.length - 1 ? idx + 1 : 0;
+                items[next].focus();
+            } else if (evt.key === 'ArrowUp') {
+                evt.preventDefault();
+                const prev = idx > 0 ? idx - 1 : items.length - 1;
+                items[prev].focus();
+            } else if (evt.key === 'Enter' || evt.key === ' ') {
+                evt.preventDefault();
+                if (items[idx]) items[idx].click();
+            }
+        });
+
+        // Focus first item
+        requestAnimationFrame(() => {
+            const first = menu.querySelector('.menu-item');
+            if (first) first.focus();
         });
     }
 
