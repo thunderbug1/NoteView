@@ -259,6 +259,8 @@ const AIAssistant = {
             document.body.classList.add('ai-panel-open');
             const overlay = document.getElementById('aiPanelOverlay');
             if (overlay) overlay.classList.add('active');
+            const fab = document.getElementById('fabNewNote');
+            if (fab) fab.style.display = 'none';
         }
 
         this._renderTabs();
@@ -278,6 +280,11 @@ const AIAssistant = {
 
         const overlay = document.getElementById('aiPanelOverlay');
         if (overlay) overlay.classList.remove('active');
+
+        if (window.innerWidth <= 768) {
+            const fab = document.getElementById('fabNewNote');
+            if (fab) fab.style.display = '';
+        }
 
         if (this._previouslyFocused && typeof this._previouslyFocused.focus === 'function') {
             try { this._previouslyFocused.focus(); } catch { /* element may be gone */ }

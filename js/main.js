@@ -807,12 +807,17 @@ const App = {
             if (sidebarEdgeLeft) sidebarEdgeLeft.classList.add('hidden');
         }
 
-        if (state.rightOpen) {
+        const hasDeadlines = state.rightOpen
+            && typeof TaskParser !== 'undefined'
+            && TaskParser.getTasksWithUrgency(Store.blocks).length > 0;
+        const rightActuallyOpen = hasDeadlines && !state.aiPanelOpen;
+
+        if (rightActuallyOpen) {
             if (sidebarRight) sidebarRight.classList.add('sidebar-open');
             if (sidebarEdgeRight) sidebarEdgeRight.classList.add('hidden');
         }
 
-        if (state.rightCollapsed) {
+        if (state.rightCollapsed || (!rightActuallyOpen && !state.leftOpen)) {
             if (sidebarRight) sidebarRight.classList.add('collapsed');
             if (sidebarRightToggle) sidebarRightToggle.classList.add('shifted', 'rotated');
         } else {
@@ -820,7 +825,7 @@ const App = {
             if (sidebarRightToggle) sidebarRightToggle.classList.remove('shifted', 'rotated');
         }
 
-        if (state.leftOpen || state.rightOpen) {
+        if (state.leftOpen || rightActuallyOpen) {
             if (overlay) overlay.classList.add('active');
             document.body.classList.add('sidebar-open');
         }
@@ -884,9 +889,13 @@ const App = {
             BlockSelector.refreshSelectionUI();
         }
 
-        // Hide FAB in kanban and capture views
+        // Hide FAB in kanban and capture views, or when AI panel is open on mobile
         const fab = document.getElementById('fabNewNote');
-        if (fab) fab.style.display = (view === 'kanban' || view === 'capture') ? 'none' : '';
+        if (fab) {
+            const hideForView = (view === 'kanban' || view === 'capture');
+            const hideForAI = AIAssistant._panelOpen && window.innerWidth <= 768;
+            fab.style.display = (hideForView || hideForAI) ? 'none' : '';
+        }
 
         // Update undo/redo button states
         this.updateUndoRedoUI();
