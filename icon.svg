@@ -1,25 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1a1b26"/>
-  <g transform="translate(80, 60)">
-    <!-- Notepad body -->
-    <rect x="20" y="20" width="312" height="372" rx="16" fill="#24283b" stroke="#414868" stroke-width="4"/>
-    <!-- Header bar -->
-    <rect x="20" y="20" width="312" height="52" rx="16" fill="#414868"/>
-    <rect x="20" y="56" width="312" height="16" fill="#414868"/>
-    <!-- Lines -->
-    <rect x="52" y="96" width="248" height="8" rx="4" fill="#565f89"/>
-    <rect x="52" y="128" width="200" height="8" rx="4" fill="#565f89"/>
-    <rect x="52" y="160" width="268" height="8" rx="4" fill="#565f89"/>
-    <rect x="52" y="192" width="180" height="8" rx="4" fill="#565f89"/>
-    <rect x="52" y="224" width="240" height="8" rx="4" fill="#565f89"/>
-    <rect x="52" y="256" width="160" height="8" rx="4" fill="#565f89"/>
-    <rect x="52" y="288" width="220" height="8" rx="4" fill="#565f89"/>
-    <rect x="52" y="320" width="140" height="8" rx="4" fill="#565f89"/>
-    <!-- Pencil -->
-    <g transform="translate(240, 280) rotate(-45)">
-      <rect x="0" y="0" width="24" height="120" rx="4" fill="#ff9e64"/>
-      <rect x="0" y="0" width="24" height="24" rx="4" fill="#e0af68"/>
-      <polygon points="4,120 20,120 12,145" fill="#9aa5ce"/>
-    </g>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .dark-version { display: none; }
+    @media (prefers-color-scheme: dark) {
+      .light-version { display: none; }
+      .dark-version { display: block; }
+    }
+  </style>
+  
+  <g class="light-version">
+    <rect width="512" height="512" fill="#F1F5F9"/>
+    <rect x="100" y="100" width="312" height="312" rx="60" fill="#F1F5F9" filter="url(#neuShadowLight)"/>
+    <path d="M180 320V192L332 320V192" stroke="#3B82F6" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" filter="url(#neuInnerLight)"/>
   </g>
+
+  <g class="dark-version">
+    <rect width="512" height="512" fill="#0F172A"/>
+    <rect x="100" y="100" width="312" height="312" rx="60" fill="#0F172A" filter="url(#neuShadowDark)"/>
+    <path d="M180 320V192L332 320V192" stroke="#60A5FA" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" filter="url(#neuInnerDark)"/>
+  </g>
+
+  <defs>
+    <!-- Light Filters -->
+    <filter id="neuShadowLight" x="50" y="50" width="412" height="412" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="15" dy="15" stdDeviation="10" flood-color="#CBD5E1"/>
+      <feDropShadow dx="-15" dy="-15" stdDeviation="10" flood-color="white"/>
+    </filter>
+    <filter id="neuInnerLight" x="150" y="150" width="212" height="212" filterUnits="userSpaceOnUse">
+      <feOffset dx="4" dy="4"/>
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceAlpha" in2="blur" operator="arithmetic" k2="-1" k3="1" result="shadow"/>
+      <feFlood flood-color="#CBD5E1" result="color"/>
+      <feComposite in="color" in2="shadow" operator="in" result="insetShadow"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="insetShadow"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Dark Filters -->
+    <filter id="neuShadowDark" x="50" y="50" width="412" height="412" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="15" dy="15" stdDeviation="15" flood-color="#020617" flood-opacity="0.8"/>
+      <feDropShadow dx="-15" dy="-15" stdDeviation="15" flood-color="#1E293B" flood-opacity="0.4"/>
+    </filter>
+    <filter id="neuInnerDark" x="150" y="150" width="212" height="212" filterUnits="userSpaceOnUse">
+      <feOffset dx="4" dy="4"/>
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceAlpha" in2="blur" operator="arithmetic" k2="-1" k3="1" result="shadow"/>
+      <feFlood flood-color="#020617" result="color"/>
+      <feComposite in="color" in2="shadow" operator="in" result="insetShadow"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="insetShadow"/>
+      </feMerge>
+    </filter>
+  </defs>
 </svg>

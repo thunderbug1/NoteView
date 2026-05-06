@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background squares with translucency and blur -->
+  <rect x="60" y="60" width="300" height="300" rx="60" fill="url(#paint0_linear_prism1)" fill-opacity="0.8">
+    <animate attributeName="x" values="60;70;60" dur="5s" repeatCount="indefinite" />
+  </rect>
+  <rect x="150" y="150" width="300" height="300" rx="60" fill="url(#paint1_linear_prism2)" fill-opacity="0.7">
+    <animate attributeName="y" values="150;160;150" dur="7s" repeatCount="indefinite" />
+  </rect>
+  
+  <!-- The central "View" mark -->
+  <g filter="url(#filter0_b_prism)">
+    <rect x="120" y="120" width="272" height="272" rx="50" fill="white" fill-opacity="0.1" stroke="white" stroke-opacity="0.4" stroke-width="2"/>
+    <!-- Stylized N/V intersection -->
+    <path d="M180 190V322L256 256L332 322V190" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <defs>
+    <filter id="filter0_b_prism" x="120" y="120" width="272" height="272" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+    <linearGradient id="paint0_linear_prism1" x1="60" y1="60" x2="360" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="paint1_linear_prism2" x1="150" y1="150" x2="450" y2="450" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+</svg>

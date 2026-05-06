@@ -2181,6 +2181,11 @@ const ThemeManager = {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('noteview-theme', theme);
         
+        const logoIcon = document.getElementById('appLogoIcon');
+        if (logoIcon) {
+            logoIcon.src = theme === 'dark' ? 'assets/icon-dark.svg' : 'assets/icon-light.svg';
+        }
+        
         if (theme === 'dark') {
             this.sunIcon.style.display = 'none';
             this.moonIcon.style.display = 'inline-block';

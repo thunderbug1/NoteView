@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Abstract Peak formed by sharp polygons -->
+  <path d="M256 80L100 400H200L256 280L312 400H412L256 80Z" fill="#1E293B"/>
+  <path d="M256 80L200 400L256 280L312 400L256 80Z" fill="#3B82F6" fill-opacity="0.8"/>
+  <path d="M256 280L200 400L256 400L256 280Z" fill="#2563EB"/>
+  <path d="M256 280L312 400L256 400L256 280Z" fill="#1D4ED8"/>
+  
+  <!-- Subtle top accent -->
+  <path d="M256 80L230 140H282L256 80Z" fill="white" fill-opacity="0.2"/>
+</svg>

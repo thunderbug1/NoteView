@@ -1,0 +1,8 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M256 40L446 148V364L256 472L66 364V148L256 40Z" fill="#1E293B"/>
+  <path d="M256 40V256L446 364" stroke="#3B82F6" stroke-width="20" stroke-linecap="round"/>
+  <path d="M66 148L256 256L446 148" stroke="#3B82F6" stroke-width="20" stroke-linecap="round"/>
+  
+  <!-- The N inside -->
+  <path d="M160 160V352H210V240L302 352H352V160H302V272L210 160H160Z" fill="white"/>
+</svg>
