@@ -294,7 +294,21 @@ const DocumentView = {
 
     showPendingInlineDiffs() {
         if (!window.AIAssistant) return;
-        const pendingIds = AIAssistant.getPendingDiffBlockIds();
+        const pendingIds = new Set(AIAssistant.getPendingDiffBlockIds());
+
+        // Clean up overlays for blocks that no longer have pending diffs
+        for (const article of document.querySelectorAll('article.block-has-pending-diff')) {
+            const blockId = article.dataset.id;
+            if (!pendingIds.has(blockId)) {
+                const overlay = article.querySelector('.inline-diff-overlay');
+                if (overlay) overlay.remove();
+                article.classList.remove('block-has-pending-diff');
+                const editorDiv = article.querySelector('.block-editor');
+                if (editorDiv) editorDiv.classList.remove('block-editor-diff-hidden');
+            }
+        }
+
+        // Add overlays for blocks that have pending diffs
         for (const blockId of pendingIds) {
             const article = document.querySelector(`article.block[data-id="${CSS.escape(blockId)}"]`);
             if (!article || article.querySelector('.inline-diff-overlay')) continue;

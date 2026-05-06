@@ -265,6 +265,7 @@ const AIAssistant = {
 
         this._renderTabs();
         this._renderActiveChat();
+        this.showInlineDiffs();
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
             const textarea = this._panelElement.querySelector('.ai-input-row textarea');
@@ -1222,6 +1223,8 @@ const AIAssistant = {
 
         this._renderMessages(chat);
         this._renderTabs();
+        this._updateBadge();
+        this.showInlineDiffs();
         this.saveChats();
     },
 
