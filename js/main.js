@@ -1916,7 +1916,7 @@ const App = {
         `;
 
         const modal = Modal.create({
-            headerContent: '',
+            title: 'Create Note',
             content,
             modalClass: 'tag-modal content-modal active-recording-preventer',
             onClose: () => {
