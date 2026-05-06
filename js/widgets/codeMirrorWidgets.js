@@ -8,7 +8,7 @@
  * The start date row is collapsible — expanded if a start value exists.
  * Works on both desktop and mobile (touch-friendly).
  */
-function showDatePopover(event, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue, fallbackPos) {
+function showDatePopover(documentView, event, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue, fallbackPos) {
     event.stopPropagation();
     document.querySelector('.date-popover')?.remove();
 
@@ -318,7 +318,7 @@ function createCodeMirrorWidgets(documentView) {
                         startValue = startMatch[1].trim();
                     }
 
-                    showDatePopover(e, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue);
+                    showDatePopover(documentView, e, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue);
                     return;
                 }
 
@@ -588,7 +588,7 @@ function createCodeMirrorWidgets(documentView) {
                 e.preventDefault();
                 e.stopPropagation();
                 // No existing badges — open unified popover with empty fields
-                showDatePopover(e, view, null, null, '', null, null, '', this.from);
+                showDatePopover(documentView, e, view, null, null, '', null, null, '', this.from);
             };
 
             wrap.onmousedown = handleClick;
