@@ -24,6 +24,8 @@ const DocumentView = {
     originalContents: new Map(), // blockId -> original content for change detection
     // Track which blocks are collapsed by block ID
     collapsedBlocks: new Map(),
+    // Track blocks expanded by click that should re-collapse on blur
+    _autoCollapseOnBlur: new Set(),
     // Track which groups are collapsed by group key
     collapsedGroups: new Map(),
     fencedBlockThresholds: {
@@ -1016,6 +1018,18 @@ const DocumentView = {
             }
             return;
         }
+
+        // Click on collapsed block body — expand and focus
+        const collapsedBlock = e.target.closest('.block.block-collapsed');
+        if (collapsedBlock) {
+            const blockId = collapsedBlock.dataset.id;
+            if (blockId && blockId !== 'new') {
+                this.expandBlock(blockId);
+                this._autoCollapseOnBlur.add(blockId);
+                const editor = this.editors.get(blockId);
+                if (editor) editor.focus();
+            }
+        }
     },
 
     handleGroupCollapseClick(e) {
@@ -1050,6 +1064,7 @@ const DocumentView = {
 
     collapseBlock(blockId) {
         this.collapsedBlocks.set(blockId, true);
+        this._autoCollapseOnBlur.delete(blockId);
         const blockEl = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
         if (!blockEl) return;
 
@@ -2954,14 +2969,22 @@ const DocumentView = {
                     if (content.trim() === '') {
                         const originalContent = self.originalContents.get(currentId);
                         if (originalContent && originalContent.trim() !== '') {
-                            const confirmed = await Modal.confirm({
-                                title: 'Delete Empty Note',
-                                message: 'This note is now empty. Delete it?',
-                                confirmText: 'Delete',
-                                cancelText: 'Keep'
-                            });
-                            if (confirmed) {
-                                App.deleteBlock(currentId, { showToast: true });
+                            const isMobile = 'ontouchstart' in window;
+                            if (isMobile) {
+                                Common.showToast('Empty note — will be cleaned up', {
+                                    actionLabel: 'Delete',
+                                    action: () => App.deleteBlock(currentId, { showToast: true })
+                                });
+                            } else {
+                                const confirmed = await Modal.confirm({
+                                    title: 'Delete Empty Note',
+                                    message: 'This note is now empty. Delete it?',
+                                    confirmText: 'Delete',
+                                    cancelText: 'Keep'
+                                });
+                                if (confirmed) {
+                                    App.deleteBlock(currentId, { showToast: true });
+                                }
                             }
                         } else {
                             App.deleteBlock(currentId);
@@ -3076,6 +3099,15 @@ const DocumentView = {
                                 if (this._focusedEditor === update.view) {
                                     this._focusedEditor = null;
                                     this.hideMobileToolbar();
+                                }
+                            }, 150);
+                        }
+                        // Re-collapse block if it was expanded by click
+                        if (this._autoCollapseOnBlur.has(blockId)) {
+                            setTimeout(() => {
+                                if (this._autoCollapseOnBlur.has(blockId) && !update.view.hasFocus) {
+                                    this._autoCollapseOnBlur.delete(blockId);
+                                    this.collapseBlock(blockId);
                                 }
                             }, 150);
                         }
