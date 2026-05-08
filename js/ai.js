@@ -589,6 +589,9 @@ const AIAssistant = {
                 </div>`;
             }
             case 'assistant': {
+                if (msg.type === 'create') {
+                    return this._renderCreateCardHTML(msg);
+                }
                 if (msg.type === 'diff') {
                     return this._renderDiffCardHTML(msg);
                 }
@@ -671,6 +674,35 @@ const AIAssistant = {
                 <button class="ai-batch-card-review-btn" data-review-batch="${msg.id}">Review all</button>
             </div>
             <div class="ai-batch-card-list">${items}</div>
+        </div>`;
+    },
+
+    _renderCreateCardHTML(msg) {
+        const status = msg.accepted === true ? 'created' : msg.accepted === false ? 'rejected' : 'pending';
+        const statusBadge = status !== 'pending'
+            ? `<span class="ai-diff-card-badge ${status === 'created' ? 'accepted' : 'rejected'}">${status}</span>`
+            : '';
+        const actions = status === 'pending'
+            ? `<div class="ai-diff-card-actions">
+                <button class="ai-reject-btn" data-reject-create="${msg.id}">Cancel</button>
+                <button class="ai-accept-btn" data-accept-create="${msg.id}">Create note</button>
+            </div>`
+            : '';
+        const isPending = status === 'pending';
+        const preview = sanitizeHtml(marked.parse(msg.noteContent || ''));
+        return `<div class="ai-create-card" data-create-id="${msg.id}">
+            <div class="ai-create-card-header">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <span class="ai-create-card-title">${escapeHtml(msg.noteTitle || 'New Note')}</span>
+                ${statusBadge}
+                <button class="ai-diff-card-toggle ${isPending ? 'expanded' : ''}" data-toggle-create="${msg.id}">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+            </div>
+            <div class="ai-create-card-body ${isPending ? 'visible' : ''}" id="createBody-${msg.id}">
+                <div class="markdown-content">${preview}</div>
+            </div>
+            ${actions}
         </div>`;
     },
 
@@ -820,6 +852,7 @@ const AIAssistant = {
         // Diff card interactions
         this._wireDiffCardEvents(chat);
         this._wireBatchCardEvents(chat);
+        this._wireCreateCardEvents(chat);
     },
 
     _wireDiffCardEvents(chat) {
@@ -876,6 +909,31 @@ const AIAssistant = {
                 const msgId = btn.dataset.reviewBatch;
                 const msg = chat.messages.find(m => m.id === msgId);
                 if (msg) this._openBatchReviewModal(chat, msg);
+            });
+        });
+    },
+
+    _wireCreateCardEvents(chat) {
+        const panel = this._panelElement;
+
+        panel.querySelectorAll('[data-accept-create]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._acceptCreateNote(chat, btn.dataset.acceptCreate);
+            });
+        });
+
+        panel.querySelectorAll('[data-reject-create]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._rejectCreateNote(chat, btn.dataset.rejectCreate);
+            });
+        });
+
+        panel.querySelectorAll('[data-toggle-create]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.classList.toggle('expanded');
+                const msgId = btn.dataset.toggleCreate;
+                const body = panel.querySelector(`#createBody-${msgId}`);
+                if (body) body.classList.toggle('visible');
             });
         });
     },
@@ -983,26 +1041,71 @@ const AIAssistant = {
                 chat.messages.push({ id: 'msg-' + Date.now(), role: 'system', type: 'info', content: 'No changes detected' });
                 chat.state = 'idle';
             } else if (chat.mode === 'ask') {
-                chat.messages.push({
-                    id: 'msg-' + Date.now(),
-                    role: 'assistant',
-                    content: raw,
-                    type: 'markdown',
-                    meta: `${profile.model} · ${elapsed}s`
-                });
-                chat.state = 'idle';
+                const createNotes = this._parseCreateNoteResponse(raw);
+                if (createNotes.length > 0) {
+                    const textContent = raw.replace(/<<<CREATE_NOTE>>>([\s\S]*?)<<<END_CREATE>>>/g, '').trim();
+                    if (textContent) {
+                        chat.messages.push({
+                            id: 'msg-' + Date.now(),
+                            role: 'assistant',
+                            content: textContent,
+                            type: 'markdown',
+                            meta: `${profile.model} · ${elapsed}s`
+                        });
+                    }
+                    for (const note of createNotes) {
+                        chat.messages.push({
+                            id: 'msg-' + Date.now() + '-create',
+                            role: 'assistant',
+                            type: 'create',
+                            noteContent: note.content,
+                            noteTitle: note.title.slice(0, 60),
+                            accepted: null,
+                            meta: `${profile.model} · ${elapsed}s`
+                        });
+                    }
+                    chat.state = 'awaiting_input';
+                } else {
+                    chat.messages.push({
+                        id: 'msg-' + Date.now(),
+                        role: 'assistant',
+                        content: raw,
+                        type: 'markdown',
+                        meta: `${profile.model} · ${elapsed}s`
+                    });
+                    chat.state = 'idle';
+                }
             } else {
                 const modified = this._stripCodeFences(raw);
                 const contextIds = [...chat.contextBlockIds];
 
-                if (contextIds.length === 1) {
+                if (contextIds.length === 0) {
+                    const noteTitle = modified.match(/^#{1,6}\s+(.+)/m)?.[1] || modified.split('\n')[0] || 'New Note';
+                    chat.messages.push({
+                        id: 'msg-' + Date.now(),
+                        role: 'assistant',
+                        type: 'create',
+                        noteContent: modified,
+                        noteTitle: noteTitle.slice(0, 60),
+                        accepted: null,
+                        meta: `${profile.model} · ${elapsed}s`
+                    });
+                    chat.state = 'awaiting_input';
+                } else if (contextIds.length === 1) {
                     // Single-note transform
                     const block = Store.blocks.find(b => b.id === contextIds[0]);
                     const original = block?.content || '';
-                    if (modified === original) {
-                        chat.messages.push({ id: 'msg-' + Date.now(), role: 'system', type: 'info', content: 'No changes detected' });
-                        chat.state = 'idle';
-                    } else {
+
+                    // Check for new-note creation markers
+                    const createNotes = this._parseCreateNoteResponse(modified);
+                    const textWithoutMarkers = createNotes.length > 0
+                        ? this._stripCodeFences(modified.replace(/<<<CREATE_NOTE>>>([\s\S]*?)<<<END_CREATE>>>/g, '').trim())
+                        : modified;
+
+                    let hasChanges = false;
+
+                    // Show diff card if the original note was modified
+                    if (textWithoutMarkers && textWithoutMarkers !== original) {
                         chat.messages.push({
                             id: 'msg-' + Date.now(),
                             role: 'assistant',
@@ -1010,10 +1113,31 @@ const AIAssistant = {
                             blockId: contextIds[0],
                             noteTitle: block ? this._extractTitle(block) : contextIds[0],
                             original,
-                            modified,
+                            modified: textWithoutMarkers,
+                            accepted: null,
+                            meta: `${profile.model} · ${elapsed}s}`
+                        });
+                        hasChanges = true;
+                    }
+
+                    // Show create cards for new notes
+                    for (const note of createNotes) {
+                        chat.messages.push({
+                            id: 'msg-' + Date.now() + '-create',
+                            role: 'assistant',
+                            type: 'create',
+                            noteContent: note.content,
+                            noteTitle: note.title.slice(0, 60),
                             accepted: null,
                             meta: `${profile.model} · ${elapsed}s`
                         });
+                        hasChanges = true;
+                    }
+
+                    if (!hasChanges) {
+                        chat.messages.push({ id: 'msg-' + Date.now(), role: 'system', type: 'info', content: 'No changes detected' });
+                        chat.state = 'idle';
+                    } else {
                         chat.state = 'awaiting_input';
                     }
                 } else {
@@ -1091,7 +1215,7 @@ const AIAssistant = {
         const messages = [];
 
         if (chat.mode === 'ask') {
-            messages.push({ role: 'system', content: 'Answer the user\'s question based on the provided notes. Be concise and helpful. If the notes don\'t contain relevant information, say so.' });
+            messages.push({ role: 'system', content: 'Answer the user\'s question based on the provided notes. Be concise and helpful. If the notes don\'t contain relevant information, say so.\n\nYou can also create new notes. When the user asks you to create a note, wrap the markdown content between <<<CREATE_NOTE>>> and <<<END_CREATE>>> markers. You may include explanatory text outside the markers. Example:\n\nSure! Here is the note:\n\n<<<CREATE_NOTE>>>\n# Note Title\nNote content...\n<<<END_CREATE>>>\n\nThe note is ready for you to review.' });
 
             // Include conversation history (exclude current message — it's in the context payload below)
             const history = chat.messages.filter(m => m.role === 'user' || (m.role === 'assistant' && m.type === 'markdown'));
@@ -1113,10 +1237,13 @@ const AIAssistant = {
             } else {
                 messages.push({ role: 'user', content: instruction });
             }
-        } else if (chat.contextBlockIds.size <= 1) {
-            messages.push({ role: 'system', content: 'Return only the modified markdown. No code fences, no commentary. If no changes are needed, return nothing.' });
+        } else if (chat.contextBlockIds.size === 0) {
+            messages.push({ role: 'system', content: 'Create a new markdown note based on the user\'s instruction. Return only the markdown content. No code fences, no commentary. Start with a heading.' });
+            messages.push({ role: 'user', content: instruction });
+        } else if (chat.contextBlockIds.size === 1) {
+            messages.push({ role: 'system', content: 'Return only the modified markdown. No code fences, no commentary. If no changes are needed, return nothing.\n\nYou can also create new notes alongside any modifications. To create a new note, wrap the content in <<<CREATE_NOTE>>> and <<<END_CREATE>>> markers. The original note outside the markers will be treated as a modification.' });
             const blockId = [...chat.contextBlockIds][0];
-            const block = blockId ? Store.blocks.find(b => b.id === blockId) : null;
+            const block = Store.blocks.find(b => b.id === blockId);
             messages.push({
                 role: 'user',
                 content: `Here is the note:\n\n${block?.content || ''}\n\nApply the following instruction and return the complete modified note:\n${instruction}`
@@ -1135,7 +1262,7 @@ const AIAssistant = {
 
     _buildSingleNoteMessages(content, instruction) {
         return [
-            { role: 'system', content: 'Return only the modified markdown. No code fences, no commentary. If no changes are needed, return nothing.' },
+            { role: 'system', content: 'Return only the modified markdown. No code fences, no commentary. If no changes are needed, return nothing.\n\nYou can also create new notes alongside any modifications. To create a new note, wrap the content in <<<CREATE_NOTE>>> and <<<END_CREATE>>> markers.' },
             { role: 'user', content: `Here is the note:\n\n${content}\n\nApply the following instruction and return the complete modified note:\n${instruction}` }
         ];
     },
@@ -1205,7 +1332,7 @@ const AIAssistant = {
         if (typeof App !== 'undefined' && App.render) App.render();
 
         // Check if all diffs resolved
-        const pending = chat.messages.filter(m => m.type === 'diff' && m.accepted === null);
+        const pending = chat.messages.filter(m => (m.type === 'diff' || m.type === 'create') && m.accepted === null);
         if (pending.length === 0) chat.state = 'idle';
 
         this._renderMessages(chat);
@@ -1219,13 +1346,54 @@ const AIAssistant = {
 
         msg.accepted = false;
 
-        const pending = chat.messages.filter(m => m.type === 'diff' && m.accepted === null);
+        const pending = chat.messages.filter(m => (m.type === 'diff' || m.type === 'create') && m.accepted === null);
         if (pending.length === 0) chat.state = 'idle';
 
         this._renderMessages(chat);
         this._renderTabs();
         this._updateBadge();
         this.showInlineDiffs();
+        this.saveChats();
+    },
+
+    async _acceptCreateNote(chat, msgId) {
+        const msg = chat.messages.find(m => m.id === msgId);
+        if (!msg || msg.accepted !== null) return;
+
+        try {
+            const block = await Store.createBlock(msg.noteContent);
+            msg.accepted = true;
+            msg.createdBlockId = block.id;
+            showToast('Note created: ' + this._extractTitle(block));
+        } catch (err) {
+            showToast('Failed to create note: ' + err.message);
+            return;
+        }
+
+        TimelineView.invalidateCache();
+        SelectionManager.updateTagCounts();
+        if (typeof App !== 'undefined' && App.render) App.render();
+
+        const pending = chat.messages.filter(m => (m.type === 'diff' || m.type === 'create') && m.accepted === null);
+        if (pending.length === 0) chat.state = 'idle';
+
+        this._renderMessages(chat);
+        this._renderTabs();
+        this.saveChats();
+    },
+
+    _rejectCreateNote(chat, msgId) {
+        const msg = chat.messages.find(m => m.id === msgId);
+        if (!msg || msg.accepted !== null) return;
+
+        msg.accepted = false;
+
+        const pending = chat.messages.filter(m => (m.type === 'diff' || m.type === 'create') && m.accepted === null);
+        if (pending.length === 0) chat.state = 'idle';
+
+        this._renderMessages(chat);
+        this._renderTabs();
+        this._updateBadge();
         this.saveChats();
     },
 
@@ -1418,7 +1586,14 @@ const AIAssistant = {
                     });
                 } else {
                     const modified = this._stripCodeFences(raw);
-                    if (modified !== block.content) {
+                    const createNotes = this._parseCreateNoteResponse(modified);
+                    const textWithoutMarkers = createNotes.length > 0
+                        ? this._stripCodeFences(modified.replace(/<<<CREATE_NOTE>>>([\s\S]*?)<<<END_CREATE>>>/g, '').trim())
+                        : modified;
+
+                    let hasChanges = false;
+
+                    if (textWithoutMarkers && textWithoutMarkers !== block.content) {
                         chat.messages.push({
                             id: 'msg-' + Date.now() + '-' + i,
                             role: 'assistant',
@@ -1426,11 +1601,27 @@ const AIAssistant = {
                             blockId,
                             noteTitle: this._extractTitle(block),
                             original: block.content,
-                            modified,
+                            modified: textWithoutMarkers,
                             accepted: null,
                             meta: `${profile.model} · ${elapsed}s · note ${i + 1}/${total}`
                         });
-                    } else {
+                        hasChanges = true;
+                    }
+
+                    for (const note of createNotes) {
+                        chat.messages.push({
+                            id: 'msg-' + Date.now() + '-' + i + '-create',
+                            role: 'assistant',
+                            type: 'create',
+                            noteContent: note.content,
+                            noteTitle: note.title.slice(0, 60),
+                            accepted: null,
+                            meta: `${profile.model} · ${elapsed}s · note ${i + 1}/${total}`
+                        });
+                        hasChanges = true;
+                    }
+
+                    if (!hasChanges) {
                         chat.messages.push({
                             id: 'msg-' + Date.now() + '-' + i,
                             role: 'system', type: 'info',
@@ -1768,8 +1959,9 @@ const AIAssistant = {
             if (typeof App !== 'undefined' && App.render) App.render();
         }
 
-        const pending = chat.messages.filter(m => m.type === 'batch' && m.results.some(r => r.status === 'pending'));
-        chat.state = pending.length > 0 ? 'awaiting_input' : 'idle';
+        const hasPendingBatch = chat.messages.some(m => m.type === 'batch' && m.results.some(r => r.status === 'pending'));
+        const hasPendingOther = chat.messages.some(m => (m.type === 'diff' || m.type === 'create') && m.accepted === null);
+        chat.state = (hasPendingBatch || hasPendingOther) ? 'awaiting_input' : 'idle';
         this._renderTabs();
         this.saveChats();
     },
@@ -1895,6 +2087,19 @@ const AIAssistant = {
             const id = match[1].trim();
             const content = match[2].replace(/\n+$/, '');
             results.push({ blockId: id, content, isNew: !inputSet.has(id) });
+        }
+        return results;
+    },
+
+    _parseCreateNoteResponse(text) {
+        const results = [];
+        const regex = /<<<CREATE_NOTE>>>([\s\S]*?)<<<END_CREATE>>>/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const content = match[1].trim();
+            if (!content) continue;
+            const title = content.match(/^#{1,6}\s+(.+)/m)?.[1] || content.split('\n')[0] || 'New Note';
+            results.push({ content, title });
         }
         return results;
     }

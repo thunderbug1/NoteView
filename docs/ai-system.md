@@ -62,17 +62,18 @@ Tab status indicators:
 
 System prompt: "Return only the modified markdown. No code fences, no commentary."
 
-- **Single note in context**: Response shows as an inline **diff card** with Accept/Reject buttons. Uses CodeMirror's `unifiedMergeView`. Accepting calls `Store.saveBlock()` with undo capture.
+- **Single note in context**: Response shows as an inline **diff card** with Accept/Reject buttons. Uses CodeMirror's `unifiedMergeView`. Accepting calls `Store.saveBlock()` with undo capture. The AI can also create new notes alongside modifications using `<<<CREATE_NOTE>>>` markers — these show as separate **create cards**.
 - **Multiple notes in context**: Response is parsed via `<<<NOTE:id>>>` markers. Shows as a **batch result card** with a compact status list. "Review all" opens the existing batch review modal.
+- **No notes in context**: Creates a new note from scratch. System prompt instructs the AI to generate markdown starting with a heading. Response shows as a **create card** with Cancel/Create note buttons.
 - **No changes**: Shows "No changes detected" system message.
 
 ### Ask Mode
 
-System prompt: "Answer the user's question based on the provided notes. Be concise."
+System prompt: "Answer the user's question based on the provided notes. Be concise. You can also create new notes."
 
 - Response renders as markdown (via `marked.parse()` + `sanitizeHtml()`)
-- No diff, no accept/reject
 - Context notes included as reference material
+- **Note creation**: When the user asks to create a note, the AI wraps note content in `<<<CREATE_NOTE>>>` / `<<<END_CREATE>>>` markers. The response is split into a markdown message (explanatory text) and a **create card** (note preview with Cancel/Create note buttons). Multiple notes can be created in a single response.
 
 ## Context Manager
 
@@ -110,6 +111,7 @@ Multiple chats can stream simultaneously. Each has its own `abortController` and
 | `assistant` | `markdown` | Rendered markdown (Ask mode) |
 | `assistant` | `diff` | Inline diff card with Accept/Reject (single-note Transform) |
 | `assistant` | `batch` | Batch result card with "Review all" button (multi-note Transform) |
+| `assistant` | `create` | Create note card with Cancel/Create note buttons (Ask mode or Transform with no context) |
 | `system` | `error` | Error message with optional retry button |
 | `system` | `info` | "No changes detected", etc. |
 
