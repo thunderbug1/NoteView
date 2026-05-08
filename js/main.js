@@ -322,10 +322,12 @@ const App = {
         });
         sidebarEdgeLeft?.addEventListener('touchstart', (e) => {
             e.stopPropagation();
+            touchValid = false;
             openSidebar();
         }, { passive: true });
         sidebarEdgeRight?.addEventListener('touchstart', (e) => {
             e.stopPropagation();
+            touchValid = false;
             openSidebarRight();
         }, { passive: true });
 
@@ -352,13 +354,16 @@ const App = {
 
         // Touch swipe for sidebars
         let touchStartX = 0, touchStartY = 0, touchStartTarget = null;
+        let touchValid = false;
 
         document.addEventListener('touchstart', e => {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             touchStartTarget = e.target;
+            touchValid = true;
         }, { passive: true });
         document.addEventListener('touchend', e => {
+            if (!touchValid) return;
             if (touchStartTarget?.closest(interactiveSelector) || e.target.closest(interactiveSelector)) return;
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = e.changedTouches[0].clientY - touchStartY;
@@ -367,7 +372,7 @@ const App = {
             const w = screenWidth();
 
             // 1. Standard swipe logic for horizontal movements
-            if (absDx < 50 || absDy > 30) return;
+            if (absDx < 80 || absDx < absDy * 1.5) return;
 
             // If touch started inside a kanban board that can still scroll in the swipe direction, skip sidebar gesture
             const kanbanBoard = touchStartTarget?.closest('.kanban-board');
@@ -381,7 +386,7 @@ const App = {
                 !sidebarRight.classList.contains('sidebar-open')) {
                 const fromLeft = touchStartX;
                 if ((fromLeft > 10 && fromLeft < 50) ||
-                    (fromLeft >= 50 && fromLeft < 120 && dx > 80)) {
+                    (fromLeft >= 50 && fromLeft < 120 && dx > 100)) {
                     openSidebar();
                     return;
                 }
@@ -394,7 +399,7 @@ const App = {
                 !sidebar.classList.contains('sidebar-open')) {
                 const fromRight = w - touchStartX;
                 if ((fromRight > 10 && fromRight < 50) ||
-                    (fromRight >= 50 && fromRight < 120 && Math.abs(dx) > 80)) {
+                    (fromRight >= 50 && fromRight < 120 && Math.abs(dx) > 100)) {
                     openSidebarRight();
                     return;
                 }
