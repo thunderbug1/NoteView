@@ -2594,6 +2594,7 @@ const DocumentView = {
 
             if (block.isCollapsible && !selectionInsideBlock) {
                 const startLine = state.doc.lineAt(block.from);
+                const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
 
                 builder.push(Decoration.replace({
                     widget: new widgets.FencedBlockWidget(block),
@@ -2606,8 +2607,13 @@ const DocumentView = {
                     }
                 }).range(startLine.from));
 
-                // Interior collapse handled by createFencedBlockCollapseExtension (StateField)
-                // — ViewPlugin decorations cannot span line breaks.
+                if (endLine.number > startLine.number) {
+                    const interiorFrom = state.doc.line(startLine.number + 1).from;
+                    const interiorTo = endLine.number < state.doc.lines
+                        ? state.doc.line(endLine.number + 1).from
+                        : endLine.to;
+                    builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
+                }
             } else if (!selectionInsideBlock) {
                 builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
             }
@@ -2618,6 +2624,7 @@ const DocumentView = {
 
             if (!selectionInsideTable) {
                 const startLine = state.doc.lineAt(table.from);
+                const endLine = state.doc.lineAt(Math.max(table.from, table.to - 1));
 
                 builder.push(Decoration.replace({
                     widget: new widgets.TableWidget(table),
@@ -2627,6 +2634,14 @@ const DocumentView = {
                 builder.push(Decoration.line({
                     attributes: { class: 'md-table-summary-line' }
                 }).range(startLine.from));
+
+                if (endLine.number > startLine.number) {
+                    const interiorFrom = state.doc.line(startLine.number + 1).from;
+                    const interiorTo = endLine.number < state.doc.lines
+                        ? state.doc.line(endLine.number + 1).from
+                        : endLine.to;
+                    builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
+                }
             } else {
                 builder.push(Decoration.mark({ class: 'md-table-source' }).range(table.from, table.to));
             }
@@ -2759,97 +2774,6 @@ const DocumentView = {
             update(deco, tr) {
                 if (tr.docChanged || tr.selection || (effect && tr.effects.some(e => e.is(effect)))) {
                     return self.buildHiddenLineDecorations(tr.state);
-                }
-                return deco.map(tr.changes);
-            },
-            provide: f => EditorView.decorations.from(f)
-        });
-    },
-
-    /**
-     * Build cross-line Decoration.replace() ranges for fenced block interiors.
-     * Called from a StateField (NOT a ViewPlugin) so it CAN span line breaks.
-     */
-    buildFencedBlockInteriorDecorations(state) {
-        const { Decoration } = window.CodeMirror;
-        const { fencedBlocks } = this._getCachedParse(state.doc);
-        const builder = [];
-
-        for (const block of fencedBlocks) {
-            if (!block.isCollapsible) continue;
-            if (this.isSelectionInsideBlock(state, block)) continue;
-
-            const startLine = state.doc.lineAt(block.from);
-            const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
-
-            if (endLine.number > startLine.number) {
-                const interiorFrom = state.doc.line(startLine.number + 1).from;
-                const interiorTo = endLine.number < state.doc.lines
-                    ? state.doc.line(endLine.number + 1).from
-                    : endLine.to;
-                builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
-            }
-        }
-
-        return builder.length > 0 ? Decoration.set(builder, true) : Decoration.none;
-    },
-
-    /**
-     * Create a StateField extension for fenced block interior collapse.
-     * StateField-based decorations CAN span line breaks (unlike ViewPlugin
-     * decorations), so the collapsed interior is properly removed from
-     * CM's height map. Summary-line decorations remain in the ViewPlugin.
-     */
-    createFencedBlockCollapseExtension() {
-        const { StateField, EditorView } = window.CodeMirror;
-        const self = this;
-        return StateField.define({
-            create(state) {
-                return self.buildFencedBlockInteriorDecorations(state);
-            },
-            update(deco, tr) {
-                if (tr.docChanged || tr.selection) {
-                    return self.buildFencedBlockInteriorDecorations(tr.state);
-                }
-                return deco.map(tr.changes);
-            },
-            provide: f => EditorView.decorations.from(f)
-        });
-    },
-
-    buildTableInteriorDecorations(state) {
-        const { Decoration } = window.CodeMirror;
-        const { tables } = this._getCachedParse(state.doc);
-        const builder = [];
-
-        for (const table of tables) {
-            if (this.isSelectionInsideBlock(state, table)) continue;
-
-            const startLine = state.doc.lineAt(table.from);
-            const endLine = state.doc.lineAt(Math.max(table.from, table.to - 1));
-
-            if (endLine.number > startLine.number) {
-                const interiorFrom = state.doc.line(startLine.number + 1).from;
-                const interiorTo = endLine.number < state.doc.lines
-                    ? state.doc.line(endLine.number + 1).from
-                    : endLine.to;
-                builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
-            }
-        }
-
-        return builder.length > 0 ? Decoration.set(builder, true) : Decoration.none;
-    },
-
-    createTableCollapseExtension() {
-        const { StateField, EditorView } = window.CodeMirror;
-        const self = this;
-        return StateField.define({
-            create(state) {
-                return self.buildTableInteriorDecorations(state);
-            },
-            update(deco, tr) {
-                if (tr.docChanged || tr.selection) {
-                    return self.buildTableInteriorDecorations(tr.state);
                 }
                 return deco.map(tr.changes);
             },
@@ -3133,8 +3057,6 @@ const DocumentView = {
                 EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }, { autocomplete: wikilinkCompletionSource }]),
                 EditorView.lineWrapping,
                 this.createHiddenLineExtension(),
-                this.createFencedBlockCollapseExtension(),
-                this.createTableCollapseExtension(),
                 this.createLivePreviewPlugin(),
                 this.createIndentFolding(),
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),
