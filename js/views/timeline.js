@@ -519,7 +519,7 @@ const TimelineView = {
                         if (!TaskParser.isUnblockedTask(eventTask)) return false;
                     }
                 }
-                if (contextSelection.has('Status.unassigned')) {
+                if (contextSelection.has('Todo.unassigned')) {
                     if (event.category !== 'task') return false;
                     const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
                     if (!TaskParser.isUnassignedTask(eventTask)) return false;

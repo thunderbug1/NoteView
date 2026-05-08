@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c /home/thinx/Projects/NoteView/NoteView/js/main.js)",
+      "Bash(node -c js/modals/tagModal.js)",
+      "Bash(find .:*)",
+      "Bash(find:*)",
+      "Bash(curl *)",
+      "WebSearch",
+      "Bash(grep -n 'data-id=\"\\\\${' /home/thinx/Projects/NoteView/NoteView/js/views/document.js)",
+      "Bash(grep -n 'querySelector\\(`.*data-id=\"\\\\${' /home/thinx/Projects/NoteView/NoteView/js/views/document.js)",
+      "Bash(node -c /home/thinx/Projects/NoteView/NoteView/js/widgets/codeMirrorWidgets.js)",
+      "Bash(node -c /home/thinx/Projects/NoteView/NoteView/js/views/document.js)",
+      "Bash(node -c /home/thinx/Projects/NoteView/NoteView/js/views/kanban.js)",
+      "Bash(grep -E \"\\\\.\\(js|css|html\\)$\")",
+      "Bash(python3 -c \"import json,sys; items=json.load\\(sys.stdin\\); [print\\(f'{i[\\\\\"type\\\\\"]:4} {i[\\\\\"name\\\\\"]}'\\) for i in items]\")",
+      "Bash(gh api *)",
+      "Bash(node *)",
+      "Bash(tar tf *)"
+    ]
+  }
+}

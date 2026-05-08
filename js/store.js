@@ -1112,7 +1112,7 @@ const Store = {
                 }
 
                 // Task-level computed: find at least one task satisfying ALL selected conditions
-                const TASK_COMPUTED_TAGS = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.unassigned'];
+                const TASK_COMPUTED_TAGS = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned'];
                 const activeTaskComputed = [...contextSelection].filter(t => TASK_COMPUTED_TAGS.includes(t));
 
                 if (activeTaskComputed.length > 0) {
@@ -1126,7 +1126,7 @@ const Store = {
                                 case 'Todo.blocked':      return TaskParser.isBlockedTask(task);
                                 case 'Todo.canceled':     return TaskParser.isCanceledTask(task);
                                 case 'Todo.unblocked':    return TaskParser.isUnblockedTask(task);
-                                case 'Status.unassigned': return TaskParser.isUnassignedTask(task);
+                                case 'Todo.unassigned': return TaskParser.isUnassignedTask(task);
                             }
                         })
                     );
@@ -1155,7 +1155,7 @@ const Store = {
                             if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isUnblockedTask(t))) return false;
                         } else if (item === 'Status.untagged') {
                             if (!block.tags || block.tags.length === 0) return false;
-                        } else if (item === 'Status.unassigned') {
+                        } else if (item === 'Todo.unassigned') {
                             if (TaskParser.hasUnassignedTasks(TaskParser.parseTasksFromBlock(block))) return false;
                         }
                     } else if (item.startsWith('path:')) {
@@ -1285,10 +1285,10 @@ const Store = {
                     reasons.push({ type: 'context', label: 'Status.untagged' });
                 }
             }
-            if (contextSelection.has('Status.unassigned')) {
+            if (contextSelection.has('Todo.unassigned')) {
                 const tasks = TaskParser.parseTasksFromBlock(block);
                 if (!TaskParser.hasUnassignedTasks(tasks)) {
-                    reasons.push({ type: 'context', label: 'Status.unassigned' });
+                    reasons.push({ type: 'context', label: 'Todo.unassigned' });
                 }
             }
         }
@@ -1327,9 +1327,9 @@ const Store = {
                         if (!block.tags || block.tags.length === 0) {
                             reasons.push({ type: 'excluded', label: 'Status.untagged' });
                         }
-                    } else if (item === 'Status.unassigned') {
+                    } else if (item === 'Todo.unassigned') {
                         if (TaskParser.hasUnassignedTasks(TaskParser.parseTasksFromBlock(block))) {
-                            reasons.push({ type: 'excluded', label: 'Status.unassigned' });
+                            reasons.push({ type: 'excluded', label: 'Todo.unassigned' });
                         }
                     }
                 } else if (item.startsWith('path:')) {

@@ -326,7 +326,7 @@ const KanbanView = {
             if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
+            if (contextSelection?.has('Todo.unassigned') && !TaskParser.isUnassignedTask(task)) {
                 return false;
             }
             return true;
@@ -355,7 +355,7 @@ const KanbanView = {
             if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
+            if (contextSelection?.has('Todo.unassigned') && !TaskParser.isUnassignedTask(task)) {
                 return false;
             }
             return true;

@@ -23,12 +23,12 @@ const SelectionManager = {
     HISTORY_DEBOUNCE_MS: 3000,
     HISTORY_MAX_ENTRIES: 50,
 
-    computedContextTags: ['Time.today', 'Time.thisWeek', 'Time.thisMonth', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
+    computedContextTags: ['Time.today', 'Time.thisWeek', 'Time.thisMonth', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned', 'Status.untagged'],
 
     // Selecting a tag in an exclusion group removes all other tags in that group
     computedExclusionGroups: [
         ['Time.today', 'Time.thisWeek', 'Time.thisMonth'],
-        ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked']
+        ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned']
     ],
 
     // Archived tags state
@@ -75,9 +75,10 @@ const SelectionManager = {
                 'blockedTodos': 'Todo.blocked',
                 'unblockedTodos': 'Todo.unblocked',
                 'untagged': 'Status.untagged',
-                'unassigned': 'Status.unassigned'
+                'unassigned': 'Todo.unassigned'
             };
             context = context.map(tag => tagMigration[tag] || tag)
+                .map(tag => tag === 'Status.unassigned' ? 'Todo.unassigned' : tag)
                 .filter(tag => tag !== 'Todo.all');
 
             this.selections.context = new Set(context.filter(tag => typeof tag === 'string' && tag.trim() !== ''));
@@ -1011,8 +1012,8 @@ const SelectionManager = {
             else if (tag === 'Todo.blocked') hasBlocks = hasBlockedTodos;
             else if (tag === 'Todo.canceled') hasBlocks = hasCanceledTodos;
             else if (tag === 'Todo.unblocked') hasBlocks = hasUnblockedTodos;
+            else if (tag === 'Todo.unassigned') hasBlocks = hasUnassigned;
             else if (tag === 'Status.untagged') hasBlocks = hasUntagged;
-            else if (tag === 'Status.unassigned') hasBlocks = hasUnassigned;
             else hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
 
             // Only update opacity if it needs to change (avoid DOM thrashing)

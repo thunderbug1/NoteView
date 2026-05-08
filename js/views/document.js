@@ -2469,7 +2469,7 @@ const DocumentView = {
     getActiveTaskFilter() {
         const context = SelectionManager.selections?.context;
         if (!context || context.size === 0) return new Set();
-        const taskFilters = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.unassigned'];
+        const taskFilters = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned'];
         const active = new Set();
         for (const f of taskFilters) {
             if (context.has(f)) active.add(f);
@@ -2500,7 +2500,7 @@ const DocumentView = {
             if (filter === 'Todo.blocked' && !isBlockedState) return false;
             if (filter === 'Todo.canceled' && !isCanceled) return false;
             if (filter === 'Todo.unblocked' && !isOpen) return false;
-            if (filter === 'Status.unassigned' && hasAssignee) return false;
+            if (filter === 'Todo.unassigned' && hasAssignee) return false;
         }
         return true;
     },
