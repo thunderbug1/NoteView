@@ -861,7 +861,7 @@ const App = {
             overlay.innerHTML = '<div class="view-spinner"></div>';
             container.appendChild(overlay);
         }
-        requestAnimationFrame(() => overlay.classList.add('visible'));
+        overlay.classList.add('visible');
         this._loadingOverlay = overlay;
     },
 
