@@ -645,6 +645,15 @@ const App = {
             });
         }
 
+        // Filter bar clear button
+        const filterBarClear = document.querySelector('.filter-bar-clear');
+        if (filterBarClear) {
+            filterBarClear.addEventListener('click', () => {
+                SelectionManager.clearAllFilters();
+                App.render();
+            });
+        }
+
         // Toolbar AI button
         const toolbarAiBtn = document.getElementById('toolbarAiBtn');
         if (toolbarAiBtn) {
@@ -924,6 +933,7 @@ const App = {
     _postRender() {
         SortManager.updateToolbar();
         GroupManager.updateToolbar();
+        this.updateFilterBar();
 
         const view = Store.currentView;
         const toolbarRecentBtn = document.getElementById('toolbarRecentBtn');
@@ -952,6 +962,50 @@ const App = {
             AITaskPanel.checkAutoDismiss(focusedBlockId);
             AITaskPanel.render();
         }
+    },
+
+    updateFilterBar() {
+        const bar = document.getElementById('filterBar');
+        if (!bar) return;
+
+        const sel = SelectionManager.selections;
+        const hasFilters = (sel?.context?.size > 0) || (sel?.excluded?.size > 0)
+            || !!Store.searchQuery || !!sel?.contact;
+
+        if (!hasFilters || Store.currentView === 'capture' || Store.currentView === 'settings') {
+            bar.hidden = true;
+            return;
+        }
+
+        const filtered = Store.getFilteredBlocks().length;
+        const total = Store.blocks.length;
+        if (filtered === total) { bar.hidden = true; return; }
+
+        bar.hidden = false;
+        bar.querySelector('.filter-bar-count').textContent =
+            `${filtered} of ${total} notes`;
+
+        const tagsEl = bar.querySelector('.filter-bar-tags');
+        const pills = [];
+        if (sel.context?.size > 0) {
+            sel.context.forEach(tag => {
+                const name = SelectionManager.getTagDisplayName(tag);
+                pills.push(`<span class="filter-bar-pill">${escapeHtml(name)}</span>`);
+            });
+        }
+        if (sel.excluded?.size > 0) {
+            sel.excluded.forEach(tag => {
+                const name = SelectionManager.getTagDisplayName(tag);
+                pills.push(`<span class="filter-bar-pill" style="text-decoration:line-through;opacity:0.7">${escapeHtml(name)}</span>`);
+            });
+        }
+        if (Store.searchQuery) {
+            pills.push(`<span class="filter-bar-pill">"${escapeHtml(Store.searchQuery)}"</span>`);
+        }
+        if (sel.contact) {
+            pills.push(`<span class="filter-bar-pill">@${escapeHtml(sel.contact)}</span>`);
+        }
+        tagsEl.innerHTML = pills.join('');
     },
 
     updateUndoRedoUI() {

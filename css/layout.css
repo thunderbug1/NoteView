@@ -404,6 +404,51 @@
     display: none;
 }
 
+/* Filter summary bar */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.75rem;
+    background: var(--accent-light, rgba(59, 130, 246, 0.08));
+    border-bottom: 1px solid var(--accent-light, rgba(59, 130, 246, 0.15));
+    font-size: 0.75rem;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+.filter-bar[hidden] { display: none; }
+.filter-bar-count { white-space: nowrap; font-weight: 500; }
+.filter-bar-tags {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    flex: 1;
+    min-width: 0;
+    scrollbar-width: none;
+}
+.filter-bar-tags::-webkit-scrollbar { display: none; }
+.filter-bar-pill {
+    padding: 0.1rem 0.4rem;
+    background: var(--accent-light, rgba(59, 130, 246, 0.12));
+    border-radius: 99px;
+    white-space: nowrap;
+    font-size: 0.7rem;
+}
+.filter-bar-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 0.15rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+.filter-bar-clear:hover { opacity: 1; background: var(--accent-light); }
+
 #viewContainer {
     flex: 1;
     overflow-y: auto;
@@ -508,7 +553,10 @@
     #main:has(.capture-page) { overflow: hidden; }
     #main:has(.capture-view) .content-toolbar,
     #main:has(.capture-page) .content-toolbar,
-    #main:has(.settings-view) .content-toolbar { display: none; }
+    #main:has(.settings-view) .content-toolbar,
+    #main:has(.capture-view) .filter-bar,
+    #main:has(.capture-page) .filter-bar,
+    #main:has(.settings-view) .filter-bar { display: none; }
     #viewContainer { padding: 1rem; overflow: visible; }
     #main:has(.capture-view) > #viewContainer,
     #main:has(.capture-page) > #viewContainer { padding: 0; }
@@ -518,6 +566,12 @@
         position: sticky;
         top: 0;
         z-index: 55;
+    }
+
+    .filter-bar {
+        position: sticky;
+        top: 38px;
+        z-index: 54;
     }
 }
 
