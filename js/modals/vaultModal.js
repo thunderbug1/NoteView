@@ -74,17 +74,25 @@ const VaultModal = {
         });
         menu.appendChild(manageItem);
 
-        // Position above the button
+        // Position above the button, or below if not enough room
         document.body.appendChild(menu);
         const rect = btn.getBoundingClientRect();
-        const availHeight = rect.top - 8; // space above the button
+        const spaceAbove = rect.top - 8;
+        const spaceBelow = window.innerHeight - rect.bottom - 8;
+        const showAbove = spaceAbove >= 120 || spaceAbove >= spaceBelow;
         menu.style.position = 'fixed';
-        menu.style.top = 'auto'; // override .task-context-menu top:0
         menu.style.left = `${rect.left}px`;
-        menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
         menu.style.minWidth = `${rect.width}px`;
-        menu.style.maxHeight = `min(${availHeight}px, 300px)`;
         menu.style.overflowY = 'auto';
+        if (showAbove) {
+            menu.style.top = 'auto';
+            menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+            menu.style.maxHeight = `min(${spaceAbove}px, 300px)`;
+        } else {
+            menu.style.top = `${rect.bottom + 4}px`;
+            menu.style.bottom = 'auto';
+            menu.style.maxHeight = `min(${spaceBelow}px, 300px)`;
+        }
 
         // Close on outside click
         const closeDropdown = (e) => {
