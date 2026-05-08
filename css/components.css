@@ -359,10 +359,18 @@
     display: flex;
 }
 
-/* Computed tag distinction in sidebar */
+/* Computed tag section */
+#computedTagGroup {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.4rem;
+}
+
 .tag-radio-option.computed .tag-badge {
     font-style: italic;
     opacity: 0.85;
+    border-style: dashed;
 }
 
 /* Untagged filter emphasis when untagged blocks exist */

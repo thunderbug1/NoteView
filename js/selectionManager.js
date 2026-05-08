@@ -8,7 +8,6 @@ const SelectionManager = {
 
     // Selection state
     selections: {
-        time: '',
         context: new Set(),
         excluded: new Set(),
         contact: ''
@@ -24,10 +23,11 @@ const SelectionManager = {
     HISTORY_DEBOUNCE_MS: 3000,
     HISTORY_MAX_ENTRIES: 50,
 
-    computedContextTags: ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
+    computedContextTags: ['Time.today', 'Time.thisWeek', 'Time.thisMonth', 'Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
 
     // Selecting a tag in an exclusion group removes all other tags in that group
     computedExclusionGroups: [
+        ['Time.today', 'Time.thisWeek', 'Time.thisMonth'],
         ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked']
     ],
 
@@ -85,6 +85,13 @@ const SelectionManager = {
             excluded = excluded.map(tag => tagMigration[tag] || tag);
             this.selections.excluded = new Set(excluded.filter(tag => typeof tag === 'string' && tag.trim() !== ''));
 
+            // Migrate old time selection to context
+            if (parsed?.time && typeof parsed.time === 'string' && parsed.time.trim() !== '') {
+                const timeMigration = { 'today': 'Time.today', 'thisWeek': 'Time.thisWeek', 'thisMonth': 'Time.thisMonth' };
+                const migrated = timeMigration[parsed.time];
+                if (migrated) this.selections.context.add(migrated);
+            }
+
             console.log('[SelectionManager] loadSelectionState:parsed', {
                 context: Array.from(this.selections.context),
                 excluded: Array.from(this.selections.excluded)
@@ -125,24 +132,6 @@ const SelectionManager = {
         });
 
         this.saveSelectionState();
-    },
-
-    /**
-     * Set the time selection
-     * @param {string} timeSelection - Time selection value
-     */
-    setTimeSelection(timeSelection) {
-        this.selections.time = timeSelection;
-        this.updateSelectionUI();
-        this.scheduleHistoryPush();
-    },
-
-    /**
-     * Get the current time selection
-     * @returns {string} Current time selection
-     */
-    getTimeSelection() {
-        return this.selections.time;
     },
 
     /**
@@ -308,7 +297,6 @@ const SelectionManager = {
     clearAllFilters() {
         this.selections.context.clear();
         this.selections.excluded.clear();
-        this.selections.time = '';
         this.selections.contact = '';
         Store.searchQuery = '';
         this.saveSelectionState();
@@ -325,7 +313,6 @@ const SelectionManager = {
         return {
             context: Array.from(this.selections.context).sort(),
             excluded: Array.from(this.selections.excluded).sort(),
-            time: this.selections.time || '',
             contact: this.selections.contact || ''
         };
     },
@@ -421,7 +408,12 @@ const SelectionManager = {
         try {
             this.selections.context = new Set(entry.context);
             this.selections.excluded = new Set(entry.excluded);
-            this.selections.time = entry.time;
+            // Migrate old time entry to context
+            if (entry.time && typeof entry.time === 'string' && entry.time.trim() !== '') {
+                const timeMigration = { 'today': 'Time.today', 'thisWeek': 'Time.thisWeek', 'thisMonth': 'Time.thisMonth' };
+                const migrated = timeMigration[entry.time];
+                if (migrated) this.selections.context.add(migrated);
+            }
             this.selections.contact = entry.contact;
             this.saveSelectionState();
             this.updateSelectionUI();
@@ -531,7 +523,10 @@ const SelectionManager = {
             'ideas': 'Ideas',
             'today': 'Today',
             'thisWeek': 'This Week',
-            'thisMonth': 'This Month'
+            'thisMonth': 'This Month',
+            'Time.today': 'Today',
+            'Time.thisWeek': 'This Week',
+            'Time.thisMonth': 'This Month'
         };
         if (displayNames[tag]) return displayNames[tag];
         return Common.formatTagDisplay(tag);
@@ -913,9 +908,7 @@ const SelectionManager = {
             let isGroupMatch = false;
             let isExcluded = false;
 
-            if (group === 'time') {
-                isSelected = this.selections.time === tag;
-            } else if (group === 'context') {
+            if (group === 'context') {
                 const directlySelected = this.selections.context.has(tag);
                 isExcluded = this.selections.excluded.has(tag);
                 isSelected = directlySelected;
@@ -1010,23 +1003,19 @@ const SelectionManager = {
             const tag = option.dataset.tag;
             let hasBlocks = false;
 
-            if (group === 'time') {
-                if (tag === '') hasBlocks = true;
-                else if (tag === 'today') hasBlocks = hasToday;
-                else if (tag === 'thisWeek') hasBlocks = hasThisWeek;
-                else if (tag === 'thisMonth') hasBlocks = hasThisMonth;
-            } else {
-                if (tag === 'Todo.all') hasBlocks = hasAllTodos;
-                else if (tag === 'Todo.open') hasBlocks = hasOpenTodos;
-                else if (tag === 'Todo.inProgress') hasBlocks = hasInProgressTodos;
-                else if (tag === 'Todo.done') hasBlocks = hasDoneTodos;
-                else if (tag === 'Todo.blocked') hasBlocks = hasBlockedTodos;
-                else if (tag === 'Todo.canceled') hasBlocks = hasCanceledTodos;
-                else if (tag === 'Todo.unblocked') hasBlocks = hasUnblockedTodos;
-                else if (tag === 'Status.untagged') hasBlocks = hasUntagged;
-                else if (tag === 'Status.unassigned') hasBlocks = hasUnassigned;
-                else hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
-            }
+            if (tag === 'Time.today') hasBlocks = hasToday;
+            else if (tag === 'Time.thisWeek') hasBlocks = hasThisWeek;
+            else if (tag === 'Time.thisMonth') hasBlocks = hasThisMonth;
+            else if (tag === 'Todo.all') hasBlocks = hasAllTodos;
+            else if (tag === 'Todo.open') hasBlocks = hasOpenTodos;
+            else if (tag === 'Todo.inProgress') hasBlocks = hasInProgressTodos;
+            else if (tag === 'Todo.done') hasBlocks = hasDoneTodos;
+            else if (tag === 'Todo.blocked') hasBlocks = hasBlockedTodos;
+            else if (tag === 'Todo.canceled') hasBlocks = hasCanceledTodos;
+            else if (tag === 'Todo.unblocked') hasBlocks = hasUnblockedTodos;
+            else if (tag === 'Status.untagged') hasBlocks = hasUntagged;
+            else if (tag === 'Status.unassigned') hasBlocks = hasUnassigned;
+            else hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
 
             // Only update opacity if it needs to change (avoid DOM thrashing)
             const newOpacity = (!hasBlocks && !option.classList.contains('selected')) ? '0.4' : '1';

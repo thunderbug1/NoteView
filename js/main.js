@@ -470,17 +470,6 @@ const App = {
                         });
                         option.classList.add('selected');
                     }
-                } else if (group === 'time') {
-                    if (wasSelected && tag !== '') {
-                        SelectionManager.setTimeSelection('');
-                        option.classList.remove('selected');
-                    } else {
-                        SelectionManager.setTimeSelection(tag);
-                        document.querySelectorAll(`.tag-radio-option[data-group="time"]`).forEach(opt => {
-                            opt.classList.remove('selected');
-                        });
-                        option.classList.add('selected');
-                    }
                 } else if (group === 'contact') {
                     if (wasSelected) {
                         SelectionManager.setContactSelection('');

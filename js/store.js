@@ -33,7 +33,6 @@ const Store = {
 
     // Cache for filtered blocks
     _filteredBlocksCache: CacheManager.createCache(() => {
-        const timeSelection = window.SelectionManager?.selections?.time || '';
         const contextSelection = window.SelectionManager?.selections?.context
             ? Array.from(window.SelectionManager.selections.context).sort().join(',')
             : '';
@@ -44,7 +43,7 @@ const Store = {
         const searchQuery = Store.searchQuery || '';
         const timeProperty = Store.timeProperty || 'lastUpdated';
         const blocksHash = Store.blocks?.map(b => b.id).join(',') || '';
-        return `${timeSelection}|${contextSelection}|${excludedSelection}|${contactSelection}|${searchQuery}|${timeProperty}|${blocksHash}`;
+        return `${contextSelection}|${excludedSelection}|${contactSelection}|${searchQuery}|${timeProperty}|${blocksHash}`;
     }),
 
     // IndexedDB for persistence
@@ -1062,9 +1061,14 @@ const Store = {
         // Filter only unpinned blocks
         const filteredUnpinned = unpinnedBlocks.filter(block => {
             // Get active selections from App
-            const timeSelection = SelectionManager.selections.time || '';
             const contextSelection = SelectionManager.selections.context;
             const contactSelection = SelectionManager.selections.contact;
+
+            // Derive time selection from context
+            let timeSelection = '';
+            if (contextSelection.has('Time.today')) timeSelection = 'today';
+            else if (contextSelection.has('Time.thisWeek')) timeSelection = 'thisWeek';
+            else if (contextSelection.has('Time.thisMonth')) timeSelection = 'thisMonth';
 
             // Time filter (if selected)
             if (timeSelection) {
@@ -1201,11 +1205,16 @@ const Store = {
         const reasons = [];
         if (block.pinned) return reasons;
 
-        const timeSelection = SelectionManager.selections.time || '';
         const contextSelection = SelectionManager.selections.context;
         const excludedSelection = SelectionManager.selections.excluded;
         const contactSelection = SelectionManager.selections.contact;
         const searchQuery = this.searchQuery;
+
+        // Derive time selection from context
+        let timeSelection = '';
+        if (contextSelection.has('Time.today')) timeSelection = 'today';
+        else if (contextSelection.has('Time.thisWeek')) timeSelection = 'thisWeek';
+        else if (contextSelection.has('Time.thisMonth')) timeSelection = 'thisMonth';
 
         // Time filter
         if (timeSelection) {

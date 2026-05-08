@@ -149,6 +149,7 @@ body {
     line-height: 1.6;
     color: var(--text-primary);
     background: var(--bg-primary);
+    overflow: hidden;
 }
 
 /* Scrollbar */

@@ -25,13 +25,12 @@ const TimelineView = {
 
     // Filtered events cache (keyed by sidebar selections)
     _cache: CacheManager.createCache(() => {
-        const timeSelection = SelectionManager.selections?.time || '';
         const contextSelection = SelectionManager.selections?.context
             ? Array.from(SelectionManager.selections.context).sort().join(',')
             : '';
         const contactSelection = SelectionManager.selections?.contact || '';
         const searchQuery = Store.searchQuery || '';
-        return `${timeSelection}|${contextSelection}|${contactSelection}|${searchQuery}`;
+        return `${contextSelection}|${contactSelection}|${searchQuery}`;
     }),
 
     // Raw git data cache — stores task snapshots per commit, survives filter changes.
@@ -448,8 +447,13 @@ const TimelineView = {
      * Filter events based on current sidebar selections (context tags, search, contacts, time).
      */
     filterEvents(events) {
-        const timeSelection = SelectionManager.selections.time || '';
         const contextSelection = SelectionManager.selections.context;
+
+        // Derive time selection from context
+        let timeSelection = '';
+        if (contextSelection.has('Time.today')) timeSelection = 'today';
+        else if (contextSelection.has('Time.thisWeek')) timeSelection = 'thisWeek';
+        else if (contextSelection.has('Time.thisMonth')) timeSelection = 'thisMonth';
         const contactSelection = SelectionManager.selections.contact;
         const searchQuery = Store.searchQuery;
 
