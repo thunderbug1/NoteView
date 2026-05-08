@@ -164,7 +164,8 @@ const SelectionManager = {
             context: Array.from(this.selections.context)
         });
         if (tag === 'Status.untagged') {
-            this.selections.context.clear();
+            // Only clear other computed tags, keep regular tags
+            this.computedContextTags.forEach(t => this.selections.context.delete(t));
         } else {
             this.selections.context.delete('Status.untagged');
             for (const group of this.computedExclusionGroups) {
