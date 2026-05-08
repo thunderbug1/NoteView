@@ -34,7 +34,20 @@ const SettingsView = {
         `).join('');
     },
 
+    _cleanupShortcutRecording() {
+        if (this._activeShortcutHandler) {
+            window.removeEventListener('keydown', this._activeShortcutHandler, true);
+            this._activeShortcutHandler = null;
+        }
+        if (this._activeShortcutBtn) {
+            this._activeShortcutBtn.classList.remove('recording');
+            this._activeShortcutBtn.textContent = 'Record';
+            this._activeShortcutBtn = null;
+        }
+    },
+
     async render(blocks) {
+        this._cleanupShortcutRecording();
         const container = document.getElementById('viewContainer');
         if (!container) return;
 
@@ -315,6 +328,15 @@ const SettingsView = {
                     e.preventDefault();
                     e.stopPropagation();
 
+                    if (e.key === 'Escape') {
+                        window.removeEventListener('keydown', handleKeydown, true);
+                        btn.textContent = 'Record';
+                        btn.classList.remove('recording');
+                        SettingsView._activeShortcutHandler = null;
+                        SettingsView._activeShortcutBtn = null;
+                        return;
+                    }
+
                     const keys = [];
                     if (e.ctrlKey) keys.push('Ctrl');
                     if (e.altKey) keys.push('Alt');
@@ -332,6 +354,8 @@ const SettingsView = {
                     window.removeEventListener('keydown', handleKeydown, true);
                     btn.classList.remove('recording');
                     btn.textContent = newShortcut;
+                    SettingsView._activeShortcutHandler = null;
+                    SettingsView._activeShortcutBtn = null;
 
                     const shortcuts = { ...Store.shortcuts, [shortcutKey]: newShortcut };
                     await Store.saveShortcuts(shortcuts);
@@ -343,6 +367,8 @@ const SettingsView = {
                     }
                 };
 
+                SettingsView._activeShortcutHandler = handleKeydown;
+                SettingsView._activeShortcutBtn = btn;
                 window.addEventListener('keydown', handleKeydown, true);
             });
         });

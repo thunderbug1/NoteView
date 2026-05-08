@@ -317,16 +317,16 @@ const KanbanView = {
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }
-            if (contextSelection.has('Todo.open') && !TaskParser.isOpenTask(task)) {
+            if (contextSelection?.has('Todo.open') && !TaskParser.isOpenTask(task)) {
                 return false;
             }
-            if (contextSelection.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
+            if (contextSelection?.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
+            if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
+            if (contextSelection?.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
                 return false;
             }
             return true;
@@ -346,16 +346,16 @@ const KanbanView = {
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }
-            if (contextSelection.has('Todo.open') && !TaskParser.isOpenTask(task)) {
+            if (contextSelection?.has('Todo.open') && !TaskParser.isOpenTask(task)) {
                 return false;
             }
-            if (contextSelection.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
+            if (contextSelection?.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
+            if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
-            if (contextSelection.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
+            if (contextSelection?.has('Status.unassigned') && !TaskParser.isUnassignedTask(task)) {
                 return false;
             }
             return true;
@@ -935,7 +935,7 @@ const KanbanView = {
         let nextNewline = content.indexOf('\n', matchIndex);
         if (nextNewline === -1) nextNewline = content.length;
         let taskLine = content.substring(matchIndex, nextNewline);
-        const completedRegex = /\s*\[completed::\s*[^\]]+\]/g;
+        const completedRegex = /\s*\[completed::\s*[^\]]+\]/;
 
         if (targetState === 'x') {
             const timestamp = new Date().toISOString();

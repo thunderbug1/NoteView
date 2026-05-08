@@ -109,13 +109,17 @@ const SyncManager = {
             this._setStatus('idle', 'Synced');
 
             // Re-render to reflect pulled changes and update unpushed markers
-            if (window.App && typeof App.render === 'function') {
-                await Store.loadBlocks();
-                Store._filteredBlocksCache.invalidate();
-                SelectionManager.updateTagCounts();
-                TimelineView.invalidateRawDataCache();
-                TimelineView.invalidateCache();
-                App.render();
+            try {
+                if (window.App && typeof App.render === 'function') {
+                    await Store.loadBlocks();
+                    Store._filteredBlocksCache.invalidate();
+                    SelectionManager.updateTagCounts();
+                    TimelineView.invalidateRawDataCache();
+                    TimelineView.invalidateCache();
+                    App.render();
+                }
+            } catch (renderErr) {
+                console.error('Post-sync render failed:', renderErr);
             }
             return true;
         } catch (err) {

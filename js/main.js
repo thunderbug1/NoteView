@@ -2126,6 +2126,9 @@ const App = {
                 // Persist created content if any
                 const editor = DocumentView.editors.get(createdBlockId || modalBlockId);
                 const currentContent = editor ? editor.state.doc.toString() : '';
+                if (!createdBlockId && currentContent.trim()) {
+                    await Store.createBlock(currentContent.trim());
+                }
                 modal.close();
 
                 // If block was already created, reopen modal for continued editing

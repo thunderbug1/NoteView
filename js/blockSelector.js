@@ -374,8 +374,12 @@ const BlockSelector = {
                 const block = Store.blocks.find(b => b.id === blockId);
                 if (!block) continue;
                 let content = block.content;
+                // Re-parse tasks from fresh content to get accurate matchIndex values
+                const freshTasks = KanbanView.extractTasks([block]);
+                const taskIds = new Set(tasks.map(t => t.id));
+                const freshMatch = freshTasks.filter(t => taskIds.has(t.id));
                 // Remove tasks in reverse matchIndex order to preserve positions
-                const sorted = tasks.sort((a, b) => b.matchIndex - a.matchIndex);
+                const sorted = freshMatch.sort((a, b) => b.matchIndex - a.matchIndex);
                 for (const task of sorted) {
                     let nextNewline = content.indexOf('\n', task.matchIndex);
                     if (nextNewline === -1) nextNewline = content.length;

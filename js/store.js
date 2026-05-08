@@ -903,14 +903,7 @@ const Store = {
 
         const block = this.blocks[index];
 
-        // Record command BEFORE deletion
-        if (!UndoRedoManager.isExecuting) {
-            await UndoRedoManager.executeCommand({
-                type: 'delete',
-                blockId: block.id,
-                blockData: { ...block }
-            });
-        }
+        const blockData = { ...block };
 
         RecentAccessTracker.recordDeletion(block);
 
@@ -921,6 +914,15 @@ const Store = {
         } catch (e) {
             console.error('Failed to delete file', e);
             throw e;
+        }
+
+        // Record command AFTER successful file deletion
+        if (!UndoRedoManager.isExecuting) {
+            await UndoRedoManager.executeCommand({
+                type: 'delete',
+                blockId: block.id,
+                blockData
+            });
         }
 
         // Remove from memory only after file deletion attempt
@@ -1368,6 +1370,7 @@ const Store = {
                     });
                     Object.assign(block, beforeState);
                 }
+                this.extractContacts();
                 throw writeError;
             }
 
@@ -1433,6 +1436,9 @@ const Store = {
 
     // Override loadBlocks to invalidate cache
     async loadBlocks() {
+        if (this._isLoading) return;
+        this._isLoading = true;
+        try {
         this.blocks = [];
         this._filteredBlocksCache.invalidate();
 
@@ -1470,6 +1476,9 @@ const Store = {
         }
         this.extractContacts();
         console.log(`Loaded ${this.blocks.length} blocks`);
+        } finally {
+            this._isLoading = false;
+        }
     }
 };
 
@@ -1491,10 +1500,10 @@ function parseFrontMatter(content) {
         currentContent = currentContent.substring(match[0].length).trimStart();
         
         metadataString.split(/\r?\n/).forEach(line => {
-            const separatorIndex = line.indexOf(':');
-            if (separatorIndex === -1) return;
-            const key = line.substring(0, separatorIndex).trim();
-            const valueStr = line.substring(separatorIndex + 1).trim();
+            const lineMatch = line.match(/^([^:]+):\s*(.*)$/);
+            if (!lineMatch) return;
+            const key = lineMatch[1].trim();
+            const valueStr = lineMatch[2].trim();
             
             // Because they stack chronologically, the first block is newest
             if (!(key in data)) {

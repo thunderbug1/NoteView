@@ -943,7 +943,7 @@ const SelectionManager = {
     /**
      * Update tag counts and dim unused tags (optimized to avoid full re-render)
      */
-    updateTagCounts() {
+    updateTagCounts({ skipRender = false } = {}) {
         const tagCounts = {};
         let hasAllTodos = false;
         let hasOpenTodos = false;
@@ -1000,7 +1000,7 @@ const SelectionManager = {
             }
         });
 
-        this.renderContextSidebar();
+        if (!skipRender) this.renderContextSidebar();
 
         // Optimized update: only modify opacity, don't re-render entire DOM
         document.querySelectorAll('.tag-radio-option').forEach(option => {

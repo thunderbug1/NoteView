@@ -67,7 +67,7 @@ const AIAssistant = {
                 this._chatIdCounter = Math.max(...this._chats.map(c => {
                     const num = parseInt(c.id.replace('chat-', ''));
                     return isNaN(num) ? 0 : num;
-                }), 0);
+                }), 0) + 1;
                 this._activeChatId = this._chats[this._chats.length - 1].id;
             } else {
                 this._chats = [];
@@ -1097,10 +1097,11 @@ const AIAssistant = {
             const history = chat.messages.filter(m => m.role === 'user' || (m.role === 'assistant' && m.type === 'markdown'));
             const recent = history.slice(0, -1).slice(-20);
             for (const msg of recent) {
-                if (msg.role === 'user') {
-                    messages.push({ role: 'user', content: msg.content });
+                const lastMsg = messages[messages.length - 1];
+                if (lastMsg && lastMsg.role === msg.role) {
+                    lastMsg.content += '\n' + msg.content;
                 } else {
-                    messages.push({ role: 'assistant', content: msg.content });
+                    messages.push({ role: msg.role, content: msg.content });
                 }
             }
 

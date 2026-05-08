@@ -690,6 +690,7 @@ const DocumentView = {
                             changes: { from: 0, to: existingEditor.state.doc.length, insert: normalizedFresh }
                         });
                     }
+                    this.originalContents.set(blockId, normalizedFresh);
                 }
 
                 // Force hidden-line StateField to rebuild for the current filter state
@@ -1968,6 +1969,7 @@ const DocumentView = {
         const fencedLineSet = new Set(fencedRanges);
 
         const isTableRow = (line) => line.trim().length > 0 && line.includes('|');
+        const isTableHeaderRow = (line) => line.trim().length > 0 && line.split('|').length >= 3;
         const parseRow = (line) => {
             let trimmed = line.trim();
             if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
@@ -1999,7 +2001,7 @@ const DocumentView = {
         while (i < lines.length - 1) {
             if (fencedLineSet.has(i)) { i++; continue; }
 
-            if (isTableRow(lines[i]) && isSeparator(lines[i + 1])) {
+            if (isTableHeaderRow(lines[i]) && isSeparator(lines[i + 1])) {
                 const headers = parseRow(lines[i]);
                 const alignments = parseAlignments(lines[i + 1]);
                 const colCount = headers.length;
@@ -3724,6 +3726,9 @@ const DocumentView = {
 
         // Cancel pending saves before destroying editors to prevent stale writes
         this.cancelAllPendingSaves();
+        for (const editor of this.editors.values()) {
+            editor.destroy();
+        }
         this.editors.clear();
 
         SelectionManager.updateTagCounts();

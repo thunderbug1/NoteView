@@ -17,9 +17,9 @@ const TASK_STATES = {
 // Badge keys that we want to extract
 const KNOWN_BADGE_KEYS = ['due', 'assignee', 'priority', 'start', 'completed'];
 
-// Regex patterns
-const CHECKBOX_REGEX = /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm;
-const BADGE_REGEX = /\[([a-zA-Z0-9_]+)::\s*([^\]]+)\]/g;
+// Regex patterns (getters return fresh instances to avoid lastIndex issues)
+function getCheckboxRegex() { return /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm; }
+function getBadgeRegex() { return /\[([a-zA-Z0-9_]+)::\s*([^\]]+)\]/g; }
 const TASK_MENTION_REGEX = /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g;
 const PRIORITY_RANKS = {
     urgent: 0,
@@ -50,8 +50,7 @@ function extractBadges(text) {
     let cleanText = text;
     let match;
 
-    // Reset regex state
-    BADGE_REGEX.lastIndex = 0;
+    const BADGE_REGEX = getBadgeRegex();
 
     while ((match = BADGE_REGEX.exec(text)) !== null) {
         const key = match[1];
@@ -404,8 +403,7 @@ function parseTasksFromBlock(block) {
 
     let match;
     const ancestorStack = [];
-    // Reset regex state
-    CHECKBOX_REGEX.lastIndex = 0;
+    const CHECKBOX_REGEX = getCheckboxRegex();
 
     while ((match = CHECKBOX_REGEX.exec(block.content)) !== null) {
         const prefix = match[1];
@@ -472,8 +470,7 @@ function parseTasksFromContent(content) {
 
     let match;
     const ancestorStack = [];
-    // Reset regex state
-    CHECKBOX_REGEX.lastIndex = 0;
+    const CHECKBOX_REGEX = getCheckboxRegex();
 
     while ((match = CHECKBOX_REGEX.exec(content)) !== null) {
         const prefix = match[1];

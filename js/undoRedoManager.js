@@ -221,6 +221,10 @@ const UndoRedoManager = {
      */
     async redoCreate(command) {
         const block = JSON.parse(JSON.stringify(command.blockData));
+        if (Store.blocks.find(b => b.id === block.id)) {
+            console.warn('redoCreate: block already exists, skipping');
+            return;
+        }
         if (block) {
             // Create file
             await Store.saveBlock(block, { commit: true, commitMessage: `Redo: recreate ${block.id}` });
@@ -346,6 +350,8 @@ const UndoRedoManager = {
             } else if (sub.type === 'delete' && sub.before && !sub.blockData) {
                 normalized.blockData = sub.before;
                 normalized.blockId = sub.before.id;
+            } else if (sub.type === 'update') {
+                normalized.blockId = sub.blockId || sub.before?.id || sub.after?.id;
             }
             switch (sub.type) {
                 case 'create': await this.undoCreate(normalized); break;
@@ -368,6 +374,8 @@ const UndoRedoManager = {
             } else if (sub.type === 'delete' && sub.before && !sub.blockData) {
                 normalized.blockData = sub.before;
                 normalized.blockId = sub.before.id;
+            } else if (sub.type === 'update') {
+                normalized.blockId = sub.blockId || sub.before?.id || sub.after?.id;
             }
             switch (sub.type) {
                 case 'create': await this.redoCreate(normalized); break;
@@ -382,7 +390,7 @@ const UndoRedoManager = {
      */
     createDiff(before, after) {
         const diff = { before: {}, after: {} };
-        const fields = ['content', 'tags', 'creationDate', 'lastUpdated'];
+        const fields = ['content', 'tags', 'creationDate', 'lastUpdated', 'pinned'];
 
         for (const field of fields) {
             const beforeValue = before[field];
