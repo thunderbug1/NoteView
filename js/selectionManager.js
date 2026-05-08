@@ -23,13 +23,12 @@ const SelectionManager = {
     HISTORY_DEBOUNCE_MS: 3000,
     HISTORY_MAX_ENTRIES: 50,
 
-    computedContextTags: ['Time.today', 'Time.thisWeek', 'Time.thisMonth', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned', 'Status.untagged'],
+    // Computed tag prefix for dynamic recognition
+    // Time.* tags are generated dynamically; Todo.* and Status.* are static
+    _dynamicTimeTags: [],
 
-    // Selecting a tag in an exclusion group removes all other tags in that group
-    computedExclusionGroups: [
-        ['Time.today', 'Time.thisWeek', 'Time.thisMonth'],
-        ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned']
-    ],
+    // Selecting a Time.* tag removes all other Time.* tags; same for Todo.*
+    // Handled via prefix-based exclusion in addContextTag()
 
     // Archived tags state
     _archivedTags: new Set(),
@@ -48,7 +47,9 @@ const SelectionManager = {
         this.initHistory();
         this.initClearContextBtn();
         this.initContextNavBtns();
+        this.initTimePropertySelect();
         this.loadArchivedTags().then(() => {
+            this.generateDynamicTimeTags();
             this.renderContextSidebar();
             this.initArchiveToggle();
         });
@@ -164,15 +165,19 @@ const SelectionManager = {
             context: Array.from(this.selections.context)
         });
         if (tag === 'Status.untagged') {
-            // Only clear other computed tags, keep regular tags
-            this.computedContextTags.forEach(t => this.selections.context.delete(t));
+            for (const t of Array.from(this.selections.context)) {
+                if (this.isComputedContextTag(t)) this.selections.context.delete(t);
+            }
         } else {
             this.selections.context.delete('Status.untagged');
-            for (const group of this.computedExclusionGroups) {
-                if (group.includes(tag)) {
-                    for (const t of group) {
-                        if (t !== tag) this.selections.context.delete(t);
-                    }
+            // Prefix-based exclusion: Time.* excludes other Time.*, Todo.* excludes other Todo.*
+            if (tag.startsWith('Time.')) {
+                for (const t of Array.from(this.selections.context)) {
+                    if (t.startsWith('Time.') && t !== tag) this.selections.context.delete(t);
+                }
+            } else if (tag.startsWith('Todo.')) {
+                for (const t of Array.from(this.selections.context)) {
+                    if (t.startsWith('Todo.') && t !== tag) this.selections.context.delete(t);
                 }
             }
         }
@@ -448,7 +453,43 @@ const SelectionManager = {
      * @returns {Array} Computed context tag ids
      */
     getComputedContextTags() {
-        return [...this.computedContextTags];
+        // Return non-time computed tags (Todo.*, Status.*)
+        return [
+            'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked',
+            'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned', 'Status.untagged'
+        ];
+    },
+
+    /**
+     * Get all time tags (static relative + dynamic quarter/year + active date/range)
+     * @returns {string[]} Array of Time.* tags
+     */
+    getTimeTags() {
+        return [...TimeFilter.RELATIVE_TIME_TAGS, ...this._dynamicTimeTags];
+    },
+
+    /**
+     * Generate dynamic time tags from vault block data
+     */
+    generateDynamicTimeTags() {
+        const dateProperty = Store.timeProperty || 'lastUpdated';
+        this._dynamicTimeTags = TimeFilter.generateDynamicTimeTags(Store.blocks, dateProperty);
+    },
+
+    /**
+     * Initialize the time property dropdown
+     */
+    initTimePropertySelect() {
+        const select = document.getElementById('timePropertySelect');
+        if (!select) return;
+        select.value = Store.timeProperty || 'lastUpdated';
+        select.addEventListener('change', () => {
+            Store.timeProperty = select.value;
+            Store._filteredBlocksCache.invalidate();
+            this.generateDynamicTimeTags();
+            this.renderContextSidebar();
+            App.render();
+        });
     },
 
     /**
@@ -457,7 +498,7 @@ const SelectionManager = {
      * @returns {boolean} True when the tag is computed
      */
     isComputedContextTag(tag) {
-        return this.computedContextTags.includes(tag);
+        return tag.startsWith('Time.') || tag.startsWith('Todo.') || tag === 'Status.untagged';
     },
 
     /**
@@ -520,16 +561,11 @@ const SelectionManager = {
      * @returns {string} Display name
      */
     getTagDisplayName(tag) {
+        if (tag.startsWith('Time.')) return TimeFilter.getTimeTagDisplayName(tag);
         const displayNames = {
             'work': 'Work',
             'personal': 'Personal',
-            'ideas': 'Ideas',
-            'today': 'Today',
-            'thisWeek': 'This Week',
-            'thisMonth': 'This Month',
-            'Time.today': 'Today',
-            'Time.thisWeek': 'This Week',
-            'Time.thisMonth': 'This Month'
+            'ideas': 'Ideas'
         };
         if (displayNames[tag]) return displayNames[tag];
         return Common.formatTagDisplay(tag);
@@ -663,6 +699,7 @@ const SelectionManager = {
     renderContextSidebar() {
         const userContainer = document.getElementById('contextTags');
         const computedContainer = document.getElementById('computedTags');
+        const timeContainer = document.getElementById('timeTags');
         if (!userContainer) return;
 
         const selectedCustomTags = Array.from(this.selections.context)
@@ -673,10 +710,12 @@ const SelectionManager = {
         ])).sort();
 
         const computedTags = this.getComputedContextTags();
+        const timeTags = this.getTimeTags();
 
         console.log('[SelectionManager] renderContextSidebar', {
             userTags,
             computedTags,
+            timeTags,
             selectedContext: Array.from(this.selections.context)
         });
 
@@ -686,7 +725,11 @@ const SelectionManager = {
 
         // Render active user tags
         this._renderTagList(userContainer, activeUserTags, false);
-        // Render computed tags
+        // Render time tags into their own section
+        if (timeContainer) {
+            this._renderTimeTagList(timeContainer, timeTags);
+        }
+        // Render computed tags (Todo.*, Status.*)
         if (computedContainer) {
             this._renderTagList(computedContainer, computedTags, true);
         }
@@ -701,6 +744,179 @@ const SelectionManager = {
             } else {
                 archivedGroup.style.display = 'none';
             }
+        }
+    },
+
+    /**
+     * Render time tags into a container with collapsible category groups
+     * @param {HTMLElement} container - Target container
+     * @param {string[]} tags - Time.* tags to render
+     */
+    _renderTimeTagList(container, tags) {
+        if (tags.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:4px 8px;">No time filters</div>';
+            return;
+        }
+
+        const { groups, flat } = Common.buildMultiLevelTagTree(tags, 2);
+        let html = '';
+
+        // Quick tags — flat, no group wrapper
+        const timeEntry = groups.get('Time');
+        const quickTags = timeEntry ? timeEntry.leaves : [];
+        quickTags.forEach(tag => {
+            const isSelected = this.selections.context.has(tag);
+            const selClass = isSelected ? 'selected' : '';
+            html += `<div class="tag-radio-option ${selClass} computed" data-group="context" data-tag="${escapeHtml(tag)}">`;
+            html += `<span class="tag-badge">${escapeHtml(this.getTagDisplayName(tag))}</span>`;
+            html += `</div>`;
+        });
+
+        // Check if any non-quick time tag is active (to auto-expand "More options")
+        const activeTime = TimeFilter.deriveTimeSelectionFromContext(this.selections.context);
+        const hasActiveNonQuick = activeTime && !quickTags.includes(activeTime);
+        const moreExpandedClass = hasActiveNonQuick ? 'expanded' : '';
+
+        // "More options" collapsible — contains quarters, years, range picker
+        html += `<div class="tag-group-hierarchy ${moreExpandedClass}" data-group-path="__time_more">`;
+        html += `<div class="tag-group-parent">`;
+        html += `<span class="tag-group-toggle">&#9654;</span>`;
+        html += `<span class="tag-group-name">More options</span>`;
+        html += `</div>`;
+        html += `<div class="tag-group-children">`;
+
+        // Subgroups (quarter, year)
+        if (timeEntry) {
+            timeEntry.subgroups.forEach((subTags, subName) => {
+                const hasActiveSelection = subTags.some(t => this.selections.context.has(t));
+                const subExpandedClass = hasActiveSelection ? 'expanded' : '';
+                const label = TimeFilter.TIME_CATEGORY_LABELS[subName] || Common.capitalizeFirst(subName);
+
+                html += `<div class="tag-group-hierarchy ${subExpandedClass}" data-group-path="__time_${subName}">`;
+                html += `<div class="tag-group-parent">`;
+                html += `<span class="tag-group-toggle">&#9654;</span>`;
+                html += `<span class="tag-group-name">${escapeHtml(label)}</span>`;
+                html += `</div>`;
+                html += `<div class="tag-group-children">`;
+                subTags.forEach(tag => {
+                    const isSelected = this.selections.context.has(tag);
+                    const selClass = isSelected ? 'selected' : '';
+                    html += `<div class="tag-radio-option ${selClass} computed" data-group="context" data-tag="${escapeHtml(tag)}">`;
+                    html += `<span class="tag-badge">${escapeHtml(this.getTagDisplayName(tag))}</span>`;
+                    html += `</div>`;
+                });
+                html += `</div></div>`;
+            });
+        }
+
+        // Range picker inside "More options"
+        const hasRange = activeTime && activeTime.startsWith('Time.range.');
+        const rangeStartVal = hasRange ? activeTime.slice('Time.range.'.length).split('..')[0] : '';
+        const rangeEndVal = hasRange ? activeTime.slice('Time.range.'.length).split('..')[1] : '';
+        const rangeHighlightClass = hasRange ? 'time-picker-active' : '';
+
+        html += `<div class="tag-group-hierarchy ${hasRange ? 'expanded' : ''}" data-group-path="__time_range_picker">`;
+        html += `<div class="tag-group-parent">`;
+        html += `<span class="tag-group-toggle">&#9654;</span>`;
+        html += `<span class="tag-group-name">Date Range</span>`;
+        html += `</div>`;
+        html += `<div class="tag-group-children">`;
+        html += `<div class="time-date-picker ${rangeHighlightClass}">`;
+        html += `<input type="date" class="time-range-start" value="${escapeHtml(rangeStartVal)}" title="Start date">`;
+        html += `<span style="font-size:0.65rem;color:var(--text-muted);">–</span>`;
+        html += `<input type="date" class="time-range-end" value="${escapeHtml(rangeEndVal)}" title="End date">`;
+        html += `</div>`;
+        html += `</div></div>`;
+
+        html += `</div></div>`; // close "More options"
+
+        container.innerHTML = html;
+
+        // Attach click handlers for time tag options
+        container.querySelectorAll('.tag-radio-option').forEach(option => {
+            let pressTimer = null;
+            let longPressed = false;
+
+            option.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            option.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0 || e.shiftKey) return;
+                longPressed = false;
+                pressTimer = setTimeout(() => {
+                    longPressed = true;
+                    const tag = option.dataset.tag;
+                    this.toggleExcludedTag(tag, this.selections.excluded.has(tag));
+                    this.renderContextSidebar();
+                    App.render();
+                }, this.LONG_PRESS_MS);
+            });
+
+            const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+            option.addEventListener('pointerup', cancelPress);
+            option.addEventListener('pointerleave', cancelPress);
+            option.addEventListener('pointercancel', cancelPress);
+
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (longPressed) { longPressed = false; return; }
+                const tag = option.dataset.tag;
+
+                if (e.shiftKey) {
+                    this.toggleExcludedTag(tag, this.selections.excluded.has(tag));
+                    this.renderContextSidebar();
+                    App.render();
+                    return;
+                }
+
+                if (this.selections.context.has(tag)) {
+                    this.selections.context.delete(tag);
+                    this.saveSelectionState();
+                } else {
+                    this.addContextTag(tag);
+                    this.saveSelectionState();
+                }
+                this.renderContextSidebar();
+                App.render();
+            });
+        });
+
+        // Attach group toggle handlers
+        container.querySelectorAll('.tag-group-parent').forEach(parentEl => {
+            const toggleEl = parentEl.querySelector('.tag-group-toggle');
+            if (toggleEl) {
+                toggleEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    parentEl.closest('.tag-group-hierarchy').classList.toggle('expanded');
+                });
+            }
+        });
+
+        // Attach range picker handler
+        const rangeStart = container.querySelector('.time-range-start');
+        const rangeEnd = container.querySelector('.time-range-end');
+        if (rangeStart && rangeEnd) {
+            const checkRange = () => {
+                const start = rangeStart.value;
+                const end = rangeEnd.value;
+                // Clear if either field is emptied
+                if (!start || !end) {
+                    for (const t of Array.from(this.selections.context)) {
+                        if (t.startsWith('Time.range.')) this.selections.context.delete(t);
+                    }
+                    this.saveSelectionState();
+                    this.renderContextSidebar();
+                    App.render();
+                    return;
+                }
+                if (start <= end) {
+                    const tag = `Time.range.${start}..${end}`;
+                    this.addContextTag(tag);
+                    this.renderContextSidebar();
+                    App.render();
+                }
+            };
+            rangeStart.addEventListener('change', checkRange);
+            rangeEnd.addEventListener('change', checkRange);
         }
     },
 
@@ -950,14 +1166,9 @@ const SelectionManager = {
         let hasUntagged = false;
         let hasUnassigned = false;
 
-        let hasToday = false;
-        let hasThisWeek = false;
-        let hasThisMonth = false;
-
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
+        // Pre-compute which time tags have matching blocks
+        const timeTagHasBlocks = {};
+        const timeTags = this.getTimeTags();
 
         const currentProp = Store.timeProperty || 'lastUpdated';
 
@@ -966,8 +1177,7 @@ const SelectionManager = {
                 tagCounts[tag] = (tagCounts[tag] || 0) + 1;
             });
             if (block.content && block.content.match(/\[[ \/]\]/)) hasOpenTodos = true;
-            
-            // New computed categories
+
             const tasks = TaskParser.parseTasksFromBlock(block);
             const hasBlocked = tasks.some(t => TaskParser.isBlockedTask(t));
             const hasUnblocked = tasks.some(t => TaskParser.isUnblockedTask(t));
@@ -982,17 +1192,30 @@ const SelectionManager = {
             if (hasDone) hasDoneTodos = true;
             if (hasInProgress) hasInProgressTodos = true;
             if (hasCanceled) hasCanceledTodos = true;
-            
+
             if (!block.tags || block.tags.length === 0) hasUntagged = true;
 
-            const dateVal = block[currentProp];
+            // Check time tags against block date
+            let dateVal = block[currentProp];
+            if (!dateVal && (currentProp === 'due' || currentProp === 'start' || currentProp === 'completed')) {
+                const dates = tasks
+                    .map(t => { const v = TaskParser.getBadgeValue(t, currentProp).trim(); return v ? new Date(v).getTime() : Number.NaN; })
+                    .filter(d => !Number.isNaN(d));
+                if (dates.length > 0) {
+                    dateVal = new Date(Math.min(...dates));
+                }
+            }
             if (dateVal) {
-                const bDate = new Date(dateVal);
-                if (bDate.toDateString() === now.toDateString()) hasToday = true;
-                if (bDate >= startOfWeek) hasThisWeek = true;
-                if (bDate.getFullYear() === now.getFullYear() && bDate.getMonth() === now.getMonth()) hasThisMonth = true;
+                timeTags.forEach(timeTag => {
+                    if (!timeTagHasBlocks[timeTag] && TimeFilter.checkTimeFilter(dateVal, timeTag)) {
+                        timeTagHasBlocks[timeTag] = true;
+                    }
+                });
             }
         });
+
+        // Refresh dynamic time tags
+        this.generateDynamicTimeTags();
 
         if (!skipRender) this.renderContextSidebar();
 
@@ -1004,10 +1227,9 @@ const SelectionManager = {
             const tag = option.dataset.tag;
             let hasBlocks = false;
 
-            if (tag === 'Time.today') hasBlocks = hasToday;
-            else if (tag === 'Time.thisWeek') hasBlocks = hasThisWeek;
-            else if (tag === 'Time.thisMonth') hasBlocks = hasThisMonth;
-            else if (tag === 'Todo.open') hasBlocks = hasOpenTodos;
+            if (tag && tag.startsWith('Time.')) {
+                hasBlocks = timeTagHasBlocks[tag] || false;
+            } else if (tag === 'Todo.open') hasBlocks = hasOpenTodos;
             else if (tag === 'Todo.inProgress') hasBlocks = hasInProgressTodos;
             else if (tag === 'Todo.done') hasBlocks = hasDoneTodos;
             else if (tag === 'Todo.blocked') hasBlocks = hasBlockedTodos;
@@ -1017,13 +1239,11 @@ const SelectionManager = {
             else if (tag === 'Status.untagged') hasBlocks = hasUntagged;
             else hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
 
-            // Only update opacity if it needs to change (avoid DOM thrashing)
             const newOpacity = (!hasBlocks && !option.classList.contains('selected')) ? '0.4' : '1';
             if (option.style.opacity !== newOpacity) {
                 option.style.opacity = newOpacity;
             }
 
-            // Highlight untagged filter when untagged blocks exist
             if (tag === 'Status.untagged') {
                 option.classList.toggle('has-untagged', hasBlocks);
             }

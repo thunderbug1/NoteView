@@ -367,6 +367,58 @@
     padding: 0.5rem 0.4rem;
 }
 
+/* Time filter section */
+#timeTagGroup {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.4rem;
+}
+
+.time-property-select {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    max-width: 110px;
+}
+
+.time-property-select:focus {
+    outline: 1px solid var(--accent);
+}
+
+.time-date-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0;
+    font-size: 0.7rem;
+    min-width: 0;
+}
+
+.time-date-picker input[type="date"] {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    flex: 1 1 calc(50% - 1rem);
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.time-picker-active {
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--accent-light);
+    padding: 0.2rem 0.3rem;
+}
+
 .tag-radio-option.computed .tag-badge {
     font-style: italic;
     opacity: 0.85;

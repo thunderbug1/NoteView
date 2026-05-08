@@ -450,10 +450,7 @@ const TimelineView = {
         const contextSelection = SelectionManager.selections.context;
 
         // Derive time selection from context
-        let timeSelection = '';
-        if (contextSelection.has('Time.today')) timeSelection = 'today';
-        else if (contextSelection.has('Time.thisWeek')) timeSelection = 'thisWeek';
-        else if (contextSelection.has('Time.thisMonth')) timeSelection = 'thisMonth';
+        const timeTag = TimeFilter.deriveTimeSelectionFromContext(contextSelection);
         const contactSelection = SelectionManager.selections.contact;
         const searchQuery = Store.searchQuery;
 
@@ -466,7 +463,7 @@ const TimelineView = {
             // Events from currently-pinned blocks always pass through
             if (pinnedBlockIds.has(event.blockId)) return true;
             // Time filter
-            if (timeSelection && !TimeFilter.checkTimeFilter(event.timestamp, timeSelection)) {
+            if (timeTag && !TimeFilter.checkTimeFilter(event.timestamp, timeTag)) {
                 return false;
             }
             

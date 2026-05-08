@@ -182,20 +182,58 @@ This enables context-aware sorting: when context tags are selected, contacts sha
 
 ## Time Filtering
 
-`TimeFilter` (`js/utils/timeFilter.js`) provides `checkTimeFilter(date, selection)`:
+`TimeFilter` (`js/utils/timeFilter.js`) provides date matching for hierarchical time tags.
 
-| Selection | Logic |
-|-----------|-------|
-| `''` | Always passes |
-| `'today'` | `date.toDateString() === now.toDateString()` |
-| `'thisWeek'` | `date >= startOfWeek` (Sunday midnight) |
-| `'thisMonth'` | `date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()` |
+### Tag taxonomy
 
-The date property used is configurable via `Store.timeProperty` (defaults to `'lastUpdated'`).
+All time tags use the `Time.*` prefix. Tags are rendered in a dedicated sidebar section with collapsible category groups.
+
+| Tag | Category | Logic |
+|-----|----------|-------|
+| `Time.today` | Quick | Same calendar day |
+| `Time.yesterday` | Quick | Previous calendar day |
+| `Time.thisWeek` | Quick | From start of current week (Sunday) |
+| `Time.lastWeek` | Quick | Previous full week (Sun-Sat) |
+| `Time.thisMonth` | Quick | Same month/year |
+| `Time.lastMonth` | Quick | Previous month |
+| `Time.quarter.Q{N}-{YYYY}` | Quarters | Date falls in that quarter |
+| `Time.year.{YYYY}` | Years | Date falls in that year |
+| `Time.range.{start}..{end}` | Date Range | Inclusive date range |
+
+Quarters and years are generated dynamically from vault block data. Date ranges are created via the inline range picker.
+
+### Date property selection
+
+A dropdown in the Time section header selects which block date field to filter on:
+
+| Property | Source |
+|----------|--------|
+| `lastUpdated` (default) | `block.lastUpdated` |
+| `creationDate` | `block.creationDate` |
+| `earliestDue` | Earliest `[due:: ...]` from block's tasks |
+| `latestDue` | Latest `[due:: ...]` from block's tasks |
+
+### Mutual exclusion
+
+All `Time.*` tags are mutually exclusive — selecting one automatically deselects any other. This is enforced by prefix-based exclusion in `SelectionManager.addContextTag()`.
+
+### Collapsible categories
+
+Time tags are rendered via `_renderTimeTagList()` with collapsible `.tag-group-hierarchy` sections:
+- **Quick**: always expanded — contains relative time tags (today, yesterday, thisWeek, etc.)
+- **Quarters/Years**: collapsed by default, auto-expanded when they contain the active selection
+- **Date Range**: collapsed, contains a pair of date inputs. When a range is active, the picker is populated with the selected values and highlighted with an accent border.
+
+### API
+
+- `TimeFilter.checkTimeFilter(date, timeTag)` — matches a date against a full `Time.*` tag
+- `TimeFilter.deriveTimeSelectionFromContext(contextSet)` — extracts the active `Time.*` tag from context
+- `TimeFilter.generateDynamicTimeTags(blocks, dateProperty)` — generates quarter/year tags from block data
+- `TimeFilter.getTimeTagDisplayName(timeTag)` — returns human-readable name for a time tag
 
 ### Tag count dimming
 
-`SelectionManager.updateTagCounts()` scans blocks to compute boolean flags (`hasToday`, `hasThisWeek`, `hasThisMonth`) and sets opacity `0.4` on time filter options with no matching blocks.
+`SelectionManager.updateTagCounts()` checks each time tag against block dates using `TimeFilter.checkTimeFilter()` and sets opacity `0.4` on tags with no matching blocks.
 
 ---
 

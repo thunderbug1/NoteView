@@ -1065,19 +1065,26 @@ const Store = {
             const contactSelection = SelectionManager.selections.contact;
 
             // Derive time selection from context
-            let timeSelection = '';
-            if (contextSelection.has('Time.today')) timeSelection = 'today';
-            else if (contextSelection.has('Time.thisWeek')) timeSelection = 'thisWeek';
-            else if (contextSelection.has('Time.thisMonth')) timeSelection = 'thisMonth';
+            const timeTag = TimeFilter.deriveTimeSelectionFromContext(contextSelection);
 
             // Time filter (if selected)
-            if (timeSelection) {
+            if (timeTag) {
                 const property = this.timeProperty || 'lastUpdated';
-                const dateVal = block[property];
+                let dateVal = block[property];
+
+                // Handle task badge dates (due, start, completed)
+                if (property === 'due' || property === 'start' || property === 'completed') {
+                    const tasks = TaskParser.parseTasksFromBlock(block);
+                    const dates = tasks
+                        .map(t => { const v = TaskParser.getBadgeValue(t, property).trim(); return v ? new Date(v).getTime() : Number.NaN; })
+                        .filter(d => !Number.isNaN(d));
+                    if (dates.length === 0) return false;
+                    dateVal = new Date(Math.min(...dates));
+                }
 
                 if (!dateVal) return false;
 
-                if (!TimeFilter.checkTimeFilter(dateVal, timeSelection)) {
+                if (!TimeFilter.checkTimeFilter(dateVal, timeTag)) {
                     return false;
                 }
             }
@@ -1208,18 +1215,25 @@ const Store = {
         const searchQuery = this.searchQuery;
 
         // Derive time selection from context
-        let timeSelection = '';
-        if (contextSelection.has('Time.today')) timeSelection = 'today';
-        else if (contextSelection.has('Time.thisWeek')) timeSelection = 'thisWeek';
-        else if (contextSelection.has('Time.thisMonth')) timeSelection = 'thisMonth';
+        const timeTag = TimeFilter.deriveTimeSelectionFromContext(contextSelection);
 
         // Time filter
-        if (timeSelection) {
+        if (timeTag) {
             const property = this.timeProperty || 'lastUpdated';
-            const dateVal = block[property];
-            if (!dateVal || !TimeFilter.checkTimeFilter(dateVal, timeSelection)) {
-                const labels = { today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month' };
-                reasons.push({ type: 'time', label: labels[timeSelection] || timeSelection });
+            let dateVal = block[property];
+
+            if (property === 'due' || property === 'start' || property === 'completed') {
+                const tasks = TaskParser.parseTasksFromBlock(block);
+                const dates = tasks
+                    .map(t => { const v = TaskParser.getBadgeValue(t, property).trim(); return v ? new Date(v).getTime() : Number.NaN; })
+                    .filter(d => !Number.isNaN(d));
+                if (dates.length > 0) {
+                    dateVal = new Date(Math.min(...dates));
+                }
+            }
+
+            if (!dateVal || !TimeFilter.checkTimeFilter(dateVal, timeTag)) {
+                reasons.push({ type: 'time', label: SelectionManager.getTagDisplayName(timeTag) });
             }
         }
 

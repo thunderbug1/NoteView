@@ -138,6 +138,55 @@ function buildTagTree(tags) {
 }
 
 /**
+ * Build a multi-level grouping from a flat list of tags.
+ * Unlike buildTagTree (which normalizes multi-dot to single-level),
+ * this preserves the full dot-path hierarchy up to maxDepth.
+ * E.g. "Time.quarter.Q1-2026" at maxDepth=2 groups under Time -> quarter -> leaf
+ * @param {string[]} tags - Tags to group
+ * @param {number} maxDepth - How many dot segments to use as group levels (default 2)
+ * @returns {{ groups: Map<string, { subgroups: Map<string, string[]>, leaves: string[] }>, flat: string[] }}
+ */
+function buildMultiLevelTagTree(tags, maxDepth = 2) {
+    const groups = new Map();
+    const flat = [];
+
+    tags.forEach(tag => {
+        const parts = tag.split('.');
+        if (parts.length <= 1) {
+            flat.push(tag);
+            return;
+        }
+
+        const topGroup = parts[0];
+        if (!groups.has(topGroup)) {
+            groups.set(topGroup, { subgroups: new Map(), leaves: [] });
+        }
+        const entry = groups.get(topGroup);
+
+        if (parts.length === 2 || maxDepth < 2) {
+            entry.leaves.push(tag);
+        } else {
+            const subGroup = parts[1];
+            if (!entry.subgroups.has(subGroup)) {
+                entry.subgroups.set(subGroup, []);
+            }
+            entry.subgroups.get(subGroup).push(tag);
+        }
+    });
+
+    const sorted = new Map([...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+    sorted.forEach(entry => {
+        const sortedSubs = new Map([...entry.subgroups.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+        sortedSubs.forEach(tagList => tagList.sort());
+        entry.subgroups = sortedSubs;
+        entry.leaves.sort();
+    });
+
+    flat.sort();
+    return { groups: sorted, flat };
+}
+
+/**
  * Render badge HTML for an array of tags
  * @param {Array<string>} tags - Array of tag strings
  * @returns {string} HTML string of badge elements
@@ -242,5 +291,6 @@ window.Common = {
     parseHierarchicalTag,
     formatTagDisplay,
     buildTagTree,
+    buildMultiLevelTagTree,
     showToast
 };
