@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v31';
+const CACHE_NAME = 'noteview-v32';
 
 const PRECACHE_URLS = [
   './',
@@ -16,6 +16,7 @@ const PRECACHE_URLS = [
   './css/views/settings.css',
   './css/views/deadline.css',
   './css/views/ai.css',
+  './css/views/aiTaskPanel.css',
   './css/views/capture.css',
   './css/views/qr-transfer.css',
   './vendor/marked.js',
@@ -48,6 +49,7 @@ const PRECACHE_URLS = [
   './js/utils/qrTransfer.js',
   './js/utils/deadlinePanel.js',
   './js/utils/backlinksPanel.js',
+  './js/utils/aiTaskPanel.js',
   './js/utils/groupManager.js',
   './js/widgets/codeMirrorWidgets.js',
   './js/menus/taskMenus.js',

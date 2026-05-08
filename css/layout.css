@@ -70,6 +70,13 @@
 .sidebar-right-toggle.rotated svg {
     transform: rotate(180deg);
 }
+.sidebar-right-toggle.ai-notification-pulse {
+    animation: sidebar-notification-pulse 2s ease-in-out infinite;
+}
+@keyframes sidebar-notification-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent); }
+    50% { box-shadow: 0 0 0 4px var(--accent); opacity: 0.8; }
+}
 
 .app-header {
     padding: 1.25rem 1.5rem;

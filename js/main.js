@@ -347,6 +347,7 @@ const App = {
             const collapsed = sidebarRight.classList.toggle('collapsed');
             sidebarRightToggle.classList.toggle('shifted', collapsed);
             sidebarRightToggle.classList.toggle('rotated', collapsed);
+            if (typeof AITaskPanel !== 'undefined') AITaskPanel._updateTogglePulse();
         });
 
         // Touch swipe for sidebars
@@ -842,7 +843,9 @@ const App = {
     _collapseRightIfNoDeadlines() {
         const hasDeadlines = typeof TaskParser !== 'undefined'
             && TaskParser.getTasksWithUrgency(Store.blocks).length > 0;
-        if (hasDeadlines) return;
+        const hasAITasks = typeof AITaskPanel !== 'undefined'
+            && (AITaskPanel._isProcessing || AITaskPanel._unreadBlockIds.length > 0);
+        if (hasDeadlines || hasAITasks) return;
         const sidebarRight = document.getElementById('sidebarRight');
         const sidebarRightToggle = document.getElementById('sidebarRightToggle');
         if (sidebarRight) sidebarRight.classList.add('collapsed');
@@ -951,6 +954,10 @@ const App = {
         DeadlinePanel.render(Store.blocks);
         const focusedBlockId = DocumentView.getFocusedBlockId();
         BacklinksPanel.render(Store.blocks, focusedBlockId);
+        if (typeof AITaskPanel !== 'undefined') {
+            AITaskPanel.checkAutoDismiss(focusedBlockId);
+            AITaskPanel.render();
+        }
     },
 
     updateUndoRedoUI() {
@@ -1612,9 +1619,6 @@ const App = {
         if (this._aiIsProcessing) return;
         this._aiIsProcessing = true;
 
-        if (this._aiDictationBtn) {
-            this._setAIButtonState(this._aiDictationBtn, 'processing');
-        }
         if (!AIAssistant.isConfigured()) {
             Common.showToast('AI is not configured. Please set up an API key in Settings.');
             this._insertAIContent(transcript + '\n', targetBlockId);
@@ -1622,20 +1626,19 @@ const App = {
             return;
         }
 
-        // Show thinking indicator in the preview area
-        const modal = this._aiDictationBtn && this._aiDictationBtn.closest('.tag-modal');
-        let thinkingPreview = modal && modal.querySelector('.ai-transcript-preview');
-        if (!thinkingPreview && modal) {
-            thinkingPreview = document.createElement('div');
-            thinkingPreview.className = 'ai-transcript-preview has-content ai-thinking';
-            const editorContainer = modal.querySelector('.block-editor');
-            if (editorContainer) {
-                editorContainer.parentNode.insertBefore(thinkingPreview, editorContainer);
-            }
+        // Auto-create the note with raw transcript so the user isn't blocked
+        const blockId = await this._autoPromoteOrCreateNote(transcript, targetBlockId);
+        if (!blockId) {
+            this._aiIsProcessing = false;
+            return;
         }
-        if (thinkingPreview) {
-            thinkingPreview.className = 'ai-transcript-preview has-content ai-thinking';
-            thinkingPreview.innerHTML = '<span class="ai-thinking-dots"></span> Writing note...';
+
+        // Close the modal — user can continue working while AI processes
+        this._closeCreateModal();
+
+        const title = transcript.split('\n')[0].slice(0, 40);
+        if (typeof AITaskPanel !== 'undefined') {
+            AITaskPanel.startProcessing(blockId, title);
         }
 
         try {
@@ -1661,7 +1664,7 @@ const App = {
 
             if (!response.ok) throw new Error('API failed');
 
-            // Accumulate full response before touching the editor
+            // Accumulate full response
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -1691,39 +1694,48 @@ const App = {
             let noteContent = fullContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
             if (!noteContent) noteContent = transcript;
 
-            // Remove thinking indicator and transcript preview
-            if (thinkingPreview) thinkingPreview.remove();
-            const transcriptPreview = modal && modal.querySelector('.ai-transcript-preview');
-            if (transcriptPreview) transcriptPreview.remove();
+            // Update the note with AI-formatted content
+            const block = Store.blocks.find(b => b.id === blockId);
+            if (block) {
+                await Store.saveBlock(block, {
+                    content: noteContent,
+                    commit: true,
+                    commitMessage: 'AI: formatted note'
+                });
+                TimelineView.invalidateCache();
+                SelectionManager.updateTagCounts();
+                App.render();
+            }
 
-            // Insert content into editor — this triggers promoteModalBlock via the update listener
-            this._insertAIContent(noteContent + '\n', targetBlockId);
-            Common.showToast('Note created by AI.');
+            if (typeof AITaskPanel !== 'undefined') {
+                AITaskPanel.finishProcessing(blockId, title);
+            }
         } catch (err) {
             console.error('AI dictation failed:', err);
-            Common.showToast('AI processing failed. Falling back to raw text.');
-            if (this._aiDictationBtn) {
-                this._setAIButtonState(this._aiDictationBtn, 'error');
+            Common.showToast('AI formatting failed, keeping raw text.');
+            if (typeof AITaskPanel !== 'undefined') {
+                AITaskPanel.failProcessing(blockId);
             }
-            // Ensure editor is unlocked even if button was detached from DOM
-            const fallbackView = DocumentView.editors.get(targetBlockId);
-            if (fallbackView && fallbackView.dom) {
-                try {
-                    const { EditorView, EditorState } = window.CodeMirror;
-                    fallbackView.dispatch({ effects: [EditorView.editable.of(true), EditorState.readOnly.of(false)] });
-                } catch (e) { /* ignore */ }
-            }
-            if (thinkingPreview) thinkingPreview.remove();
-            this._insertAIContent(transcript + '\n', targetBlockId);
         } finally {
             this._aiIsProcessing = false;
             this._aiIsStreaming = false;
-            if (this._aiDictationBtn && !this._aiDictationBtn.classList.contains('ai-error')) {
-                this._cleanupAIDictation();
-            } else {
-                this._aiRecognition = null;
-                this._aiDictationBtn = null;
-            }
+            this._cleanupAIDictation();
+        }
+    },
+
+    async _autoPromoteOrCreateNote(transcript, targetBlockId) {
+        if (this._createModalPromote) {
+            await this._createModalPromote(transcript);
+            return this._aiDictationBlockId;
+        }
+        return null;
+    },
+
+    _closeCreateModal() {
+        if (this._createModalClose) {
+            this._createModalClose();
+            this._createModalClose = null;
+            this._createModalPromote = null;
         }
     },
 
@@ -1986,11 +1998,23 @@ const App = {
             modalClass: 'tag-modal content-modal active-recording-preventer',
             onClose: () => {
                 DocumentView.stopSpeechRecognition();
-                if (this._aiDictationActive) {
-                    this.stopAIDictation(createdBlockId || modalBlockId);
+                if (this._aiDictationActive && !this._aiIsProcessing) {
+                    // Capture transcript before stopping, then create note with raw text
+                    const rawTranscript = (this._aiTranscript || '').trim();
+                    this._aiDictationActive = false;
+                    this._isStoppingAIDictation = true;
+                    if (this._aiRecognition) { this._aiRecognition.stop(); this._aiRecognition = null; }
+                    this._aiTranscript = '';
+                    if (rawTranscript && !createdBlockId) {
+                        promoteModalBlock(rawTranscript);
+                    }
+                    this._cleanupAIDictation();
                 }
                 const preview = modal.querySelector('.ai-transcript-preview');
                 if (preview) preview.remove();
+
+                this._createModalClose = null;
+                this._createModalPromote = null;
 
                 // Ensure the view is refreshed to show the new note
                 setTimeout(() => this.render(), 50);
@@ -2073,6 +2097,10 @@ const App = {
                 App.render();
             }
         };
+
+        // Store references for background AI dictation processing (after close override)
+        this._createModalClose = modal.close.bind(modal);
+        this._createModalPromote = promoteModalBlock;
 
         // Stop button for dictate/AI-dictate modes
         const actionsDiv = modal.querySelector('.block-creation-actions');

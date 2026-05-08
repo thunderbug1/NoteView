@@ -1,0 +1,89 @@
+/* ============================================
+   NoteView - AI Task Panel (Right Sidebar)
+   ============================================ */
+
+.ai-task-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ai-task-panel .section-header {
+    padding: 1rem 1.25rem 0.5rem;
+}
+
+.ai-task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    margin: 0 0.75rem;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.ai-task-item:hover {
+    background: var(--bg-hover);
+}
+
+.ai-task-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+    background: var(--text-muted);
+}
+
+/* Processing: spinning dot */
+.ai-task-item--processing .ai-task-dot {
+    background: var(--accent);
+    animation: ai-task-spin 1s linear infinite;
+    border-radius: 50%;
+}
+
+/* Unread/ready: pulsing accent dot */
+.ai-task-item--unread .ai-task-dot {
+    background: var(--accent);
+    animation: ai-task-pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 4px var(--accent);
+}
+
+.ai-task-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-task-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.ai-task-item--unread .ai-task-label {
+    color: var(--accent);
+}
+
+.ai-task-title {
+    display: block;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: var(--text-primary);
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@keyframes ai-task-spin {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+@keyframes ai-task-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent); }
+    50% { box-shadow: 0 0 0 3px var(--accent); opacity: 0.7; }
+}
