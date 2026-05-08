@@ -321,11 +321,25 @@ const App = {
             openSidebarRight();
         });
         sidebarEdgeLeft?.addEventListener('touchstart', (e) => {
+            touchEdgeStartX = e.touches[0].clientX;
+            touchEdgeStartY = e.touches[0].clientY;
+        }, { passive: true });
+        sidebarEdgeLeft?.addEventListener('touchend', (e) => {
+            const dx = e.changedTouches[0].clientX - touchEdgeStartX;
+            const dy = e.changedTouches[0].clientY - touchEdgeStartY;
+            if (Math.abs(dy) > Math.abs(dx)) return;
             e.stopPropagation();
             touchValid = false;
             openSidebar();
         }, { passive: true });
         sidebarEdgeRight?.addEventListener('touchstart', (e) => {
+            touchEdgeStartX = e.touches[0].clientX;
+            touchEdgeStartY = e.touches[0].clientY;
+        }, { passive: true });
+        sidebarEdgeRight?.addEventListener('touchend', (e) => {
+            const dx = e.changedTouches[0].clientX - touchEdgeStartX;
+            const dy = e.changedTouches[0].clientY - touchEdgeStartY;
+            if (Math.abs(dy) > Math.abs(dx)) return;
             e.stopPropagation();
             touchValid = false;
             openSidebarRight();
@@ -355,6 +369,7 @@ const App = {
         // Touch swipe for sidebars
         let touchStartX = 0, touchStartY = 0, touchStartTarget = null;
         let touchValid = false;
+        let touchEdgeStartX = 0, touchEdgeStartY = 0;
 
         document.addEventListener('touchstart', e => {
             touchStartX = e.touches[0].clientX;
