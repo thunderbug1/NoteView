@@ -23,12 +23,12 @@ const SelectionManager = {
     HISTORY_DEBOUNCE_MS: 3000,
     HISTORY_MAX_ENTRIES: 50,
 
-    computedContextTags: ['Time.today', 'Time.thisWeek', 'Time.thisMonth', 'Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
+    computedContextTags: ['Time.today', 'Time.thisWeek', 'Time.thisMonth', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.untagged', 'Status.unassigned'],
 
     // Selecting a tag in an exclusion group removes all other tags in that group
     computedExclusionGroups: [
         ['Time.today', 'Time.thisWeek', 'Time.thisMonth'],
-        ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked']
+        ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked']
     ],
 
     // Archived tags state
@@ -77,7 +77,8 @@ const SelectionManager = {
                 'untagged': 'Status.untagged',
                 'unassigned': 'Status.unassigned'
             };
-            context = context.map(tag => tagMigration[tag] || tag);
+            context = context.map(tag => tagMigration[tag] || tag)
+                .filter(tag => tag !== 'Todo.all');
 
             this.selections.context = new Set(context.filter(tag => typeof tag === 'string' && tag.trim() !== ''));
 
@@ -938,7 +939,6 @@ const SelectionManager = {
      */
     updateTagCounts({ skipRender = false } = {}) {
         const tagCounts = {};
-        let hasAllTodos = false;
         let hasOpenTodos = false;
         let hasInProgressTodos = false;
         let hasDoneTodos = false;
@@ -963,7 +963,6 @@ const SelectionManager = {
             (block.tags || []).forEach(tag => {
                 tagCounts[tag] = (tagCounts[tag] || 0) + 1;
             });
-            if (block.content && block.content.match(/\[[ xX\/bB\-]\]/)) hasAllTodos = true;
             if (block.content && block.content.match(/\[[ \/]\]/)) hasOpenTodos = true;
             
             // New computed categories
@@ -1006,7 +1005,6 @@ const SelectionManager = {
             if (tag === 'Time.today') hasBlocks = hasToday;
             else if (tag === 'Time.thisWeek') hasBlocks = hasThisWeek;
             else if (tag === 'Time.thisMonth') hasBlocks = hasThisMonth;
-            else if (tag === 'Todo.all') hasBlocks = hasAllTodos;
             else if (tag === 'Todo.open') hasBlocks = hasOpenTodos;
             else if (tag === 'Todo.inProgress') hasBlocks = hasInProgressTodos;
             else if (tag === 'Todo.done') hasBlocks = hasDoneTodos;

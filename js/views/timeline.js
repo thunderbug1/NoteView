@@ -484,8 +484,7 @@ const TimelineView = {
                 }
 
                 // Todo filters only apply to task events
-                const activeTodoFilter = contextSelection.has('Todo.all')
-                    || contextSelection.has('Todo.open')
+                const activeTodoFilter = contextSelection.has('Todo.open')
                     || contextSelection.has('Todo.inProgress')
                     || contextSelection.has('Todo.done')
                     || contextSelection.has('Todo.blocked')

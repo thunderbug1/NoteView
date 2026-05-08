@@ -1112,7 +1112,7 @@ const Store = {
                 }
 
                 // Task-level computed: find at least one task satisfying ALL selected conditions
-                const TASK_COMPUTED_TAGS = ['Todo.all', 'Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.unassigned'];
+                const TASK_COMPUTED_TAGS = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Status.unassigned'];
                 const activeTaskComputed = [...contextSelection].filter(t => TASK_COMPUTED_TAGS.includes(t));
 
                 if (activeTaskComputed.length > 0) {
@@ -1120,7 +1120,6 @@ const Store = {
                     const hasMatchingTask = tasks.some(task =>
                         activeTaskComputed.every(tag => {
                             switch (tag) {
-                                case 'Todo.all':          return true;
                                 case 'Todo.open':         return TaskParser.isOpenTask(task);
                                 case 'Todo.inProgress':   return TaskParser.isInProgressTask(task);
                                 case 'Todo.done':         return TaskParser.isDoneTask(task);
@@ -1142,9 +1141,7 @@ const Store = {
 
                 for (const item of excludedSelection) {
                     if (SelectionManager.isComputedContextTag(item)) {
-                        if (item === 'Todo.all') {
-                            if (block.content?.match(/\[[ xX\/bB\-]\]/)) return false;
-                        } else if (item === 'Todo.open') {
+                        if (item === 'Todo.open') {
                             if (block.content?.match(/\[[ \/]\]/)) return false;
                         } else if (item === 'Todo.inProgress') {
                             if (block.content?.match(/\[[\/]\]/)) return false;
@@ -1250,11 +1247,6 @@ const Store = {
             }
 
             // Computed context tags
-            if (contextSelection.has('Todo.all')) {
-                if (!block.content?.match(/\[[ xX\/bB\-]\]/)) {
-                    reasons.push({ type: 'context', label: 'Todo.all' });
-                }
-            }
             if (contextSelection.has('Todo.open')) {
                 if (!block.content?.match(/\[[ \/]\]/)) {
                     reasons.push({ type: 'context', label: 'Todo.open' });
@@ -1307,11 +1299,7 @@ const Store = {
 
             for (const item of excludedSelection) {
                 if (SelectionManager.isComputedContextTag(item)) {
-                    if (item === 'Todo.all') {
-                        if (block.content?.match(/\[[ xX\/bB\-]\]/)) {
-                            reasons.push({ type: 'excluded', label: 'Todo.all' });
-                        }
-                    } else if (item === 'Todo.open') {
+                    if (item === 'Todo.open') {
                         if (block.content?.match(/\[[ \/]\]/)) {
                             reasons.push({ type: 'excluded', label: 'Todo.open' });
                         }
