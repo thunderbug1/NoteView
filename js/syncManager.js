@@ -96,6 +96,7 @@ const SyncManager = {
         this._syncing = true;
 
         this._setStatus('syncing', 'Syncing...');
+        if (window.App) App.showViewLoading();
         try {
             await GitRemote.pull();
             await GitRemote.push();
@@ -144,6 +145,7 @@ const SyncManager = {
             return false;
         } finally {
             this._syncing = false;
+            if (window.App) App.hideViewLoading();
         }
     },
 
@@ -504,12 +506,17 @@ const SyncManager = {
         this._setStatus('idle', 'Merge resolved');
 
         if (window.App && typeof App.render === 'function') {
-            await Store.loadBlocks();
-            Store._filteredBlocksCache.invalidate();
-            SelectionManager.updateTagCounts();
-            TimelineView.invalidateRawDataCache();
-            TimelineView.invalidateCache();
-            App.render();
+            App.showViewLoading();
+            try {
+                await Store.loadBlocks();
+                Store._filteredBlocksCache.invalidate();
+                SelectionManager.updateTagCounts();
+                TimelineView.invalidateRawDataCache();
+                TimelineView.invalidateCache();
+                App.render();
+            } finally {
+                App.hideViewLoading();
+            }
         }
     },
 
@@ -923,12 +930,17 @@ const SyncManager = {
                 this._setStatus('idle', 'Force pull succeeded');
 
                 if (window.App && typeof App.render === 'function') {
-                    await Store.loadBlocks();
-                    Store._filteredBlocksCache.invalidate();
-                    SelectionManager.updateTagCounts();
-                    TimelineView.invalidateRawDataCache();
-                    TimelineView.invalidateCache();
-                    App.render();
+                    App.showViewLoading();
+                    try {
+                        await Store.loadBlocks();
+                        Store._filteredBlocksCache.invalidate();
+                        SelectionManager.updateTagCounts();
+                        TimelineView.invalidateRawDataCache();
+                        TimelineView.invalidateCache();
+                        App.render();
+                    } finally {
+                        App.hideViewLoading();
+                    }
                 }
 
                 showToast('Updated to match remote.');

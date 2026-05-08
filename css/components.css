@@ -1011,6 +1011,38 @@
     color: var(--text-muted);
 }
 
+/* View loading overlay */
+.view-loading-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
+
+.view-loading-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.view-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: view-spin 0.7s linear infinite;
+}
+
+@keyframes view-spin {
+    to { transform: rotate(360deg); }
+}
+
 .reopen-prompt {
     display: flex;
     flex-direction: column;

@@ -438,7 +438,7 @@ const App = {
 
         const debouncedSearch = debounce((value) => {
             Store.searchQuery = value;
-            this.render();
+            this.render({ loading: true });
         }, 300);
 
         searchInput.addEventListener('input', (e) => {
@@ -495,7 +495,7 @@ const App = {
                     SelectionManager.toggleContextTag(tag, wasSelected);
                 }
 
-                this.render();
+                this.render({ loading: true });
             });
         });
     },
@@ -756,7 +756,7 @@ const App = {
         const recentBtn = document.getElementById('toolbarRecentBtn');
         if (recentBtn) recentBtn.hidden = view !== 'document';
 
-        this.render();
+        this.render({ loading: true });
         console.log('[App] setView:done', {
             currentView: Store.currentView
         });
@@ -849,33 +849,49 @@ const App = {
         if (sidebarRightToggle) sidebarRightToggle.classList.add('shifted', 'rotated');
     },
 
-    render() {
+    _loadingOverlay: null,
+
+    showViewLoading() {
+        const container = document.getElementById('viewContainer');
+        if (!container) return;
+        let overlay = container.querySelector('.view-loading-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'view-loading-overlay';
+            overlay.innerHTML = '<div class="view-spinner"></div>';
+            container.appendChild(overlay);
+        }
+        requestAnimationFrame(() => overlay.classList.add('visible'));
+        this._loadingOverlay = overlay;
+    },
+
+    hideViewLoading() {
+        const overlay = this._loadingOverlay;
+        if (!overlay) return;
+        overlay.classList.remove('visible');
+        const el = overlay;
+        setTimeout(() => el.remove(), 160);
+        this._loadingOverlay = null;
+    },
+
+    render(options = {}) {
+        if (options.loading) {
+            this.showViewLoading();
+            const self = this;
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                self._executeViewRender();
+                self._postRender();
+                self.hideViewLoading();
+            }));
+            return;
+        }
+        this._executeViewRender();
+        this._postRender();
+    },
+
+    _executeViewRender() {
         const blocks = Store.getFilteredBlocks();
         const view = Store.currentView;
-
-        SortManager.updateToolbar();
-        GroupManager.updateToolbar();
-
-        // Update recent sort button state
-        const toolbarRecentBtn = document.getElementById('toolbarRecentBtn');
-        if (toolbarRecentBtn) {
-            const sortConfig = Store.getSortConfig('document');
-            const isRecentMode = sortConfig?.clauses?.[0]?.field === 'lastAccessed';
-            toolbarRecentBtn.classList.toggle('active', isRecentMode);
-            toolbarRecentBtn.title = isRecentMode
-                ? 'Exit recent sort (Alt+R)'
-                : 'Sort by recently viewed (Alt+R)';
-            toolbarRecentBtn.hidden = view !== 'document';
-        }
-
-        // Update toolbar AI button state
-        const toolbarAiBtn = document.getElementById('toolbarAiBtn');
-        if (toolbarAiBtn) {
-            const aiReady = AIAssistant.isConfigured();
-            toolbarAiBtn.disabled = !aiReady || blocks.length === 0;
-            toolbarAiBtn.hidden = view === 'settings' || !aiReady;
-        }
-
         const groupBy = GroupManager.getGroupBy(view);
 
         switch (view) {
@@ -896,25 +912,43 @@ const App = {
                 break;
         }
 
-        // Refresh selection UI if select mode is active
         if (typeof BlockSelector !== 'undefined' && BlockSelector.active) {
             BlockSelector.refreshSelectionUI();
         }
 
-        // Hide FAB in kanban and capture views, or when AI panel is open on mobile
         const fab = document.getElementById('fabNewNote');
         if (fab) {
             const hideForView = (view === 'kanban' || view === 'capture');
             const hideForAI = AIAssistant._panelOpen && window.innerWidth <= 768;
             fab.style.display = (hideForView || hideForAI) ? 'none' : '';
         }
+    },
 
-        // Update undo/redo button states
+    _postRender() {
+        SortManager.updateToolbar();
+        GroupManager.updateToolbar();
+
+        const view = Store.currentView;
+        const toolbarRecentBtn = document.getElementById('toolbarRecentBtn');
+        if (toolbarRecentBtn) {
+            const sortConfig = Store.getSortConfig('document');
+            const isRecentMode = sortConfig?.clauses?.[0]?.field === 'lastAccessed';
+            toolbarRecentBtn.classList.toggle('active', isRecentMode);
+            toolbarRecentBtn.title = isRecentMode
+                ? 'Exit recent sort (Alt+R)'
+                : 'Sort by recently viewed (Alt+R)';
+            toolbarRecentBtn.hidden = view !== 'document';
+        }
+
+        const toolbarAiBtn = document.getElementById('toolbarAiBtn');
+        if (toolbarAiBtn) {
+            const aiReady = AIAssistant.isConfigured();
+            toolbarAiBtn.disabled = !aiReady || Store.getFilteredBlocks().length === 0;
+            toolbarAiBtn.hidden = view === 'settings' || !aiReady;
+        }
+
         this.updateUndoRedoUI();
-
-        // Update deadline panel in right sidebar (uses all blocks, not filtered)
         DeadlinePanel.render(Store.blocks);
-        // Update backlinks panel
         const focusedBlockId = DocumentView.getFocusedBlockId();
         BacklinksPanel.render(Store.blocks, focusedBlockId);
     },
