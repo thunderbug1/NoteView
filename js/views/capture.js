@@ -295,21 +295,35 @@ const CaptureView = {
             this._recognitionSession++;
             let sessionId = this._recognitionSession;
             this._isStopping = false;
+            this._insertedTranscript = '';
             this._interimTranscript = '';
 
             hideAiBtns();
 
             this._recognition.onresult = (event) => {
                 if (this._recognitionSession !== sessionId) return;
-                let final = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                let currentTranscript = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    if (event.results[i].isFinal) {
+                        const chunk = event.results[i][0].transcript;
+                        const normalizedPrev = currentTranscript.trim().toLowerCase();
+                        const normalizedChunk = chunk.trim().toLowerCase();
+                        if (normalizedPrev && normalizedChunk.startsWith(normalizedPrev)) {
+                            currentTranscript = chunk;
+                        } else {
+                            currentTranscript += chunk;
+                        }
+                    }
                 }
-                if (final) {
-                    const existing = editArea.value;
-                    editArea.value = existing + (existing && !existing.endsWith(' ') ? ' ' : '') + final;
-                    updateSaveState();
-                    showAiBtns();
+                if (currentTranscript.length > this._insertedTranscript.length) {
+                    const newText = currentTranscript.substring(this._insertedTranscript.length);
+                    this._insertedTranscript = currentTranscript;
+                    if (newText.trim()) {
+                        const existing = editArea.value;
+                        editArea.value = existing + (existing && !existing.endsWith(' ') ? ' ' : '') + newText.trim();
+                        updateSaveState();
+                        showAiBtns();
+                    }
                 }
             };
 
@@ -325,6 +339,7 @@ const CaptureView = {
                 if (this._recognitionSession !== sessionId) return;
                 if (!this._isStopping) {
                     try {
+                        this._insertedTranscript = '';
                         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                         this._recognition = new SR();
                         this._recognition.continuous = true;
