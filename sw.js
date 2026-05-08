@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v32';
+const CACHE_NAME = 'noteview-v33';
 
 const PRECACHE_URLS = [
   './',
@@ -47,6 +47,7 @@ const PRECACHE_URLS = [
   './js/utils/sortManager.js',
   './js/utils/appSettings.js',
   './js/utils/qrTransfer.js',
+  './js/utils/sendToVault.js',
   './js/utils/deadlinePanel.js',
   './js/utils/backlinksPanel.js',
   './js/utils/aiTaskPanel.js',

@@ -939,6 +939,60 @@ const Store = {
         }
     },
 
+    // Copy a block's .md file to a different vault
+    async sendBlockToVault(blockId, targetVaultName) {
+        const block = this.blocks.find(b => b.id === blockId);
+        if (!block) throw new Error('Block not found');
+
+        const handle = await this.getVaultHandle(targetVaultName);
+        if (!handle) throw new Error('Vault not found. It may have been removed.');
+
+        // Permission check for non-OPFS vaults
+        const vaultList = await this.getVaultList();
+        const entry = vaultList.find(v => v.name === targetVaultName);
+        if (!this.isOPFSVault(entry)) {
+            const perm = await handle.queryPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') {
+                const requested = await handle.requestPermission({ mode: 'readwrite' });
+                if (requested !== 'granted') {
+                    throw new Error('Permission denied for ' + targetVaultName + '. Try opening it first via Manage Vaults.');
+                }
+            }
+        }
+
+        const content = serializeBlock(block);
+        const fileName = `${block.id}.md`;
+
+        const fileHandle = await handle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+
+        return { fileName, vaultName: targetVaultName };
+    },
+
+    // Check if a block already exists with identical content in a target vault
+    async checkVaultDuplicate(blockId, targetVaultName) {
+        const block = this.blocks.find(b => b.id === blockId);
+        if (!block) return false;
+
+        const handle = await this.getVaultHandle(targetVaultName);
+        if (!handle) return false;
+
+        const fileName = `${block.id}.md`;
+        let existingFile;
+        try {
+            const fh = await handle.getFileHandle(fileName);
+            existingFile = await fh.getFile();
+        } catch {
+            return false;
+        }
+
+        const existingContent = await existingFile.text();
+        const newContent = serializeBlock(block);
+        return existingContent === newContent;
+    },
+
     // Get display title for a block (first heading, or empty string if none)
     getBlockTitle(block) {
         if (!block || !block.content) return '';

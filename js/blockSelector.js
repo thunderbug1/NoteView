@@ -303,6 +303,10 @@ const BlockSelector = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
                 <span>AI</span>
             </button>
+            <button class="select-action-btn select-action-secondary${hasSelection ? '' : ' select-action-disabled'}" data-action="sendtovault" ${hasSelection ? '' : 'disabled'}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="19" x2="12" y2="11"></line><polyline points="8 15 12 11 16 15"></polyline></svg>
+                <span>Send</span>
+            </button>
             <button class="select-action-btn select-action-done" data-action="done"><span>Done</span></button>
         `;
 
@@ -317,6 +321,7 @@ const BlockSelector = {
                     case 'delete': this.bulkDelete(); break;
                     case 'tags': this.bulkAddTags(); break;
                     case 'ai': this.bulkSendToAI(); break;
+                    case 'sendtovault': this.bulkSendToVault(); break;
                     case 'done': this.deactivate(); break;
                 }
             });
@@ -461,5 +466,11 @@ const BlockSelector = {
             : `${contextIds.length} notes`;
 
         AIAssistant.openPanel();
+    },
+
+    bulkSendToVault() {
+        const ids = [...this.selectedIds];
+        if (ids.length === 0) return;
+        SendToVault.show(ids, this._actionBar);
     }
 };

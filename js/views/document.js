@@ -774,6 +774,10 @@ const DocumentView = {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 Revision history
             </div>
+            <div class="menu-item" data-action="sendtovault" role="menuitem" tabindex="-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="19" x2="12" y2="11"></line><polyline points="8 15 12 11 16 15"></polyline></svg>
+                Send to vault
+            </div>
             <div class="menu-divider" role="separator"></div>
             <div class="menu-item menu-item-danger" data-action="delete" role="menuitem" tabindex="-1">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.5rem"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -816,6 +820,10 @@ const DocumentView = {
                 navigator.clipboard.writeText(content).catch(() => Common.showToast('Clipboard access denied'));
             } else if (action === 'history') {
                 HistoryView.openHistory(blockId);
+            } else if (action === 'sendtovault') {
+                this.closeBlockMenu();
+                SendToVault.show(blockId, btn);
+                return;
             } else if (action === 'delete') {
                 this.closeBlockMenu();
                 const confirmed = await Modal.confirm({
