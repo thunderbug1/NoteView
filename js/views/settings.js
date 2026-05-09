@@ -231,11 +231,54 @@ const SettingsView = {
                     <div class="settings-item">
                         <p>NoteView is a block-based markdown note-taker with built-in version control and flexible views.</p>
                     </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Version</label>
+                        </div>
+                        <span class="settings-item-value">v${App.VERSION}</span>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Updates</label>
+                            <p id="update-status" class="settings-item-hint"></p>
+                        </div>
+                        <button id="checkUpdatesBtn" class="settings-btn secondary">Check for Updates</button>
+                    </div>
                 </div>
             </div>
         `;
 
         this.attachEventListeners();
+        this._checkForUpdates();
+    },
+
+    async _checkForUpdates() {
+        const statusEl = document.getElementById('update-status');
+        const btn = document.getElementById('checkUpdatesBtn');
+        if (!statusEl || !btn) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Checking...';
+        statusEl.textContent = '';
+
+        try {
+            const res = await fetch('https://api.github.com/repos/thunderbug1/NoteView/releases/latest');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            const latestTag = (data.tag_name || '').replace(/^v/, '');
+            if (!latestTag) throw new Error('No tag found');
+
+            if (latestTag === App.VERSION) {
+                statusEl.textContent = 'You\'re up to date.';
+            } else {
+                statusEl.innerHTML = `<a href="https://github.com/thunderbug1/NoteView/releases/latest" target="_blank" rel="noopener" style="color:var(--accent)">v${escapeHtml(latestTag)} is available</a>`;
+            }
+        } catch (err) {
+            statusEl.textContent = 'Could not check for updates.';
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Check for Updates';
     },
 
     attachEventListeners() {
@@ -438,6 +481,12 @@ const SettingsView = {
         const importAIBtn = document.getElementById('importAISettingsBtn');
         if (importAIBtn) {
             importAIBtn.addEventListener('click', () => this._openImportVaultPicker());
+        }
+
+        // Check for updates button
+        const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
+        if (checkUpdatesBtn) {
+            checkUpdatesBtn.addEventListener('click', () => this._checkForUpdates());
         }
     },
 
