@@ -317,16 +317,25 @@ const KanbanView = {
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.open') && !TaskParser.isOpenTask(task)) {
+            if (contextSelection?.has('Todo.open') && TaskParser.isOpenTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
+            if (contextSelection?.has('Todo.inProgress') && TaskParser.isInProgressTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
+            if (contextSelection?.has('Todo.done') && TaskParser.isDoneTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.unassigned') && !TaskParser.isUnassignedTask(task)) {
+            if (contextSelection?.has('Todo.blocked') && TaskParser.isBlockedTask(task)) {
+                return false;
+            }
+            if (contextSelection?.has('Todo.canceled') && TaskParser.isCanceledTask(task)) {
+                return false;
+            }
+            if (contextSelection?.has('Todo.unblocked') && TaskParser.isUnblockedTask(task)) {
+                return false;
+            }
+            if (contextSelection?.has('Todo.unassigned') && TaskParser.isUnassignedTask(task)) {
                 return false;
             }
             return true;
@@ -346,16 +355,25 @@ const KanbanView = {
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.open') && !TaskParser.isOpenTask(task)) {
+            if (contextSelection?.has('Todo.open') && TaskParser.isOpenTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
+            if (contextSelection?.has('Todo.inProgress') && TaskParser.isInProgressTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
+            if (contextSelection?.has('Todo.done') && TaskParser.isDoneTask(task)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.unassigned') && !TaskParser.isUnassignedTask(task)) {
+            if (contextSelection?.has('Todo.blocked') && TaskParser.isBlockedTask(task)) {
+                return false;
+            }
+            if (contextSelection?.has('Todo.canceled') && TaskParser.isCanceledTask(task)) {
+                return false;
+            }
+            if (contextSelection?.has('Todo.unblocked') && TaskParser.isUnblockedTask(task)) {
+                return false;
+            }
+            if (contextSelection?.has('Todo.unassigned') && TaskParser.isUnassignedTask(task)) {
                 return false;
             }
             return true;

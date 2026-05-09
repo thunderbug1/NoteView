@@ -2702,7 +2702,7 @@ const DocumentView = {
                 return self.buildHiddenLineDecorations(state);
             },
             update(deco, tr) {
-                if (tr.docChanged || tr.selection || (effect && tr.effects.some(e => e.is(effect)))) {
+                if (tr.docChanged || tr.selectionSet || (effect && tr.effects.some(e => e.is(effect)))) {
                     return self.buildHiddenLineDecorations(tr.state);
                 }
                 return deco.map(tr.changes);

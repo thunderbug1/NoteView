@@ -544,10 +544,11 @@ function getActiveExcludedTaskFilter() {
 }
 
 /**
- * Check whether a task line matches all of the active task filters.
- * Non-task lines (no checkbox) always return true (stay visible).
+ * Check whether a task line matches the given task filters.
+ * By default uses AND logic (all filters must match); set anyMatch=true for OR logic.
+ * Non-task lines (no checkbox) always return true.
  */
-function taskLineMatchesFilter(lineText, activeFilters) {
+function taskLineMatchesFilter(lineText, activeFilters, anyMatch = false) {
     const checkboxMatch = lineText.match(/^\s*[-*+]\s+\[([ xX\/bB\-])\]/);
     if (!checkboxMatch) return true;
 
@@ -560,14 +561,19 @@ function taskLineMatchesFilter(lineText, activeFilters) {
     const hasAssignee = lineText.includes('[assignee::');
 
     for (const filter of activeFilters) {
-        if (filter === 'Todo.open' && !isOpen) return false;
-        if (filter === 'Todo.inProgress' && !isInProgress) return false;
-        if (filter === 'Todo.done' && !isDone) return false;
-        if (filter === 'Todo.blocked' && !isBlockedState) return false;
-        if (filter === 'Todo.canceled' && !isCanceled) return false;
-        if (filter === 'Todo.unblocked' && !isOpen) return false;
-        if (filter === 'Todo.unassigned' && hasAssignee) return false;
+        const matches = (
+            (filter === 'Todo.open' && isOpen) ||
+            (filter === 'Todo.inProgress' && isInProgress) ||
+            (filter === 'Todo.done' && isDone) ||
+            (filter === 'Todo.blocked' && isBlockedState) ||
+            (filter === 'Todo.canceled' && isCanceled) ||
+            (filter === 'Todo.unblocked' && isOpen) ||
+            (filter === 'Todo.unassigned' && !hasAssignee)
+        );
+        if (anyMatch && matches) return true;
+        if (!anyMatch && !matches) return false;
     }
+    return !anyMatch;
     return true;
 }
 
@@ -590,7 +596,7 @@ function getHiddenTaskLineIndices(lineTexts, activeFilters, excludeFilters) {
         const indent = text.match(/^(\s*)/)[1].length;
         const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
         const matchesActive = isTask && hasActive && taskLineMatchesFilter(text, activeFilters);
-        const matchesExclude = isTask && hasExclude && taskLineMatchesFilter(text, excludeFilters);
+        const matchesExclude = isTask && hasExclude && taskLineMatchesFilter(text, excludeFilters, true);
         return { indent, isTask, matchesActive, matchesExclude };
     });
 
