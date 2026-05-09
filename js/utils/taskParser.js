@@ -513,6 +513,128 @@ function parseTasksFromContent(content) {
     return tasks;
 }
 
+const TASK_COMPUTED_TAGS = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned'];
+
+/**
+ * Get active task computed tag filters from selection state.
+ * @returns {Set} Set of active Todo.* filter tags
+ */
+function getActiveTaskFilter() {
+    const context = window.SelectionManager?.selections?.context;
+    if (!context || context.size === 0) return new Set();
+    const active = new Set();
+    for (const f of TASK_COMPUTED_TAGS) {
+        if (context.has(f)) active.add(f);
+    }
+    return active;
+}
+
+/**
+ * Get excluded task computed tag filters from selection state.
+ * @returns {Set} Set of excluded Todo.* filter tags
+ */
+function getActiveExcludedTaskFilter() {
+    const excluded = window.SelectionManager?.selections?.excluded;
+    if (!excluded || excluded.size === 0) return new Set();
+    const active = new Set();
+    for (const f of TASK_COMPUTED_TAGS) {
+        if (excluded.has(f)) active.add(f);
+    }
+    return active;
+}
+
+/**
+ * Check whether a task line matches all of the active task filters.
+ * Non-task lines (no checkbox) always return true (stay visible).
+ */
+function taskLineMatchesFilter(lineText, activeFilters) {
+    const checkboxMatch = lineText.match(/^\s*[-*+]\s+\[([ xX\/bB\-])\]/);
+    if (!checkboxMatch) return true;
+
+    const state = checkboxMatch[1];
+    const isOpen = state === ' ' || state === '/';
+    const isInProgress = state === '/';
+    const isDone = state === 'x' || state === 'X';
+    const isBlockedState = state === 'b' || state === 'B';
+    const isCanceled = state === '-';
+    const hasAssignee = lineText.includes('[assignee::');
+
+    for (const filter of activeFilters) {
+        if (filter === 'Todo.open' && !isOpen) return false;
+        if (filter === 'Todo.inProgress' && !isInProgress) return false;
+        if (filter === 'Todo.done' && !isDone) return false;
+        if (filter === 'Todo.blocked' && !isBlockedState) return false;
+        if (filter === 'Todo.canceled' && !isCanceled) return false;
+        if (filter === 'Todo.unblocked' && !isOpen) return false;
+        if (filter === 'Todo.unassigned' && hasAssignee) return false;
+    }
+    return true;
+}
+
+/**
+ * Compute which line indices should be hidden based on active task filters.
+ * Matching tasks and their children are HIDDEN (e.g., selecting Todo.done hides done lines).
+ * Non-task lines are always visible.
+ * @param {string[]} lineTexts - Array of line text strings
+ * @param {Set} activeFilters - Active context filters (Todo.* tags) — matching lines are hidden
+ * @param {Set} excludeFilters - Active exclusion filters (Todo.* tags) — matching lines are hidden
+ * @returns {Set} Set of 0-based line indices to hide
+ */
+function getHiddenTaskLineIndices(lineTexts, activeFilters, excludeFilters) {
+    const hidden = new Set();
+    const hasActive = activeFilters && activeFilters.size > 0;
+    const hasExclude = excludeFilters && excludeFilters.size > 0;
+    if (!hasActive && !hasExclude) return hidden;
+
+    const lineInfo = lineTexts.map(text => {
+        const indent = text.match(/^(\s*)/)[1].length;
+        const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
+        const matchesActive = isTask && hasActive && taskLineMatchesFilter(text, activeFilters);
+        const matchesExclude = isTask && hasExclude && taskLineMatchesFilter(text, excludeFilters);
+        return { indent, isTask, matchesActive, matchesExclude };
+    });
+
+    // Stack of { indent, subtreeVisible } for tree-based visibility
+    const stack = [];
+
+    for (let i = 0; i < lineInfo.length; i++) {
+        const { indent, isTask, matchesActive, matchesExclude } = lineInfo[i];
+
+        if (!isTask) continue; // Non-task lines are never hidden
+
+        // Pop stack entries that are siblings or their children
+        while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
+            stack.pop();
+        }
+
+        let isVisible;
+
+        // Children of hidden parents are hidden
+        if (stack.length > 0 && !stack[stack.length - 1].subtreeVisible) {
+            isVisible = false;
+        } else if (hasActive) {
+            // Active context filter: matching tasks are HIDDEN
+            isVisible = !matchesActive;
+        } else {
+            // No active filter: default visible
+            isVisible = true;
+        }
+
+        // Exclusion: hide matching tasks (and their children inherit hiddenness via the stack)
+        if (isVisible && matchesExclude) {
+            isVisible = false;
+        }
+
+        if (!isVisible) {
+            hidden.add(i);
+        }
+
+        stack.push({ indent, subtreeVisible: isVisible });
+    }
+
+    return hidden;
+}
+
 // Export for use in other modules
 window.TaskParser = {
     normalizeState,
@@ -543,6 +665,11 @@ window.TaskParser = {
     parseTasksFromBlock,
     parseTasksFromBlocks,
     parseTasksFromContent,
+    getActiveTaskFilter,
+    getActiveExcludedTaskFilter,
+    taskLineMatchesFilter,
+    getHiddenTaskLineIndices,
+    TASK_COMPUTED_TAGS,
     PRIORITY_RANKS,
     UPCOMING_DAYS,
     KNOWN_BADGE_KEYS,

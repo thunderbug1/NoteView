@@ -1118,26 +1118,14 @@ const Store = {
                     if (block.tags && block.tags.length > 0) return false;
                 }
 
-                // Task-level computed: find at least one task satisfying ALL selected conditions
-                const TASK_COMPUTED_TAGS = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned'];
-                const activeTaskComputed = [...contextSelection].filter(t => TASK_COMPUTED_TAGS.includes(t));
-
-                if (activeTaskComputed.length > 0) {
-                    const tasks = TaskParser.parseTasksFromBlock(block);
-                    const hasMatchingTask = tasks.some(task =>
-                        activeTaskComputed.every(tag => {
-                            switch (tag) {
-                                case 'Todo.open':         return TaskParser.isOpenTask(task);
-                                case 'Todo.inProgress':   return TaskParser.isInProgressTask(task);
-                                case 'Todo.done':         return TaskParser.isDoneTask(task);
-                                case 'Todo.blocked':      return TaskParser.isBlockedTask(task);
-                                case 'Todo.canceled':     return TaskParser.isCanceledTask(task);
-                                case 'Todo.unblocked':    return TaskParser.isUnblockedTask(task);
-                                case 'Todo.unassigned': return TaskParser.isUnassignedTask(task);
-                            }
-                        })
-                    );
-                    if (!hasMatchingTask) return false;
+                // Task-level computed: filter at line level, hide block only if all content would be hidden
+                const activeTaskComputed = TaskParser.getActiveTaskFilter();
+                if (activeTaskComputed.size > 0) {
+                    const lines = (block.content || '').split('\n');
+                    const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
+                    const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskComputed, excludeFilters);
+                    const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
+                    if (!hasVisibleContent) return false;
                 }
             }
 
@@ -1148,22 +1136,10 @@ const Store = {
 
                 for (const item of excludedSelection) {
                     if (SelectionManager.isComputedContextTag(item)) {
-                        if (item === 'Todo.open') {
-                            if (block.content?.match(/\[[ \/]\]/)) return false;
-                        } else if (item === 'Todo.inProgress') {
-                            if (block.content?.match(/\[[\/]\]/)) return false;
-                        } else if (item === 'Todo.done') {
-                            if (block.content?.match(/\[[xX]\]/)) return false;
-                        } else if (item === 'Todo.blocked') {
-                            if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isBlockedTask(t))) return false;
-                        } else if (item === 'Todo.canceled') {
-                            if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isCanceledTask(t))) return false;
-                        } else if (item === 'Todo.unblocked') {
-                            if (TaskParser.parseTasksFromBlock(block).some(t => TaskParser.isUnblockedTask(t))) return false;
-                        } else if (item === 'Status.untagged') {
+                        // Todo.* exclusions are handled at line level via getHiddenTaskLineIndices
+                        if (item.startsWith('Todo.')) continue;
+                        if (item === 'Status.untagged') {
                             if (!block.tags || block.tags.length === 0) return false;
-                        } else if (item === 'Todo.unassigned') {
-                            if (TaskParser.hasUnassignedTasks(TaskParser.parseTasksFromBlock(block))) return false;
                         }
                     } else if (item.startsWith('path:')) {
                         const group = item.slice(5);
@@ -1174,6 +1150,16 @@ const Store = {
                     } else {
                         if (blockTags.includes(item)) return false;
                     }
+                }
+
+                // Check emptiness after line-level exclusion of todo tags
+                const excludedTaskFilters = TaskParser.getActiveExcludedTaskFilter();
+                if (excludedTaskFilters.size > 0) {
+                    const lines = (block.content || '').split('\n');
+                    const activeTaskFilters = TaskParser.getActiveTaskFilter();
+                    const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskFilters, excludedTaskFilters);
+                    const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
+                    if (!hasVisibleContent) return false;
                 }
             }
 

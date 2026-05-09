@@ -2482,14 +2482,7 @@ const DocumentView = {
      * Returns only filters that should hide non-matching task lines (excludes Todo.all).
      */
     getActiveTaskFilter() {
-        const context = SelectionManager.selections?.context;
-        if (!context || context.size === 0) return new Set();
-        const taskFilters = ['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled', 'Todo.unblocked', 'Todo.unassigned'];
-        const active = new Set();
-        for (const f of taskFilters) {
-            if (context.has(f)) active.add(f);
-        }
-        return active;
+        return TaskParser.getActiveTaskFilter();
     },
 
     /**
@@ -2497,27 +2490,7 @@ const DocumentView = {
      * Non-task lines (no checkbox) always return true (stay visible).
      */
     taskLineMatchesFilter(lineText, activeFilters) {
-        const checkboxMatch = lineText.match(/^\s*[-*+]\s+\[([ xX\/bB\-])\]/);
-        if (!checkboxMatch) return true; // non-task line, always visible
-
-        const state = checkboxMatch[1];
-        const isOpen = state === ' ' || state === '/';
-        const isInProgress = state === '/';
-        const isDone = state === 'x' || state === 'X';
-        const isBlockedState = state === 'b' || state === 'B';
-        const isCanceled = state === '-';
-        const hasAssignee = lineText.includes('[assignee::');
-
-        for (const filter of activeFilters) {
-            if (filter === 'Todo.open' && !isOpen) return false;
-            if (filter === 'Todo.inProgress' && !isInProgress) return false;
-            if (filter === 'Todo.done' && !isDone) return false;
-            if (filter === 'Todo.blocked' && !isBlockedState) return false;
-            if (filter === 'Todo.canceled' && !isCanceled) return false;
-            if (filter === 'Todo.unblocked' && !isOpen) return false;
-            if (filter === 'Todo.unassigned' && hasAssignee) return false;
-        }
-        return true;
+        return TaskParser.taskLineMatchesFilter(lineText, activeFilters);
     },
 
     /**
@@ -2526,48 +2499,16 @@ const DocumentView = {
      * Shared by buildDecorations (display) and export (file output).
      */
     getHiddenTaskLineIndices(lineTexts, activeTaskFilters) {
-        const hidden = new Set();
-        if (!activeTaskFilters || activeTaskFilters.size === 0) return hidden;
-
-        // Pre-compute line metadata
-        const lineInfo = lineTexts.map(text => {
-            const indent = text.match(/^(\s*)/)[1].length;
-            const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
-            const matchesFilter = isTask && this.taskLineMatchesFilter(text, activeTaskFilters);
-            return { indent, isTask, matchesFilter };
-        });
-
-        // Build hidden set
-        let hideBelowIndent = null;
-
-        for (let i = 0; i < lineInfo.length; i++) {
-            const { indent, isTask, matchesFilter } = lineInfo[i];
-
-            if (isTask && matchesFilter) {
-                hideBelowIndent = null;
-            } else if (isTask) {
-                if (hideBelowIndent === null) {
-                    hideBelowIndent = indent;
-                }
-            } else if (hideBelowIndent !== null && indent <= hideBelowIndent) {
-                hideBelowIndent = null;
-            }
-
-            const shouldHide = isTask
-                ? !matchesFilter
-                : (hideBelowIndent !== null && indent > hideBelowIndent);
-
-            if (shouldHide) hidden.add(i);
-        }
-
-        return hidden;
+        const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
+        return TaskParser.getHiddenTaskLineIndices(lineTexts, activeTaskFilters, excludeFilters);
     },
 
     /**
      * Filter markdown content, removing lines that don't match active task filters.
      */
     filterContentLines(content, activeTaskFilters) {
-        if (!activeTaskFilters || activeTaskFilters.size === 0) return content;
+        const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
+        if ((!activeTaskFilters || activeTaskFilters.size === 0) && (!excludeFilters || excludeFilters.size === 0)) return content;
         const lines = content.split('\n');
         const hidden = this.getHiddenTaskLineIndices(lines, activeTaskFilters);
         return lines.filter((_, i) => !hidden.has(i)).join('\n');
@@ -2669,31 +2610,9 @@ const DocumentView = {
         for (let i = 1; i <= state.doc.lines; i++) allLineTexts.push(state.doc.line(i).text);
         const hiddenLines = this.getHiddenTaskLineIndices(allLineTexts, activeTaskFilters);
 
-        // Detect orphaned tasks: visible tasks whose parent task was hidden
-        const orphanedLines = new Set();
-        const taskAncestors = []; // stack of { indent, hidden }
-        for (let i = 0; i < allLineTexts.length; i++) {
-            const text = allLineTexts[i];
-            const indent = text.match(/^(\s*)/)[1].length;
-            const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
-
-            if (isTask) {
-                while (taskAncestors.length > 0 && taskAncestors[taskAncestors.length - 1].indent >= indent) {
-                    taskAncestors.pop();
-                }
-
-                if (!hiddenLines.has(i) && taskAncestors.length > 0 && taskAncestors[taskAncestors.length - 1].hidden) {
-                    orphanedLines.add(i);
-                }
-
-                taskAncestors.push({ indent, hidden: hiddenLines.has(i) });
-            }
-        }
-
         // Hidden task lines are handled by a separate StateField extension (see
         // createHiddenLineExtension) which CAN use cross-line Decoration.replace() —
-        // something ViewPlugin decorations cannot do.  Here we only skip already-hidden
-        // lines and detect orphaned tasks.
+        // something ViewPlugin decorations cannot do.
         for (let i = 1; i <= state.doc.lines; i++) {
             if (fencedBlockLines.has(i)) continue;
             if (tableLines.has(i)) continue;
@@ -2703,11 +2622,6 @@ const DocumentView = {
             // Skip lines hidden by the StateField, but NOT cursor lines — the
             // StateField preserves those so they still need syntax decorations.
             if (hiddenLines.has(i - 1) && !cursorLines.has(i)) continue;
-
-            // Mark orphaned tasks whose parent was filtered out
-            if (orphanedLines.has(i - 1)) {
-                builder.push(Decoration.line({ attributes: { class: 'cm-orphaned-task-line' } }).range(line.from));
-            }
 
             const hideSyntax = !cursorLines.has(i);
             this.applyLineDecorations(line, builder, hideSyntax, Decoration, i === state.doc.lines);
@@ -2726,7 +2640,8 @@ const DocumentView = {
     buildHiddenLineDecorations(state) {
         const { Decoration } = window.CodeMirror;
         const activeTaskFilters = this.getActiveTaskFilter();
-        if (!activeTaskFilters || activeTaskFilters.size === 0) {
+        const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
+        if ((!activeTaskFilters || activeTaskFilters.size === 0) && (!excludeFilters || excludeFilters.size === 0)) {
             return Decoration.none;
         }
 
