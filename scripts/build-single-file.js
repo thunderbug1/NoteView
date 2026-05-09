@@ -33,8 +33,9 @@ const svgUri = `data:image/svg+xml;base64,${svgData}`;
 html = html.replace(/href="icon\.svg"/g, `href="${svgUri}"`);
 
 const manifestPath = path.join(projectRoot, 'manifest.json');
-const manifestData = fs.readFileSync(manifestPath).toString('base64');
-const manifestUri = `data:application/json;base64,${manifestData}`;
+let manifestJson = fs.readFileSync(manifestPath, 'utf8');
+manifestJson = manifestJson.replace(/"src":\s*"icon\.svg"/g, `"src": "${svgUri}"`);
+const manifestUri = `data:application/json;base64,${Buffer.from(manifestJson).toString('base64')}`;
 html = html.replace(/href="manifest\.json"/g, `href="${manifestUri}"`);
 
 // 4. Remove Service Worker Registration block

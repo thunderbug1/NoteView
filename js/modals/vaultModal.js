@@ -172,6 +172,11 @@ const VaultModal = {
 
         const modal = Modal.create({
             title: 'Manage Vaults',
+            onClose: () => {
+                if (!Store.directoryHandle) {
+                    App.showDirectoryPicker();
+                }
+            },
             content: `
                 <div class="vault-manager">
                     <div class="vault-manager-sidebar">

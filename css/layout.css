@@ -461,7 +461,8 @@
 #app.no-vault #sidebarRight,
 #app.no-vault #sidebarRightToggle,
 #app.no-vault .sidebar-edge,
-#app.no-vault #aiPanel { display: none !important; }
+#app.no-vault #aiPanel,
+#app.no-vault .content-toolbar { display: none !important; }
 
 /* Mobile Responsive */
 #sidebarOverlay { display: none; }
