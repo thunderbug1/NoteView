@@ -489,37 +489,37 @@ const TimelineView = {
                     || contextSelection.has('Todo.unblocked');
 
                 if (activeTodoFilter) {
-                    if (event.category !== 'task') return true;
+                    if (event.category !== 'task') return false;
 
                     if (contextSelection.has('Todo.open')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                        if (TaskParser.isOpenTask(eventTask)) return false;
+                        if (!TaskParser.isOpenTask(eventTask)) return false;
                     }
                     if (contextSelection.has('Todo.inProgress')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                        if (TaskParser.isInProgressTask(eventTask)) return false;
+                        if (!TaskParser.isInProgressTask(eventTask)) return false;
                     }
                     if (contextSelection.has('Todo.done')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                        if (TaskParser.isDoneTask(eventTask)) return false;
+                        if (!TaskParser.isDoneTask(eventTask)) return false;
                     }
                     if (contextSelection.has('Todo.blocked')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                        if (TaskParser.isBlockedTask(eventTask)) return false;
+                        if (!TaskParser.isBlockedTask(eventTask)) return false;
                     }
                     if (contextSelection.has('Todo.canceled')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                        if (TaskParser.isCanceledTask(eventTask)) return false;
+                        if (!TaskParser.isCanceledTask(eventTask)) return false;
                     }
                     if (contextSelection.has('Todo.unblocked')) {
                         const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                        if (TaskParser.isUnblockedTask(eventTask)) return false;
+                        if (!TaskParser.isUnblockedTask(eventTask)) return false;
                     }
                 }
                 if (contextSelection.has('Todo.unassigned')) {
-                    if (event.category !== 'task') return true;
+                    if (event.category !== 'task') return false;
                     const eventTask = { state: event.newState ?? event.oldState, badges: event.badges || [] };
-                    if (TaskParser.isUnassignedTask(eventTask)) return false;
+                    if (!TaskParser.isUnassignedTask(eventTask)) return false;
                 }
             }
 

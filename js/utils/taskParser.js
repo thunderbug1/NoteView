@@ -597,6 +597,7 @@ function getHiddenTaskLineIndices(lineTexts, activeFilters, excludeFilters) {
         const isTask = /^\s*[-*+]\s+\[([ xX\/bB\-])\]/.test(text);
         const matchesActive = isTask && hasActive && taskLineMatchesFilter(text, activeFilters);
         const matchesExclude = isTask && hasExclude && taskLineMatchesFilter(text, excludeFilters, true);
+
         return { indent, isTask, matchesActive, matchesExclude };
     });
 
@@ -619,8 +620,8 @@ function getHiddenTaskLineIndices(lineTexts, activeFilters, excludeFilters) {
         if (stack.length > 0 && !stack[stack.length - 1].subtreeVisible) {
             isVisible = false;
         } else if (hasActive) {
-            // Active context filter: matching tasks are HIDDEN
-            isVisible = !matchesActive;
+            // Active context filter: show ONLY matching tasks
+            isVisible = matchesActive;
         } else {
             // No active filter: default visible
             isVisible = true;

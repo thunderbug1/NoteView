@@ -1124,7 +1124,7 @@ const Store = {
                     const lines = (block.content || '').split('\n');
                     const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
                     const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskComputed, excludeFilters);
-                    const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
+                    const hasVisibleContent = lines.some((line, i) => !hidden.has(i) && line.trim());
                     if (!hasVisibleContent) return false;
                 }
             }
@@ -1158,7 +1158,7 @@ const Store = {
                     const lines = (block.content || '').split('\n');
                     const activeTaskFilters = TaskParser.getActiveTaskFilter();
                     const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskFilters, excludedTaskFilters);
-                    const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
+                    const hasVisibleContent = lines.some((line, i) => !hidden.has(i) && line.trim());
                     if (!hasVisibleContent) return false;
                 }
             }

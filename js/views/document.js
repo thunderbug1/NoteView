@@ -2550,7 +2550,6 @@ const DocumentView = {
 
             if (block.isCollapsible && !selectionInsideBlock) {
                 const startLine = state.doc.lineAt(block.from);
-                const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
 
                 builder.push(Decoration.replace({
                     widget: new widgets.FencedBlockWidget(block),
@@ -2562,14 +2561,6 @@ const DocumentView = {
                         class: 'md-fenced-block-summary-line'
                     }
                 }).range(startLine.from));
-
-                if (endLine.number > startLine.number) {
-                    const interiorFrom = state.doc.line(startLine.number + 1).from;
-                    const interiorTo = endLine.number < state.doc.lines
-                        ? state.doc.line(endLine.number + 1).from
-                        : endLine.to;
-                    builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
-                }
             } else if (!selectionInsideBlock) {
                 builder.push(Decoration.mark({ class: 'md-fenced-block-source' }).range(block.from, block.to));
             }
@@ -2580,7 +2571,6 @@ const DocumentView = {
 
             if (!selectionInsideTable) {
                 const startLine = state.doc.lineAt(table.from);
-                const endLine = state.doc.lineAt(Math.max(table.from, table.to - 1));
 
                 builder.push(Decoration.replace({
                     widget: new widgets.TableWidget(table),
@@ -2590,14 +2580,6 @@ const DocumentView = {
                 builder.push(Decoration.line({
                     attributes: { class: 'md-table-summary-line' }
                 }).range(startLine.from));
-
-                if (endLine.number > startLine.number) {
-                    const interiorFrom = state.doc.line(startLine.number + 1).from;
-                    const interiorTo = endLine.number < state.doc.lines
-                        ? state.doc.line(endLine.number + 1).from
-                        : endLine.to;
-                    builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
-                }
             } else {
                 builder.push(Decoration.mark({ class: 'md-table-source' }).range(table.from, table.to));
             }
@@ -2610,9 +2592,10 @@ const DocumentView = {
         for (let i = 1; i <= state.doc.lines; i++) allLineTexts.push(state.doc.line(i).text);
         const hiddenLines = this.getHiddenTaskLineIndices(allLineTexts, activeTaskFilters);
 
-        // Hidden task lines are handled by a separate StateField extension (see
-        // createHiddenLineExtension) which CAN use cross-line Decoration.replace() —
-        // something ViewPlugin decorations cannot do.
+        // Hidden task lines and collapsed block/table interiors are handled by
+        // separate StateField extensions (see createHiddenLineExtension and
+        // createCollapsedBlockExtension) which CAN use cross-line
+        // Decoration.replace() — something ViewPlugin decorations cannot do.
         for (let i = 1; i <= state.doc.lines; i++) {
             if (fencedBlockLines.has(i)) continue;
             if (tableLines.has(i)) continue;
@@ -2709,6 +2692,74 @@ const DocumentView = {
             },
             provide: f => EditorView.decorations.from(f)
         });
+    },
+
+    /**
+     * Build cross-line Decoration.replace() ranges for collapsed fenced-block
+     * and table interiors.  Called from a StateField (NOT a ViewPlugin) so it
+     * CAN span line breaks, which properly removes hidden regions from CM's
+     * height map and keeps the gutter in sync.
+     */
+    buildCollapsedBlockDecorations(state, hasFocus) {
+        const { Decoration } = window.CodeMirror;
+        const { fencedBlocks, tables } = this._getCachedParse(state.doc);
+        const builder = [];
+
+        for (const block of fencedBlocks) {
+            const selectionInsideBlock = hasFocus && this.isSelectionInsideBlock(state, block);
+            if (!block.isCollapsible || selectionInsideBlock) continue;
+
+            const startLine = state.doc.lineAt(block.from);
+            const endLine = state.doc.lineAt(Math.max(block.from, block.to - 1));
+            if (endLine.number > startLine.number) {
+                const interiorFrom = state.doc.line(startLine.number + 1).from;
+                const interiorTo = endLine.number < state.doc.lines
+                    ? state.doc.line(endLine.number + 1).from
+                    : endLine.to;
+                builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
+            }
+        }
+
+        for (const table of tables) {
+            const selectionInsideTable = hasFocus && this.isSelectionInsideBlock(state, table);
+            if (selectionInsideTable) continue;
+
+            const startLine = state.doc.lineAt(table.from);
+            const endLine = state.doc.lineAt(Math.max(table.from, table.to - 1));
+            if (endLine.number > startLine.number) {
+                const interiorFrom = state.doc.line(startLine.number + 1).from;
+                const interiorTo = endLine.number < state.doc.lines
+                    ? state.doc.line(endLine.number + 1).from
+                    : endLine.to;
+                builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
+            }
+        }
+
+        return builder.length > 0 ? Decoration.set(builder, true) : Decoration.none;
+    },
+
+    createCollapsedBlockExtension() {
+        const { StateField, EditorView } = window.CodeMirror;
+        const self = this;
+        const effect = getFilterChangedEffect();
+        let focused = false;
+        return [
+            EditorView.updateListener.of((update) => {
+                if (update.focusChanged) focused = update.view.hasFocus;
+            }),
+            StateField.define({
+                create(state) {
+                    return self.buildCollapsedBlockDecorations(state, false);
+                },
+                update(deco, tr) {
+                    if (tr.docChanged || tr.selectionSet || tr.focusChanged || (effect && tr.effects.some(e => e.is(effect)))) {
+                        return self.buildCollapsedBlockDecorations(tr.state, focused);
+                    }
+                    return deco.map(tr.changes);
+                },
+                provide: f => EditorView.decorations.from(f)
+            })
+        ];
     },
 
     /**
@@ -2995,6 +3046,7 @@ const DocumentView = {
                 EditorState.languageData.of(() => [{ autocomplete: mentionCompletionSource }, { autocomplete: wikilinkCompletionSource }]),
                 EditorView.lineWrapping,
                 this.createHiddenLineExtension(),
+                ...this.createCollapsedBlockExtension(),
                 this.createLivePreviewPlugin(),
                 this.createIndentFolding(),
                 placeholder(blockId === 'new' ? 'Write a note...' : ''),
