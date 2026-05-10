@@ -149,8 +149,18 @@ function createTaskMenus(documentView) {
         menu.className = 'task-context-menu';
         menu.setAttribute('role', 'menu');
         menu.setAttribute('aria-label', 'Task priority menu');
-        menu.style.left = `${x}px`;
-        menu.style.top = `${y}px`;
+
+        // Ensure menu stays within viewport
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const menuWidth = 200;
+        const menuHeight = 200;
+        let menuX = x;
+        let menuY = y;
+        if (menuX + menuWidth > viewportWidth) menuX = viewportWidth - menuWidth - 10;
+        if (menuY + menuHeight > viewportHeight) menuY = viewportHeight - menuHeight - 10;
+        menu.style.left = `${menuX}px`;
+        menu.style.top = `${menuY}px`;
 
         const priorities = [
             { label: 'Urgent', color: '#ef4444' },

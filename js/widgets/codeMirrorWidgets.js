@@ -344,7 +344,9 @@ function createCodeMirrorWidgets(documentView) {
                 }
 
                 if (this.type === 'priority') {
-                    documentView.showPriorityMenu(e.pageX, e.pageY, view, this.from, this.to);
+                    const px = e.changedTouches?.[0]?.pageX ?? e.pageX;
+                    const py = e.changedTouches?.[0]?.pageY ?? e.pageY;
+                    documentView.showPriorityMenu(px, py, view, this.from, this.to);
                     return;
                 }
 

@@ -1239,7 +1239,10 @@ const SelectionManager = {
             else if (tag === 'Status.untagged') hasBlocks = hasUntagged;
             else hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
 
-            const newOpacity = (!hasBlocks && !option.classList.contains('selected')) ? '0.4' : '1';
+            // In kanban view, state-based Todo.* tags map directly to columns — no filter effect
+            const kanbanColumnTags = new Set(['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled']);
+            const isIneffectiveInKanban = Store.currentView === 'kanban' && kanbanColumnTags.has(tag);
+            const newOpacity = (!hasBlocks && !option.classList.contains('selected')) || isIneffectiveInKanban ? '0.4' : '1';
             if (option.style.opacity !== newOpacity) {
                 option.style.opacity = newOpacity;
             }

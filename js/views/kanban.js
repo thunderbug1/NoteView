@@ -317,21 +317,7 @@ const KanbanView = {
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.open') && !TaskParser.isOpenTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.inProgress') && !TaskParser.isInProgressTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.done') && !TaskParser.isDoneTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.canceled') && !TaskParser.isCanceledTask(task)) {
-                return false;
-            }
+            // State-based Todo.* tags are no-ops in kanban — tasks are already separated into columns
             if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
@@ -355,21 +341,7 @@ const KanbanView = {
             if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
                 return false;
             }
-            if (contextSelection?.has('Todo.open') && !TaskParser.isOpenTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.inProgress') && !TaskParser.isInProgressTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.done') && !TaskParser.isDoneTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.blocked') && !TaskParser.isBlockedTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.canceled') && !TaskParser.isCanceledTask(task)) {
-                return false;
-            }
+            // State-based Todo.* tags are no-ops in kanban
             if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
                 return false;
             }
