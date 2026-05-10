@@ -598,6 +598,62 @@
     color: var(--danger, #ef4444);
 }
 
+/* Drag Handle Button (6-dot grip) */
+.drag-handle-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: grab;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.document-view .block:hover .drag-handle-btn,
+.document-view .block:focus-within .drag-handle-btn {
+    opacity: 0.6;
+}
+
+.drag-handle-btn:hover {
+    opacity: 1 !important;
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+/* Grabbing cursor during drag */
+body.is-dragging-wikilink,
+body.is-dragging-wikilink * {
+    cursor: grabbing !important;
+}
+
+/* Drag source visual feedback */
+.document-view .block.dragging-source {
+    opacity: 0.5;
+}
+
+/* Drop target highlight */
+.document-view .block.wikilink-drop-target {
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+    background: color-mix(in srgb, var(--accent) 5%, var(--bg-primary));
+}
+
+/* Drop indicator line */
+.wikilink-drop-indicator {
+    position: fixed;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 0 6px var(--accent);
+    transition: top 0.05s ease, left 0.05s ease, width 0.05s ease;
+}
+
 /* Task Toggle Button */
 .task-toggle-btn {
     background: transparent;
@@ -634,6 +690,9 @@
 
 @media (max-width: 768px) {
     .task-toggle-btn {
+        display: none;
+    }
+    .drag-handle-btn {
         display: none;
     }
 }

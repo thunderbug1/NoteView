@@ -48,6 +48,10 @@ const DocumentView = {
     // Mobile toolbar state
     _mobileToolbar: null,
     _focusedEditor: null,
+    // Drag-and-drop wikilink state
+    _dragState: { active: false },
+    _dragMoveHandler: null,
+    _dragEndHandler: null,
 
     /**
      * Get or initialize task menus
@@ -174,6 +178,13 @@ const DocumentView = {
         }
         this._groupCollapseHandler = this.handleGroupCollapseClick.bind(this);
         container.addEventListener('click', this._groupCollapseHandler);
+
+        // Drag handle mousedown delegation
+        if (this._dragStartHandler) {
+            container.removeEventListener('mousedown', this._dragStartHandler);
+        }
+        this._dragStartHandler = this.handleDragStart.bind(this);
+        container.addEventListener('mousedown', this._dragStartHandler);
 
         this.attachEventListeners();
 
@@ -537,6 +548,14 @@ const DocumentView = {
 
         // Task toggle button
         const actions = [];
+
+        // Drag handle for wikilink insertion
+        actions.push(`
+            <button class="drag-handle-btn" data-block-id="${escapeHtml(block.id)}" title="Drag to link to another note" aria-label="Drag to insert wikilink">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+            </button>
+        `);
+
         actions.push(`
             <button class="task-toggle-btn" data-id="${escapeHtml(block.id)}" title="Toggle task on current line (Alt+T)" aria-label="Toggle task on current line">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -1000,6 +1019,137 @@ const DocumentView = {
         } else {
             this.startSpeechRecognition(blockId, micBtn);
         }
+    },
+
+    // --- Drag-and-drop wikilink handlers (pointer events) ---
+
+    handleDragStart(e) {
+        const handle = e.target.closest('.drag-handle-btn');
+        if (!handle) return;
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const article = handle.closest('article.block');
+        const blockId = handle.dataset.blockId;
+        const block = Store.blocks.find(b => b.id === blockId);
+        if (!block) return;
+
+        const title = Store.getBlockTitle(block);
+        this._dragState = {
+            active: false,
+            startX: e.clientX,
+            startY: e.clientY,
+            sourceBlockId: blockId,
+            sourceTitle: title || '',
+            sourceArticle: article,
+            targetBlockId: null,
+            indicator: null,
+        };
+
+        if (!this._dragMoveHandler) {
+            this._dragMoveHandler = this._handleDragMove.bind(this);
+            this._dragEndHandler = this._handleDragEnd.bind(this);
+        }
+        document.addEventListener('mousemove', this._dragMoveHandler);
+        document.addEventListener('mouseup', this._dragEndHandler);
+    },
+
+    _handleDragMove(e) {
+        const ds = this._dragState;
+        if (!ds.sourceBlockId) return;
+
+        // Activate after 5px movement
+        if (!ds.active) {
+            const dx = e.clientX - ds.startX;
+            const dy = e.clientY - ds.startY;
+            if (dx * dx + dy * dy < 25) return;
+            ds.active = true;
+            ds.sourceArticle.classList.add('dragging-source');
+            document.body.classList.add('is-dragging-wikilink');
+
+            ds.indicator = document.createElement('div');
+            ds.indicator.className = 'wikilink-drop-indicator';
+            document.body.appendChild(ds.indicator);
+        }
+
+        // Find block under cursor (hide source to avoid hitting it)
+        ds.sourceArticle.style.pointerEvents = 'none';
+        const hitEl = document.elementFromPoint(e.clientX, e.clientY);
+        ds.sourceArticle.style.pointerEvents = '';
+
+        const targetBlock = hitEl?.closest('article.block');
+
+        // Clear previous highlights
+        document.querySelectorAll('.wikilink-drop-target').forEach(el => el.classList.remove('wikilink-drop-target'));
+
+        if (!targetBlock || targetBlock.dataset.id === 'new' || targetBlock.dataset.id === ds.sourceBlockId) {
+            ds.targetBlockId = null;
+            if (ds.indicator) ds.indicator.style.display = 'none';
+            return;
+        }
+
+        targetBlock.classList.add('wikilink-drop-target');
+        ds.targetBlockId = targetBlock.dataset.id;
+
+        // Position indicator line at bottom of target block
+        if (ds.indicator) {
+            const rect = targetBlock.getBoundingClientRect();
+            ds.indicator.style.display = '';
+            ds.indicator.style.top = rect.bottom + 'px';
+            ds.indicator.style.left = rect.left + 'px';
+            ds.indicator.style.width = rect.width + 'px';
+        }
+    },
+
+    _handleDragEnd(e) {
+        document.removeEventListener('mousemove', this._dragMoveHandler);
+        document.removeEventListener('mouseup', this._dragEndHandler);
+
+        const ds = this._dragState;
+        if (!ds.active) {
+            this._dragState = { active: false };
+            return;
+        }
+
+        // Clean up visual feedback
+        if (ds.sourceArticle) ds.sourceArticle.classList.remove('dragging-source');
+        if (ds.indicator) ds.indicator.remove();
+        document.body.classList.remove('is-dragging-wikilink');
+        document.querySelectorAll('.wikilink-drop-target').forEach(el => el.classList.remove('wikilink-drop-target'));
+
+        // Insert wikilink into target
+        if (ds.targetBlockId && ds.targetBlockId !== ds.sourceBlockId) {
+            const wikilink = ds.sourceTitle
+                ? `[[${ds.sourceBlockId}|${ds.sourceTitle}]]`
+                : `[[${ds.sourceBlockId}]]`;
+
+            const editor = this.editors.get(ds.targetBlockId);
+            const targetBlock = Store.blocks.find(b => b.id === ds.targetBlockId);
+            if (!targetBlock) { this._dragState = { active: false }; return; }
+
+            if (editor && this._focusedBlockId === ds.targetBlockId) {
+                this.insertTextAtSelection(editor, wikilink);
+            } else {
+                const content = targetBlock.content || '';
+                const newContent = content.endsWith('\n') ? content + wikilink : content + '\n' + wikilink;
+                App.saveBlockContent(ds.targetBlockId, newContent, {
+                    commit: true,
+                    commitMessage: `Link to ${ds.sourceTitle || ds.sourceBlockId}`
+                });
+                // Sync CodeMirror editor with the new content
+                if (editor) {
+                    const normalized = newContent.endsWith('\n') ? newContent : newContent + '\n';
+                    editor.dispatch({
+                        changes: { from: 0, to: editor.state.doc.length, insert: normalized }
+                    });
+                    this.originalContents.set(ds.targetBlockId, normalized);
+                }
+            }
+            Common.showToast(`Linked to ${ds.sourceTitle || ds.sourceBlockId}`);
+        }
+
+        this._dragState = { active: false };
     },
 
     handleCollapseClick(e) {
@@ -2978,6 +3128,33 @@ const DocumentView = {
             ? self.shortcutToCM6(Store.shortcuts.toggleTask)
             : 'Mod-Shift-t';
         return Prec.high(keymap.of([
+            {
+                key: 'Enter',
+                run: (view) => {
+                    const state = view.state;
+                    const sel = state.selection.main;
+                    if (!sel.empty) return false;
+
+                    const pos = sel.head;
+                    const line = state.doc.lineAt(pos);
+                    const lineText = line.text;
+
+                    // Empty list item (just a marker) — exit the list without extra blank lines
+                    const emptyListMatch = lineText.match(/^(\s*)([-*+]\s+|\d+[.)]\s+)$/);
+                    if (emptyListMatch) {
+                        const indent = emptyListMatch[1];
+                        view.dispatch({
+                            changes: { from: line.from, to: line.to, insert: indent + '\n' },
+                            selection: { anchor: line.from + indent.length + 1 },
+                            userEvent: 'input',
+                            scrollIntoView: true
+                        });
+                        return true;
+                    }
+
+                    return false;
+                }
+            },
             {
                 key: 'Mod-Enter',
                 run: (target) => {

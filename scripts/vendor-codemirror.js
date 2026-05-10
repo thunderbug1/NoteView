@@ -9,7 +9,7 @@ import {foldService} from "@codemirror/language";
 import {ViewPlugin, Decoration, WidgetType, keymap, placeholder} from "@codemirror/view";
 import {EditorState, StateField, Prec, Annotation} from "@codemirror/state";
 import {unifiedMergeView} from "@codemirror/merge";
-import {indentWithTab, indentMore, indentLess} from "@codemirror/commands";
+import {indentWithTab, indentMore, indentLess, insertNewlineAndIndent} from "@codemirror/commands";
 import {autocompletion, completionKeymap, closeBracketsKeymap, snippet} from "@codemirror/autocomplete";
 
 window.CodeMirror = {
@@ -27,6 +27,7 @@ window.CodeMirror = {
     indentWithTab,
     indentMore,
     indentLess,
+    insertNewlineAndIndent,
     placeholder,
     EditorState,
     autocompletion,
