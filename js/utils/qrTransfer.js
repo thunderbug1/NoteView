@@ -57,8 +57,20 @@ const QRTransfer = {
     },
 
     _validateData(raw) {
+        if (typeof raw !== 'string') return null;
+
+        let jsonString;
+        if (raw.startsWith('Z:')) {
+            try {
+                jsonString = LZString.decompressFromEncodedURIComponent(raw.slice(2));
+            } catch { return null; }
+            if (!jsonString) return null;
+        } else {
+            jsonString = raw;
+        }
+
         let data;
-        try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return null; }
+        try { data = JSON.parse(jsonString); } catch { return null; }
         if (!data || data.v !== 1) return null;
         return data;
     },
@@ -133,10 +145,10 @@ const QRTransfer = {
     // --- QR generation ---
 
     _generateQR(text) {
-        const qr = qrcode(0, 'L');
+        const qr = qrcode(0, 'M');
         qr.addData(text);
         qr.make();
-        return qr.createDataURL(4, 4);
+        return qr.createSvgTag({ cellSize: 2, margin: 2, scalable: true, alt: 'QR code with vault settings' });
     },
 
     // --- Export modal ---
@@ -155,14 +167,17 @@ const QRTransfer = {
             return;
         }
 
-        if (json.length > 2500) {
+        const compressed = LZString.compressToEncodedURIComponent(json);
+        const qrPayload = 'Z:' + compressed;
+
+        if (compressed.length > 2300) {
             showToast('Settings too large for a single QR code. Remove some AI profiles or presets.');
             return;
         }
 
-        let dataUrl;
+        let svgMarkup;
         try {
-            dataUrl = this._generateQR(json);
+            svgMarkup = this._generateQR(qrPayload);
         } catch (e) {
             showToast('Failed to generate QR code.');
             return;
@@ -173,9 +188,10 @@ const QRTransfer = {
 
         const modal = Modal.create({
             title: 'Transfer Settings',
+            width: 'min(600px, 90vw)',
             content: `
                 <div class="qr-transfer-display">
-                    <img src="${dataUrl}" alt="QR code with vault settings" />
+                    ${svgMarkup}
                     <button class="settings-btn secondary" id="qrCopyJsonBtn" style="margin-top:0.25rem">Copy JSON</button>
                     <div class="qr-transfer-warning">
                         This QR code contains API keys and git credentials. Only scan on a trusted device.
