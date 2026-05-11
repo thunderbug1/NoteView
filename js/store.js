@@ -445,6 +445,18 @@ const Store = {
             }
         }
 
+        // Fallback: try all known vaults until one works
+        if (!savedHandle) {
+            const vaultList = await this.getVaultList();
+            for (const entry of vaultList) {
+                const handle = await this.getVaultHandle(entry.name);
+                if (handle) {
+                    savedHandle = handle;
+                    break;
+                }
+            }
+        }
+
         if (savedHandle) {
             try {
                 // Look up vault entry to check if OPFS (no permission needed)
@@ -463,6 +475,7 @@ const Store = {
                 if (permission === 'granted') {
                     this.directoryHandle = savedHandle;
                     await this.saveVault(savedHandle);
+                    await this.setLastActiveVault(savedHandle.name);
                     await GitStore.init(this.directoryHandle); // INIT GIT HERE
                     await this.loadBlocks();
                     RecentAccessTracker.init(this.directoryHandle.name);
@@ -865,6 +878,7 @@ const Store = {
         this.directoryHandle = vaultHandle;
         await this.saveDirectoryHandle(vaultHandle);
         await this.saveVault(vaultHandle, 'opfs');
+        await this.setLastActiveVault(vaultHandle.name);
         await GitStore.init(vaultHandle);
         await this.loadBlocks();
         RecentAccessTracker.init(vaultHandle.name);
