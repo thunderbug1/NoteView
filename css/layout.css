@@ -562,6 +562,33 @@
     #main:has(.capture-view) > #viewContainer,
     #main:has(.capture-page) > #viewContainer { padding: 0; }
 
+    .pull-refresh-indicator {
+        position: absolute;
+        top: -40px;
+        left: 50%;
+        transform: translateY(0);
+        margin-left: -20px;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: var(--bg-primary);
+        box-shadow: var(--shadow-md);
+        color: var(--text-muted);
+        z-index: 60;
+        pointer-events: none;
+        transition: transform 0.2s ease;
+    }
+    .pull-refresh-indicator.ready { color: var(--accent); }
+    .pull-refresh-indicator.spinning svg {
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
     .content-toolbar {
         padding: 0.25rem 0.5rem;
         position: sticky;

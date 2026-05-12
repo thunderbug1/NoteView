@@ -185,6 +185,7 @@ const App = {
         await GitRemote.init();
         await SyncManager.init();
         this.setupEventListeners();
+        this.setupMobilePullToRefresh();
         SelectionManager.init();
         SelectionManager.updateTagCounts();
         await AIAssistant.init();
@@ -625,6 +626,60 @@ const App = {
                 BlockSelector.deactivate();
             }
         });
+    },
+
+    setupMobilePullToRefresh() {
+        if (!('ontouchstart' in window)) return;
+        const main = document.getElementById('main');
+        if (!main || main._pullRefreshSetup) return;
+        main._pullRefreshSetup = true;
+
+        let startY = 0, pulling = false;
+        const threshold = 80;
+
+        // Create indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'pull-refresh-indicator';
+        indicator.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+        indicator.setAttribute('aria-hidden', 'true');
+        main.prepend(indicator);
+
+        main.addEventListener('touchstart', (e) => {
+            if (main.scrollTop > 0) return;
+            startY = e.touches[0].clientY;
+            pulling = true;
+            indicator.classList.remove('spinning');
+        }, { passive: true });
+
+        main.addEventListener('touchmove', (e) => {
+            if (!pulling) return;
+            const dy = e.touches[0].clientY - startY;
+            if (main.scrollTop > 0 || dy < 0) {
+                indicator.style.transform = '';
+                return;
+            }
+            const pull = Math.min(dy, threshold * 1.5);
+            indicator.style.transform = `translateY(${pull}px)`;
+            indicator.classList.toggle('ready', dy >= threshold);
+        }, { passive: true });
+
+        main.addEventListener('touchend', async () => {
+            if (!pulling) return;
+            pulling = false;
+            const ready = indicator.classList.contains('ready');
+            indicator.classList.remove('ready');
+
+            if (ready) {
+                indicator.classList.add('spinning');
+                try {
+                    await Store.loadBlocks();
+                    App.render();
+                    Common.showToast('Notes reloaded');
+                } catch { /* ignore */ }
+                indicator.classList.remove('spinning');
+            }
+            indicator.style.transform = '';
+        }, { passive: true });
     },
 
     setupEventListeners() {

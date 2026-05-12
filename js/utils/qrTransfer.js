@@ -372,9 +372,9 @@ const QRTransfer = {
                     await Store.createOPFSVault(name);
                     await this.importSettings(data);
                     await this._pullIfAvailable(data);
-                    showToast('Vault created and settings imported.');
                     VaultModal.updateVaultSwitcherName();
-                    App.render();
+                    await App.completeInitialization();
+                    showToast('Vault created and settings imported.');
                 } catch (e) {
                     showToast('Failed to create browser vault.');
                 }
@@ -408,7 +408,7 @@ const QRTransfer = {
             await GitRemote.pull();
             await Store.loadBlocks();
         } catch (e) {
-            // Pull may fail if repo is empty or auth is wrong — non-fatal
+            showToast('Pull failed: ' + (e.message || 'check your connection'));
         }
     },
 
