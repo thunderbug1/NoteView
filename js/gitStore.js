@@ -29,6 +29,38 @@ const GitStore = {
         }
     },
     
+    async commitAll(message = 'Full sync') {
+        if (!this.git || !this.fs) return;
+        try {
+            const entries = await this.fs.readdir(this.dir);
+            for (const name of entries) {
+                if (name.endsWith('.md') || name === '.noteview') {
+                    try {
+                        const stat = await this.fs.stat(`${this.dir}/${name}`);
+                        if (stat.isFile()) {
+                            await this.git.add({ fs: this.fs, dir: this.dir, filepath: name });
+                        } else if (stat.isDirectory() && name === '.noteview') {
+                            const subEntries = await this.fs.readdir(`${this.dir}/${name}`);
+                            for (const sub of subEntries) {
+                                if (sub.endsWith('.json')) {
+                                    await this.git.add({ fs: this.fs, dir: this.dir, filepath: `${name}/${sub}` });
+                                }
+                            }
+                        }
+                    } catch (e) { /* skip files that can't be staged */ }
+                }
+            }
+            const sha = await this.git.commit({
+                fs: this.fs, dir: this.dir, author: this.author, message
+            });
+            console.log(`Commit all as ${sha}`);
+            return sha;
+        } catch (err) {
+            console.error('Failed to commit all:', err);
+            throw err;
+        }
+    },
+
     async commitBlock(filename, message = 'Update note') {
         if (!this.git || !this.fs || !filename) return;
 

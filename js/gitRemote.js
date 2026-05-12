@@ -40,7 +40,7 @@ const GitRemote = {
         return true;
     },
 
-    async push() {
+    async push(force = false) {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
@@ -52,6 +52,7 @@ const GitRemote = {
                 http: window.GitHttp,
                 remote: this.config.name,
                 ref,
+                force,
                 corsProxy: this._getCorsProxy(),
                 onAuth: () => this.config.auth
             });
@@ -116,6 +117,28 @@ const GitRemote = {
             console.log('Pull successful');
             return true;
         } catch (err) {
+            // If pull fails due to conflict or diverged history, try hard reset to remote
+            if (err instanceof Error && (err.name === 'CheckoutConflictError' || err.code === 'CheckoutConflictError' || err.message?.includes('would be overwritten'))) {
+                console.log('Pull conflict detected, attempting hard reset to remote');
+                try {
+                    await git.fetch({
+                        fs, dir,
+                        http: window.GitHttp,
+                        remote: remoteName,
+                        corsProxy: this._getCorsProxy(),
+                        onAuth: () => this.config.auth
+                    });
+                    const remoteRef = `refs/remotes/${remoteName}/${ref}`;
+                    const commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
+                    await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
+                    await git.checkout({ fs, dir, ref, force: true });
+                    console.log('Hard reset to remote successful');
+                    return true;
+                } catch (resetErr) {
+                    console.error('Hard reset also failed:', resetErr);
+                    throw resetErr;
+                }
+            }
             console.error('Pull failed:', err);
             throw err;
         }

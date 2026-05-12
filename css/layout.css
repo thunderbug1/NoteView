@@ -558,7 +558,7 @@
     #main:has(.capture-view) .filter-bar,
     #main:has(.capture-page) .filter-bar,
     #main:has(.settings-view) .filter-bar { display: none; }
-    #viewContainer { padding: 1rem; overflow: visible; }
+    #viewContainer { padding: 0.5rem; overflow: visible; }
     #main:has(.capture-view) > #viewContainer,
     #main:has(.capture-page) > #viewContainer { padding: 0; }
 

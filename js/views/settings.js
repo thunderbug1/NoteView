@@ -127,6 +127,9 @@ const SettingsView = {
                             <button id="syncNowBtn" class="settings-btn secondary">
                                 Sync Now
                             </button>
+                            <button id="commitForcePushBtn" class="settings-btn secondary" style="margin-left:0.5rem;color:var(--danger, #ef4444)">
+                                Commit All &amp; Force Push
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -353,6 +356,43 @@ const SettingsView = {
                 } finally {
                     syncNowBtn.disabled = false;
                     syncNowBtn.textContent = 'Sync Now';
+                }
+            });
+        }
+
+        const commitForcePushBtn = document.getElementById('commitForcePushBtn');
+        if (commitForcePushBtn) {
+            commitForcePushBtn.addEventListener('click', async () => {
+                const confirmModal = Modal.create({
+                    title: 'Overwrite Remote?',
+                    content: `
+                        <p style="margin-bottom:0.75rem;color:var(--text-secondary)">This will commit all local files and <strong>force push</strong> to the remote, completely replacing its history.</p>
+                        <p style="margin-bottom:1rem;color:var(--danger, #ef4444)">This cannot be undone. Any notes on the remote that are not in this vault will be lost.</p>
+                        <div style="display:flex;gap:0.5rem;justify-content:flex-end">
+                            <button class="modal-cancel-btn" style="padding:0.5rem 1rem;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">Cancel</button>
+                            <button class="modal-confirm-btn" style="padding:0.5rem 1rem;background:var(--danger, #ef4444);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Overwrite Remote</button>
+                        </div>
+                    `
+                });
+                const confirmed = await new Promise(resolve => {
+                    confirmModal.querySelector('.modal-confirm-btn').addEventListener('click', () => { confirmModal.close(); resolve(true); });
+                    confirmModal.querySelector('.modal-cancel-btn').addEventListener('click', () => { confirmModal.close(); resolve(false); });
+                    confirmModal.addEventListener('close', () => resolve(false), { once: true });
+                });
+                if (!confirmed) return;
+
+                commitForcePushBtn.disabled = true;
+                commitForcePushBtn.textContent = 'Committing...';
+                try {
+                    await GitStore.commitAll();
+                    commitForcePushBtn.textContent = 'Pushing...';
+                    await GitRemote.push(true);
+                    Common.showToast('Commit all & force push successful');
+                } catch (e) {
+                    Common.showToast('Failed: ' + (e.message || 'Unknown error'));
+                } finally {
+                    commitForcePushBtn.disabled = false;
+                    commitForcePushBtn.textContent = 'Commit All & Force Push';
                 }
             });
         }

@@ -267,4 +267,8 @@
         left: 4px;
         opacity: 0.8;
     }
+
+    .codemirror-container {
+        padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+    }
 }
