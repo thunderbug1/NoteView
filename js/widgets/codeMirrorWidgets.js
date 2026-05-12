@@ -680,6 +680,153 @@ function createCodeMirrorWidgets(documentView) {
         ignoreEvent() { return true; }
     }
 
+    class ImageWidget extends WidgetType {
+        constructor(alt, url, from, to) {
+            super();
+            this.alt = alt;
+            this.url = url;
+            this.from = from;
+            this.to = to;
+        }
+        eq(other) {
+            return other.alt === this.alt && other.url === this.url && other.from === this.from;
+        }
+        toDOM(view) {
+            const wrap = document.createElement('div');
+            wrap.className = 'md-media-preview md-media-preview-image';
+
+            const img = document.createElement('img');
+            img.src = this.url;
+            img.alt = this.alt;
+            img.loading = 'lazy';
+            img.onerror = () => {
+                img.replaceWith(Object.assign(document.createElement('span'), {
+                    className: 'md-media-broken',
+                    textContent: this.alt ? `Image: ${this.alt}` : `Image: ${this.url}`
+                }));
+            };
+
+            if (this.alt) {
+                const caption = document.createElement('span');
+                caption.className = 'md-media-caption';
+                caption.textContent = this.alt;
+                wrap.append(img, caption);
+            } else {
+                wrap.appendChild(img);
+            }
+
+            wrap.onmousedown = (e) => e.stopPropagation();
+            wrap.onclick = (e) => {
+                e.stopPropagation();
+                view.dispatch({ selection: { anchor: this.from }, scrollIntoView: true });
+                view.focus();
+            };
+            return wrap;
+        }
+        ignoreEvent() { return true; }
+    }
+
+    class VideoWidget extends WidgetType {
+        constructor(url, from, to) {
+            super();
+            this.url = url;
+            this.from = from;
+            this.to = to;
+        }
+        eq(other) {
+            return other.url === this.url && other.from === this.from;
+        }
+        toDOM(view) {
+            const wrap = document.createElement('div');
+            wrap.className = 'md-media-preview md-media-preview-video';
+
+            const video = document.createElement('video');
+            video.src = this.url;
+            video.controls = true;
+            video.preload = 'metadata';
+            video.onerror = () => {
+                video.replaceWith(Object.assign(document.createElement('span'), {
+                    className: 'md-media-broken',
+                    textContent: `Video: ${this.url}`
+                }));
+            };
+
+            wrap.appendChild(video);
+
+            wrap.onmousedown = (e) => e.stopPropagation();
+            wrap.onclick = (e) => {
+                if (e.target === video) return;
+                e.stopPropagation();
+                view.dispatch({ selection: { anchor: this.from }, scrollIntoView: true });
+                view.focus();
+            };
+            return wrap;
+        }
+        ignoreEvent() { return true; }
+    }
+
+    function extractYouTubeId(url) {
+        try {
+            const u = new URL(url);
+            if (u.hostname === 'youtu.be') return u.pathname.slice(1);
+            if (u.pathname.startsWith('/embed/')) return u.pathname.split('/')[2];
+            if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2];
+            return u.searchParams.get('v');
+        } catch { return null; }
+    }
+
+    class EmbedWidget extends WidgetType {
+        constructor(url, type, videoId, from, to) {
+            super();
+            this.url = url;
+            this.type = type;
+            this.videoId = videoId;
+            this.from = from;
+            this.to = to;
+        }
+        eq(other) {
+            return other.url === this.url && other.type === this.type && other.from === this.from;
+        }
+        toDOM(view) {
+            const wrap = document.createElement('div');
+            wrap.className = 'md-media-preview md-media-preview-embed';
+
+            const thumb = document.createElement('img');
+            thumb.className = 'md-media-embed-thumb';
+            if (this.type === 'youtube' && this.videoId) {
+                thumb.src = `https://img.youtube.com/vi/${this.videoId}/mqdefault.jpg`;
+                thumb.alt = 'YouTube video thumbnail';
+            } else {
+                thumb.src = '';
+                thumb.alt = `${this.type} video`;
+            }
+            thumb.loading = 'lazy';
+
+            const playBtn = document.createElement('div');
+            playBtn.className = 'md-media-play-btn';
+            playBtn.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+
+            const label = document.createElement('span');
+            label.className = 'md-media-embed-label';
+            label.textContent = this.type === 'youtube' ? 'YouTube' : 'Vimeo';
+
+            wrap.append(thumb, playBtn, label);
+
+            wrap.onmousedown = (e) => e.stopPropagation();
+            wrap.onclick = (e) => {
+                e.stopPropagation();
+                if (e.target.closest('.md-media-play-btn') || e.target === thumb) {
+                    window.open(this.url, '_blank', 'noopener');
+                } else {
+                    view.dispatch({ selection: { anchor: this.from }, scrollIntoView: true });
+                    view.focus();
+                }
+            };
+            return wrap;
+        }
+        ignoreEvent() { return true; }
+    }
+
     return {
         CheckboxWidget,
         BadgeWidget,
@@ -689,7 +836,11 @@ function createCodeMirrorWidgets(documentView) {
         TableWidget,
         AddDeadlineWidget,
         AddAssigneeWidget,
-        AddPriorityWidget
+        AddPriorityWidget,
+        ImageWidget,
+        VideoWidget,
+        EmbedWidget,
+        extractYouTubeId
     };
 }
 

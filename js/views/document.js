@@ -1788,6 +1788,8 @@ const DocumentView = {
                 insertPreview = `![image](${url})`;
             } else if (type === 'video') {
                 insertPreview = `<video src="${url}" controls></video>`;
+            } else if (type === 'youtube' || type === 'vimeo') {
+                insertPreview = `${label} embed: ${url}`;
             } else {
                 insertPreview = url;
             }
@@ -1870,6 +1872,10 @@ const DocumentView = {
                 break;
             case 'video':
                 insertText = `<video src="${mediaInfo.url}" controls></video>`;
+                break;
+            case 'youtube':
+            case 'vimeo':
+                insertText = mediaInfo.url;
                 break;
             default:
                 insertText = mediaInfo.url;
@@ -3457,6 +3463,9 @@ const DocumentView = {
                 this.decorateTaskAnchors.bind(this),
                 this.decorateHeaders.bind(this),
                 this.decorateInlineFormats.bind(this),
+                this.decorateImages.bind(this),
+                this.decorateVideos.bind(this),
+                this.decorateEmbeds.bind(this),
                 this.decorateLinks.bind(this),
                 this.decorateBareUrls.bind(this),
                 this.decorateWikilinks.bind(this)
@@ -3558,6 +3567,91 @@ const DocumentView = {
                     }
                     usedRanges.push({ from: matchFrom, to: matchTo });
                 }
+            }
+        }
+    },
+
+    // Decorator: markdown images ![alt](url)
+    decorateImages(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
+        const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+        let match;
+        while ((match = imageRegex.exec(text)) !== null) {
+            const matchFrom = from + match.index;
+            const matchTo = matchFrom + match[0].length;
+
+            let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
+            if (!overlaps) {
+                if (hideSyntax) {
+                    builder.push(Decoration.replace({
+                        widget: new widgets.ImageWidget(match[1], match[2], matchFrom, matchTo)
+                    }).range(matchFrom, matchTo));
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-image-source' }).range(matchFrom, matchTo));
+                }
+                usedRanges.push({ from: matchFrom, to: matchTo });
+            }
+        }
+    },
+
+    // Decorator: <video> HTML tags
+    decorateVideos(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
+        const videoRegex = /<video\s+[^>]*src=["']([^"']+)["'][^>]*>[^<]*<\/video\s*>/gi;
+        let match;
+        while ((match = videoRegex.exec(text)) !== null) {
+            const matchFrom = from + match.index;
+            const matchTo = matchFrom + match[0].length;
+
+            let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
+            if (!overlaps) {
+                if (hideSyntax) {
+                    builder.push(Decoration.replace({
+                        widget: new widgets.VideoWidget(match[1], matchFrom, matchTo)
+                    }).range(matchFrom, matchTo));
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-video-source' }).range(matchFrom, matchTo));
+                }
+                usedRanges.push({ from: matchFrom, to: matchTo });
+            }
+        }
+    },
+
+    // Decorator: YouTube/Vimeo embed URLs
+    decorateEmbeds(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
+        const youtubeRegex = /https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]+)/gi;
+        const vimeoRegex = /https?:\/\/(www\.)?vimeo\.com\/(\d+)/gi;
+
+        let match;
+        while ((match = youtubeRegex.exec(text)) !== null) {
+            const matchFrom = from + match.index;
+            const matchTo = matchFrom + match[0].length;
+            let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
+            if (!overlaps) {
+                const videoId = match[4];
+                if (hideSyntax) {
+                    builder.push(Decoration.replace({
+                        widget: new widgets.EmbedWidget(match[0], 'youtube', videoId, matchFrom, matchTo)
+                    }).range(matchFrom, matchTo));
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-embed-source' }).range(matchFrom, matchTo));
+                }
+                usedRanges.push({ from: matchFrom, to: matchTo });
+            }
+        }
+
+        while ((match = vimeoRegex.exec(text)) !== null) {
+            const matchFrom = from + match.index;
+            const matchTo = matchFrom + match[0].length;
+            let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
+            if (!overlaps) {
+                const videoId = match[2];
+                if (hideSyntax) {
+                    builder.push(Decoration.replace({
+                        widget: new widgets.EmbedWidget(match[0], 'vimeo', videoId, matchFrom, matchTo)
+                    }).range(matchFrom, matchTo));
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-embed-source' }).range(matchFrom, matchTo));
+                }
+                usedRanges.push({ from: matchFrom, to: matchTo });
             }
         }
     },
