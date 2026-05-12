@@ -563,23 +563,7 @@
     #main:has(.capture-page) > #viewContainer { padding: 0; }
 
     .pull-refresh-indicator {
-        position: absolute;
-        top: -40px;
-        left: 50%;
         transform: translateY(0);
-        margin-left: -20px;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        background: var(--bg-primary);
-        box-shadow: var(--shadow-md);
-        color: var(--text-muted);
-        z-index: 60;
-        pointer-events: none;
-        transition: transform 0.2s ease;
     }
     .pull-refresh-indicator.ready { color: var(--accent); }
     .pull-refresh-indicator.spinning svg {
@@ -600,6 +584,32 @@
         position: sticky;
         top: 38px;
         z-index: 54;
+    }
+}
+
+/* Pull-to-refresh indicator (hidden off-screen by default, animated on mobile) */
+.pull-refresh-indicator {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    margin-left: -20px;
+    width: 40px;
+    height: 40px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-primary);
+    box-shadow: var(--shadow-md);
+    color: var(--text-muted);
+    z-index: 60;
+    pointer-events: none;
+    transition: transform 0.2s ease;
+}
+
+@media (max-width: 768px) {
+    .pull-refresh-indicator {
+        display: flex;
     }
 }
 
