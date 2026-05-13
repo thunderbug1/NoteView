@@ -796,19 +796,31 @@ function createCodeMirrorWidgets(documentView) {
             if (this.type === 'youtube' && this.videoId) {
                 thumb.src = `https://img.youtube.com/vi/${this.videoId}/mqdefault.jpg`;
                 thumb.alt = 'YouTube video thumbnail';
+            } else if (this.type === 'steam' && this.videoId) {
+                thumb.src = `https://cdn.cloudflare.steamstatic.com/steam/apps/${this.videoId}/header.jpg`;
+                thumb.alt = 'Steam game';
             } else {
                 thumb.src = '';
                 thumb.alt = `${this.type} video`;
             }
             thumb.loading = 'lazy';
+            thumb.onerror = () => {
+                thumb.src = '';
+                thumb.alt = '(thumbnail unavailable)';
+            };
 
+            const isSteam = this.type === 'steam';
             const playBtn = document.createElement('div');
             playBtn.className = 'md-media-play-btn';
-            playBtn.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+            if (isSteam) {
+                playBtn.innerHTML = '<svg width="36" height="36" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>';
+            } else {
+                playBtn.innerHTML = '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+            }
 
             const label = document.createElement('span');
             label.className = 'md-media-embed-label';
-            label.textContent = this.type === 'youtube' ? 'YouTube' : 'Vimeo';
+            label.textContent = this.type === 'youtube' ? 'YouTube' : this.type === 'steam' ? 'Steam' : 'Vimeo';
 
             wrap.append(thumb, playBtn, label);
 
@@ -827,6 +839,145 @@ function createCodeMirrorWidgets(documentView) {
         ignoreEvent() { return true; }
     }
 
+    class MediaGalleryWidget extends WidgetType {
+        constructor(gallery) {
+            super();
+            this.gallery = gallery;
+        }
+        eq(other) {
+            return other.gallery.from === this.gallery.from
+                && other.gallery.to === this.gallery.to;
+        }
+        toDOM(view) {
+            const { items } = this.gallery;
+            const wrap = document.createElement('div');
+            wrap.className = 'md-media-gallery';
+            if (items.length === 1) wrap.classList.add('md-media-gallery-single');
+            else if (items.length === 2) wrap.classList.add('md-media-gallery-double');
+
+            for (const item of items) {
+                const card = document.createElement('div');
+                card.className = 'md-gallery-card';
+
+                if (item.type === 'youtube' || item.type === 'vimeo') {
+                    const thumbWrap = document.createElement('div');
+                    thumbWrap.className = 'md-gallery-card-thumb';
+
+                    const img = document.createElement('img');
+                    img.loading = 'lazy';
+                    if (item.type === 'youtube' && item.videoId) {
+                        img.src = `https://img.youtube.com/vi/${item.videoId}/mqdefault.jpg`;
+                        img.alt = 'YouTube thumbnail';
+                    } else {
+                        img.alt = `${item.type} video`;
+                    }
+                    img.onerror = () => { img.src = ''; img.alt = '(thumbnail unavailable)'; };
+
+                    const playBtn = document.createElement('div');
+                    playBtn.className = 'md-gallery-card-play';
+                    playBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+
+                    const label = document.createElement('span');
+                    label.className = 'md-gallery-card-label';
+                    label.textContent = item.type === 'youtube' ? 'YouTube' : 'Vimeo';
+
+                    thumbWrap.append(img, playBtn, label);
+                    card.appendChild(thumbWrap);
+
+                    thumbWrap.onclick = (e) => {
+                        e.stopPropagation();
+                        window.open(item.url, '_blank', 'noopener');
+                    };
+                } else if (item.type === 'steam') {
+                    const thumbWrap = document.createElement('div');
+                    thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-steam';
+
+                    const img = document.createElement('img');
+                    img.loading = 'lazy';
+                    if (item.videoId) {
+                        img.src = `https://cdn.cloudflare.steamstatic.com/steam/apps/${item.videoId}/header.jpg`;
+                    }
+                    img.alt = 'Steam game';
+                    img.onerror = () => { img.src = ''; img.alt = '(thumbnail unavailable)'; };
+
+                    const icon = document.createElement('div');
+                    icon.className = 'md-gallery-card-play';
+                    icon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>';
+
+                    const label = document.createElement('span');
+                    label.className = 'md-gallery-card-label';
+                    label.textContent = 'Steam';
+
+                    thumbWrap.append(img, icon, label);
+                    card.appendChild(thumbWrap);
+
+                    thumbWrap.onclick = (e) => {
+                        e.stopPropagation();
+                        window.open(item.url, '_blank', 'noopener');
+                    };
+                } else if (item.type === 'image') {
+                    const thumbWrap = document.createElement('div');
+                    thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-image';
+
+                    const img = document.createElement('img');
+                    img.src = item.url;
+                    img.loading = 'lazy';
+                    img.alt = item.caption || 'image';
+                    img.onerror = () => { img.replaceWith(Object.assign(document.createElement('span'), { className: 'md-media-broken', textContent: 'Image unavailable' })); };
+
+                    thumbWrap.appendChild(img);
+                    card.appendChild(thumbWrap);
+                } else if (item.type === 'video') {
+                    const thumbWrap = document.createElement('div');
+                    thumbWrap.className = 'md-gallery-card-thumb';
+
+                    const video = document.createElement('video');
+                    video.src = item.url;
+                    video.preload = 'metadata';
+                    video.muted = true;
+                    video.onerror = () => { video.replaceWith(Object.assign(document.createElement('span'), { className: 'md-media-broken', textContent: 'Video unavailable' })); };
+
+                    const label = document.createElement('span');
+                    label.className = 'md-gallery-card-label';
+                    label.textContent = 'Video';
+
+                    thumbWrap.append(video, label);
+                    card.appendChild(thumbWrap);
+                }
+
+                if (item.caption) {
+                    const caption = document.createElement('div');
+                    caption.className = 'md-gallery-card-caption';
+                    caption.textContent = item.caption;
+                    card.appendChild(caption);
+                }
+
+                wrap.appendChild(card);
+            }
+
+            wrap.onmousedown = (e) => e.stopPropagation();
+            wrap.onclick = (e) => {
+                if (e.target.closest('.md-gallery-card-thumb')) return;
+                e.stopPropagation();
+                view.focus();
+                const captionEl = e.target.closest('.md-gallery-card-caption');
+                const cards = wrap.querySelectorAll('.md-gallery-card');
+                let pos = this.gallery.from;
+                if (captionEl) {
+                    const clickedCard = captionEl.closest('.md-gallery-card');
+                    const idx = Array.from(cards).indexOf(clickedCard);
+                    if (idx >= 0 && idx < this.gallery.items.length && this.gallery.items[idx].from != null) {
+                        pos = this.gallery.items[idx].from;
+                    }
+                }
+                view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+            };
+
+            return wrap;
+        }
+        ignoreEvent() { return true; }
+    }
+
     return {
         CheckboxWidget,
         BadgeWidget,
@@ -840,6 +991,7 @@ function createCodeMirrorWidgets(documentView) {
         ImageWidget,
         VideoWidget,
         EmbedWidget,
+        MediaGalleryWidget,
         extractYouTubeId
     };
 }

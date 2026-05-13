@@ -1698,6 +1698,9 @@ const DocumentView = {
         if (/^https?:\/\/(www\.)?vimeo\.com\/\d+/i.test(url)) {
             return { type: 'vimeo', url, label: 'Vimeo Video' };
         }
+        if (/^https?:\/\/store\.steampowered\.com\/app\/(\d+)/i.test(url)) {
+            return { type: 'steam', url, label: 'Steam Game' };
+        }
 
         return null;
     },
@@ -1788,7 +1791,7 @@ const DocumentView = {
                 insertPreview = `![image](${url})`;
             } else if (type === 'video') {
                 insertPreview = `<video src="${url}" controls></video>`;
-            } else if (type === 'youtube' || type === 'vimeo') {
+            } else if (type === 'youtube' || type === 'vimeo' || type === 'steam') {
                 insertPreview = `${label} embed: ${url}`;
             } else {
                 insertPreview = url;
@@ -1875,6 +1878,7 @@ const DocumentView = {
                 break;
             case 'youtube':
             case 'vimeo':
+            case 'steam':
                 insertText = mediaInfo.url;
                 break;
             default:
@@ -2221,6 +2225,148 @@ const DocumentView = {
         }
 
         return tables;
+    },
+
+    parseMediaItem(lineText) {
+        const trimmed = lineText.trim();
+        if (!trimmed) return null;
+
+        const youtubePattern = /https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]+)/i;
+        const vimeoPattern = /https?:\/\/(www\.)?vimeo\.com\/(\d+)/i;
+        const steamPattern = /https?:\/\/store\.steampowered\.com\/app\/(\d+)/i;
+        const videoFilePattern = /https?:\/\/\S+\.(mp4|webm|ogg|mov)(\?\S*)?(?=\s|$)/i;
+        const imageMdPattern = /!\[([^\]]*)\]\(([^)]+)\)/;
+
+        let match, url, type, videoId;
+
+        match = trimmed.match(imageMdPattern);
+        if (match) {
+            url = match[2];
+            type = 'image';
+            videoId = null;
+        }
+
+        if (!match) {
+            match = trimmed.match(youtubePattern);
+            if (match) {
+                url = match[0];
+                type = 'youtube';
+                if (match[4]) videoId = match[4];
+                else {
+                    try { videoId = new URL(url).searchParams.get('v'); } catch { videoId = null; }
+                }
+            }
+        }
+
+        if (!match) {
+            match = trimmed.match(vimeoPattern);
+            if (match) {
+                url = match[0];
+                type = 'vimeo';
+                videoId = match[2];
+            }
+        }
+
+        if (!match) {
+            match = trimmed.match(videoFilePattern);
+            if (match) {
+                url = match[0];
+                type = 'video';
+                videoId = null;
+            }
+        }
+
+        if (!match) {
+            match = trimmed.match(steamPattern);
+            if (match) {
+                url = match[0];
+                type = 'steam';
+                videoId = match[1];
+            }
+        }
+
+        if (!match) return null;
+
+        const caption = trimmed.replace(match[0], '').replace(/\s{2,}/g, ' ').trim().replace(/^[:(]\s*/, '').replace(/\s*[):]$/, '').trim();
+
+        return {
+            caption: caption || null,
+            url,
+            type,
+            videoId: videoId || null
+        };
+    },
+
+    getMediaGalleries(text, fencedBlocks, tables) {
+        const galleries = [];
+        const lines = text.split('\n');
+
+        // Build line offsets and skip set
+        const lineOffsets = [];
+        const skipSet = new Set();
+        let offset = 0;
+        for (let i = 0; i < lines.length; i++) {
+            lineOffsets.push(offset);
+            for (const fb of fencedBlocks) {
+                if (offset >= fb.from && offset < fb.to) { skipSet.add(i); break; }
+            }
+            if (!skipSet.has(i)) {
+                for (const t of tables) {
+                    if (offset >= t.from && offset < t.to) { skipSet.add(i); break; }
+                }
+            }
+            offset += lines[i].length + 1;
+        }
+
+        let currentItems = [];
+        let currentStartIdx = -1;
+
+        const flushGroup = (endIdx) => {
+            if (currentItems.length === 0) return;
+            const from = lineOffsets[currentStartIdx];
+            let to = from;
+            for (let k = currentStartIdx; k <= endIdx; k++) to += lines[k].length + 1;
+            if (to > 0 && text[to - 1] === '\n') to--;
+
+            galleries.push({
+                from,
+                to: Math.min(to, text.length),
+                items: currentItems
+            });
+            currentItems = [];
+            currentStartIdx = -1;
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            if (skipSet.has(i)) { flushGroup(i - 1); continue; }
+
+            const item = this.parseMediaItem(lines[i]);
+            if (item) {
+                if (currentItems.length === 0) currentStartIdx = i;
+                item.from = lineOffsets[i];
+                currentItems.push(item);
+            } else {
+                flushGroup(i - 1);
+            }
+        }
+        flushGroup(lines.length - 1);
+
+        return galleries;
+    },
+
+    buildGalleryLineSet(doc, mediaGalleries) {
+        const blockedLines = new Set();
+
+        for (const gallery of mediaGalleries) {
+            const startLine = doc.lineAt(gallery.from).number;
+            const endPosition = Math.max(gallery.from, gallery.to - 1);
+            const endLine = doc.lineAt(endPosition).number;
+            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
+                blockedLines.add(lineNumber);
+            }
+        }
+
+        return blockedLines;
     },
 
     buildTableLineSet(doc, tables) {
@@ -2677,7 +2823,8 @@ const DocumentView = {
         const text = doc.toString();
         const fencedBlocks = this.getFencedBlocks(text);
         const tables = this.getTables(text, fencedBlocks);
-        const result = { fencedBlocks, tables };
+        const mediaGalleries = this.getMediaGalleries(text, fencedBlocks, tables);
+        const result = { fencedBlocks, tables, mediaGalleries };
         this._parseCache.set(doc, result);
         return result;
     },
@@ -2688,9 +2835,10 @@ const DocumentView = {
     buildDecorations(state, hasFocus) {
         const { Decoration } = window.CodeMirror;
         const builder = [];
-        const { fencedBlocks, tables } = this._getCachedParse(state.doc);
+        const { fencedBlocks, tables, mediaGalleries } = this._getCachedParse(state.doc);
         const fencedBlockLines = this.buildFencedBlockLineSet(state.doc, fencedBlocks);
         const tableLines = this.buildTableLineSet(state.doc, tables);
+        const galleryLines = this.buildGalleryLineSet(state.doc, mediaGalleries);
 
         // Get lines containing cursors ONLY if editor is focused
         const cursorLines = new Set();
@@ -2741,6 +2889,23 @@ const DocumentView = {
             }
         }
 
+        for (const gallery of mediaGalleries) {
+            const selectionInsideGallery = this.isSelectionInsideBlock(state, gallery);
+
+            if (!selectionInsideGallery) {
+                const startLine = state.doc.lineAt(gallery.from);
+
+                builder.push(Decoration.replace({
+                    widget: new widgets.MediaGalleryWidget(gallery),
+                    inclusive: false
+                }).range(startLine.from, startLine.to));
+
+                builder.push(Decoration.line({
+                    attributes: { class: 'md-gallery-summary-line' }
+                }).range(startLine.from));
+            }
+        }
+
         const activeTaskFilters = this.getActiveTaskFilter();
 
         // Build 0-based index set of hidden lines (shared with export)
@@ -2755,6 +2920,7 @@ const DocumentView = {
         for (let i = 1; i <= state.doc.lines; i++) {
             if (fencedBlockLines.has(i)) continue;
             if (tableLines.has(i)) continue;
+            if (galleryLines.has(i)) continue;
 
             const line = state.doc.line(i);
 
@@ -2858,7 +3024,7 @@ const DocumentView = {
      */
     buildCollapsedBlockDecorations(state, hasFocus) {
         const { Decoration } = window.CodeMirror;
-        const { fencedBlocks, tables } = this._getCachedParse(state.doc);
+        const { fencedBlocks, tables, mediaGalleries } = this._getCachedParse(state.doc);
         const builder = [];
 
         for (const block of fencedBlocks) {
@@ -2882,6 +3048,21 @@ const DocumentView = {
 
             const startLine = state.doc.lineAt(table.from);
             const endLine = state.doc.lineAt(Math.max(table.from, table.to - 1));
+            if (endLine.number > startLine.number) {
+                const interiorFrom = state.doc.line(startLine.number + 1).from;
+                const interiorTo = endLine.number < state.doc.lines
+                    ? state.doc.line(endLine.number + 1).from
+                    : endLine.to;
+                builder.push(Decoration.replace({}).range(interiorFrom, interiorTo));
+            }
+        }
+
+        for (const gallery of mediaGalleries) {
+            const selectionInsideGallery = this.isSelectionInsideBlock(state, gallery);
+            if (selectionInsideGallery) continue;
+
+            const startLine = state.doc.lineAt(gallery.from);
+            const endLine = state.doc.lineAt(Math.max(gallery.from, gallery.to - 1));
             if (endLine.number > startLine.number) {
                 const interiorFrom = state.doc.line(startLine.number + 1).from;
                 const interiorTo = endLine.number < state.doc.lines
@@ -3615,10 +3796,11 @@ const DocumentView = {
         }
     },
 
-    // Decorator: YouTube/Vimeo embed URLs
+    // Decorator: YouTube/Vimeo/Steam embed URLs
     decorateEmbeds(text, from, builder, hideSyntax, Decoration, usedRanges, widgets) {
         const youtubeRegex = /https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]+)/gi;
         const vimeoRegex = /https?:\/\/(www\.)?vimeo\.com\/(\d+)/gi;
+        const steamRegex = /https?:\/\/store\.steampowered\.com\/app\/(\d+)[^\s]*/gi;
 
         let match;
         while ((match = youtubeRegex.exec(text)) !== null) {
@@ -3647,6 +3829,23 @@ const DocumentView = {
                 if (hideSyntax) {
                     builder.push(Decoration.replace({
                         widget: new widgets.EmbedWidget(match[0], 'vimeo', videoId, matchFrom, matchTo)
+                    }).range(matchFrom, matchTo));
+                } else {
+                    builder.push(Decoration.mark({ class: 'md-embed-source' }).range(matchFrom, matchTo));
+                }
+                usedRanges.push({ from: matchFrom, to: matchTo });
+            }
+        }
+
+        while ((match = steamRegex.exec(text)) !== null) {
+            const matchFrom = from + match.index;
+            const matchTo = matchFrom + match[0].length;
+            let overlaps = usedRanges.some(r => matchFrom < r.to && matchTo > r.from);
+            if (!overlaps) {
+                const appId = match[1];
+                if (hideSyntax) {
+                    builder.push(Decoration.replace({
+                        widget: new widgets.EmbedWidget(match[0], 'steam', appId, matchFrom, matchTo)
                     }).range(matchFrom, matchTo));
                 } else {
                     builder.push(Decoration.mark({ class: 'md-embed-source' }).range(matchFrom, matchTo));
