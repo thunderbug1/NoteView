@@ -125,3 +125,4 @@ CodeMirror 6 is loaded as a vendored bundle from `vendor/codemirror.js`, which s
 - [Task System](docs/task-system.md) — Task syntax and states, parsing, kanban drag-and-drop, timeline, context menus, computed tags, dependencies
 - [Filtering & UI](docs/filtering-and-ui.md) — SelectionManager, filter groups, tag system, contacts, time filtering, modal factory, sidebar, theming, mobile
 - [AI Assistant System](docs/ai-system.md) — Chat panel architecture, multi-chat model, context management, Transform/Ask modes, streaming, diff cards, batch review, settings integration
+- [Media Embeds & Custom Syntax](docs/media-embeds.md) — Media URL auto-detection, gallery grids, video timestamps, image thumbnails, wikilinks, inline fields, task syntax

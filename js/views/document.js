@@ -2285,6 +2285,20 @@ const DocumentView = {
             }
         }
 
+        if (!match) {
+            const genericUrlPattern = /https?:\/\/\S+/i;
+            const urlMatch = trimmed.match(genericUrlPattern);
+            if (urlMatch) {
+                const potentialCaption = trimmed.replace(urlMatch[0], '').replace(/\s{2,}/g, ' ').trim().replace(/^[:(]\s*/, '').replace(/\s*[):]$/, '').trim();
+                if (potentialCaption) {
+                    url = urlMatch[0];
+                    type = 'link';
+                    videoId = null;
+                    match = urlMatch;
+                }
+            }
+        }
+
         if (!match) return null;
 
         const caption = trimmed.replace(match[0], '').replace(/\s{2,}/g, ' ').trim().replace(/^[:(]\s*/, '').replace(/\s*[):]$/, '').trim();
@@ -2295,6 +2309,40 @@ const DocumentView = {
             type,
             videoId: videoId || null
         };
+    },
+
+    parseNoteLine(lineText) {
+        if (!lineText.length) return null;
+        if (lineText[0] !== ' ' && lineText[0] !== '\t') return null;
+        const trimmed = lineText.trim();
+        if (!trimmed) return null;
+
+        const imgRegex = /^!\[([^\]]*)\]\(([^)]+)\)/;
+        const imgMatch = trimmed.match(imgRegex);
+        if (imgMatch) {
+            return { type: 'image', url: imgMatch[2], alt: imgMatch[1] || '', text: imgMatch[1] || '' };
+        }
+
+        const tsRegex = /^@\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s+(.*)$/;
+        const tsMatch = trimmed.match(tsRegex);
+
+        if (tsMatch) {
+            const hours = tsMatch[3] ? parseInt(tsMatch[1], 10) : 0;
+            const minutes = tsMatch[3] ? parseInt(tsMatch[2], 10) : parseInt(tsMatch[1], 10);
+            const seconds = tsMatch[3] ? parseInt(tsMatch[3], 10) : parseInt(tsMatch[2], 10);
+            const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+            const label = tsMatch[3]
+                ? `${tsMatch[1]}:${tsMatch[2]}:${tsMatch[3]}`
+                : `${tsMatch[1]}:${tsMatch[2]}`;
+            return {
+                type: 'timestamp',
+                seconds: totalSeconds,
+                label,
+                text: tsMatch[4] || ''
+            };
+        }
+
+        return { type: 'note', text: trimmed };
     },
 
     getMediaGalleries(text, fencedBlocks, tables) {
@@ -2344,9 +2392,16 @@ const DocumentView = {
             if (item) {
                 if (currentItems.length === 0) currentStartIdx = i;
                 item.from = lineOffsets[i];
+                item.notes = [];
                 currentItems.push(item);
             } else {
-                flushGroup(i - 1);
+                const note = this.parseNoteLine(lines[i]);
+                if (note && currentItems.length > 0) {
+                    note.from = lineOffsets[i];
+                    currentItems[currentItems.length - 1].notes.push(note);
+                } else {
+                    flushGroup(i - 1);
+                }
             }
         }
         flushGroup(lines.length - 1);
@@ -2890,11 +2945,18 @@ const DocumentView = {
         }
 
         for (const gallery of mediaGalleries) {
-            const selectionInsideGallery = this.isSelectionInsideBlock(state, gallery);
+            const startLine = state.doc.lineAt(gallery.from);
+            const endLine = state.doc.lineAt(Math.max(gallery.from, gallery.to - 1));
 
-            if (!selectionInsideGallery) {
-                const startLine = state.doc.lineAt(gallery.from);
-
+            let cursorInGallery = false;
+            for (const range of state.selection.ranges) {
+                const line = state.doc.lineAt(range.head).number;
+                if (line >= startLine.number && line <= endLine.number) {
+                    cursorInGallery = true;
+                    break;
+                }
+            }
+            if (!cursorInGallery) {
                 builder.push(Decoration.replace({
                     widget: new widgets.MediaGalleryWidget(gallery),
                     inclusive: false
@@ -3058,11 +3120,19 @@ const DocumentView = {
         }
 
         for (const gallery of mediaGalleries) {
-            const selectionInsideGallery = this.isSelectionInsideBlock(state, gallery);
-            if (selectionInsideGallery) continue;
-
             const startLine = state.doc.lineAt(gallery.from);
             const endLine = state.doc.lineAt(Math.max(gallery.from, gallery.to - 1));
+
+            let cursorInGallery = false;
+            for (const range of state.selection.ranges) {
+                const line = state.doc.lineAt(range.head).number;
+                if (line >= startLine.number && line <= endLine.number) {
+                    cursorInGallery = true;
+                    break;
+                }
+            }
+            if (cursorInGallery) continue;
+
             if (endLine.number > startLine.number) {
                 const interiorFrom = state.doc.line(startLine.number + 1).from;
                 const interiorTo = endLine.number < state.doc.lines
@@ -3089,7 +3159,8 @@ const DocumentView = {
                     return self.buildCollapsedBlockDecorations(state, false);
                 },
                 update(deco, tr) {
-                    if (tr.docChanged || tr.selectionSet || tr.focusChanged || (effect && tr.effects.some(e => e.is(effect)))) {
+                    const selectionChanged = tr.selection !== tr.startState.selection;
+                    if (tr.docChanged || selectionChanged || (effect && tr.effects.some(e => e.is(effect)))) {
                         return self.buildCollapsedBlockDecorations(tr.state, focused);
                     }
                     return deco.map(tr.changes);

@@ -845,8 +845,14 @@ function createCodeMirrorWidgets(documentView) {
             this.gallery = gallery;
         }
         eq(other) {
-            return other.gallery.from === this.gallery.from
-                && other.gallery.to === this.gallery.to;
+            if (other.gallery.from !== this.gallery.from || other.gallery.to !== this.gallery.to) return false;
+            const a = this.gallery.items, b = other.gallery.items;
+            if (a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) {
+                if (a[i].url !== b[i].url || a[i].caption !== b[i].caption) return false;
+                if ((a[i].notes ? a[i].notes.length : 0) !== (b[i].notes ? b[i].notes.length : 0)) return false;
+            }
+            return true;
         }
         toDOM(view) {
             const { items } = this.gallery;
@@ -943,6 +949,27 @@ function createCodeMirrorWidgets(documentView) {
 
                     thumbWrap.append(video, label);
                     card.appendChild(thumbWrap);
+                } else if (item.type === 'link') {
+                    const thumbWrap = document.createElement('div');
+                    thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-link';
+
+                    const icon = document.createElement('div');
+                    icon.className = 'md-gallery-card-link-icon';
+                    icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+
+                    let domain = '';
+                    try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch {}
+
+                    const label = document.createElement('span');
+                    label.className = 'md-gallery-card-label';
+                    label.textContent = domain;
+
+                    thumbWrap.append(icon, label);
+                    thumbWrap.onclick = (e) => {
+                        e.stopPropagation();
+                        window.open(item.url, '_blank', 'noopener');
+                    };
+                    card.appendChild(thumbWrap);
                 }
 
                 if (item.caption) {
@@ -952,14 +979,96 @@ function createCodeMirrorWidgets(documentView) {
                     card.appendChild(caption);
                 }
 
+                if (item.notes && item.notes.length > 0) {
+                    const notesDiv = document.createElement('div');
+                    notesDiv.className = 'md-gallery-card-notes';
+
+                    for (const note of item.notes) {
+                        const noteRow = document.createElement('div');
+                        noteRow.className = 'md-gallery-card-note';
+                        noteRow.dataset.noteFrom = note.from;
+
+                        if (note.type === 'timestamp' && (item.type === 'youtube' || item.type === 'vimeo' || item.type === 'video')) {
+                            noteRow.classList.add('md-gallery-card-note-timestamp');
+
+                            const thumbWrap = document.createElement('div');
+                            thumbWrap.className = 'md-gallery-card-note-thumb';
+
+                            if (item.type === 'video') {
+                                const videoEl = document.createElement('video');
+                                videoEl.src = item.url;
+                                videoEl.preload = 'metadata';
+                                videoEl.muted = true;
+                                videoEl.currentTime = note.seconds;
+                                thumbWrap.appendChild(videoEl);
+                            } else {
+                                const thumbImg = document.createElement('img');
+                                thumbImg.loading = 'lazy';
+                                if (item.type === 'youtube' && item.videoId) {
+                                    thumbImg.src = `https://img.youtube.com/vi/${item.videoId}/mqdefault.jpg`;
+                                } else {
+                                    thumbImg.src = '';
+                                }
+                                thumbImg.alt = '';
+                                thumbWrap.appendChild(thumbImg);
+                            }
+
+                            const timeBadge = document.createElement('a');
+                            timeBadge.className = 'md-gallery-card-time-badge';
+                            timeBadge.textContent = note.label;
+                            let timeUrl = item.url;
+                            if (item.type === 'youtube') {
+                                timeUrl += (item.url.includes('?') ? '&' : '?') + 't=' + note.seconds;
+                            } else if (item.type === 'vimeo') {
+                                timeUrl += '#t=' + note.seconds + 's';
+                            }
+                            timeBadge.href = timeUrl;
+                            timeBadge.target = '_blank';
+                            timeBadge.rel = 'noopener noreferrer';
+                            timeBadge.onclick = (e) => e.stopPropagation();
+
+                            thumbWrap.appendChild(timeBadge);
+                            noteRow.appendChild(thumbWrap);
+                        }
+
+                        if (note.type === 'image') {
+                            noteRow.classList.add('md-gallery-card-note-image');
+                            const noteImg = document.createElement('img');
+                            noteImg.className = 'md-gallery-card-note-full-img';
+                            noteImg.src = note.url;
+                            noteImg.alt = note.alt || '';
+                            noteImg.loading = 'lazy';
+                            noteImg.onerror = () => { noteImg.replaceWith(Object.assign(document.createElement('span'), { className: 'md-media-broken', textContent: 'Image unavailable' })); };
+                            noteRow.appendChild(noteImg);
+                            continue;
+                        }
+
+                        const noteText = document.createElement('span');
+                        noteText.className = 'md-gallery-card-note-text';
+                        noteText.textContent = note.text || (note.type === 'timestamp' ? note.label : '');
+                        noteRow.appendChild(noteText);
+
+                        notesDiv.appendChild(noteRow);
+                    }
+                    card.appendChild(notesDiv);
+                }
+
                 wrap.appendChild(card);
             }
 
             wrap.onmousedown = (e) => e.stopPropagation();
             wrap.onclick = (e) => {
                 if (e.target.closest('.md-gallery-card-thumb')) return;
+                if (e.target.closest('.md-gallery-card-time-badge')) return;
                 e.stopPropagation();
                 view.focus();
+
+                const noteRow = e.target.closest('.md-gallery-card-note');
+                if (noteRow && noteRow.dataset.noteFrom != null) {
+                    view.dispatch({ selection: { anchor: parseInt(noteRow.dataset.noteFrom, 10) }, scrollIntoView: true });
+                    return;
+                }
+
                 const captionEl = e.target.closest('.md-gallery-card-caption');
                 const cards = wrap.querySelectorAll('.md-gallery-card');
                 let pos = this.gallery.from;
