@@ -951,11 +951,6 @@ function createCodeMirrorWidgets(documentView) {
                     card.appendChild(thumbWrap);
                 } else if (item.type === 'link') {
                     const thumbWrap = document.createElement('div');
-                    thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-link';
-
-                    const icon = document.createElement('div');
-                    icon.className = 'md-gallery-card-link-icon';
-                    icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
 
                     let domain = '';
                     try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch {}
@@ -964,7 +959,64 @@ function createCodeMirrorWidgets(documentView) {
                     label.className = 'md-gallery-card-label';
                     label.textContent = domain;
 
-                    thumbWrap.append(icon, label);
+                    const imageNote = item.notes && item.notes.find(n => n.type === 'image');
+
+                    if (imageNote) {
+                        thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-link md-gallery-card-thumb-link-image';
+                        const img = document.createElement('img');
+                        img.src = imageNote.url;
+                        img.alt = imageNote.alt || '';
+                        img.loading = 'lazy';
+                        img.onerror = () => { img.replaceWith(Object.assign(document.createElement('span'), { className: 'md-media-broken', textContent: 'Image unavailable' })); };
+                        thumbWrap.append(img, label);
+                    } else {
+                        thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-link';
+                        thumbWrap.tabIndex = 0;
+                        const icon = document.createElement('div');
+                        icon.className = 'md-gallery-card-link-icon';
+                        icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+                        thumbWrap.append(icon, label);
+
+                        const insertImageNote = (url) => {
+                            if (!url || !/^https?:\/\//i.test(url)) return;
+                            const doc = view.state.doc;
+                            let insertPos;
+                            if (item.notes && item.notes.length > 0) {
+                                insertPos = doc.lineAt(item.notes[item.notes.length - 1].from).to;
+                            } else {
+                                insertPos = doc.lineAt(item.from).to;
+                            }
+                            view.dispatch({
+                                changes: { from: insertPos, to: insertPos, insert: '\n  ![](' + url + ')' }
+                            });
+                        };
+
+                        const handleThumbDrop = (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            thumbWrap.classList.remove('md-gallery-card-thumb-drop-hover');
+                            const url = (e.dataTransfer ? (e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list')) : (e.clipboardData ? e.clipboardData.getData('text/plain') : '')).trim();
+                            insertImageNote(url);
+                        };
+
+                        thumbWrap.addEventListener('dragover', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            e.dataTransfer.dropEffect = 'copy';
+                            thumbWrap.classList.add('md-gallery-card-thumb-drop-hover');
+                        });
+                        thumbWrap.addEventListener('dragleave', (e) => {
+                            e.stopPropagation();
+                            thumbWrap.classList.remove('md-gallery-card-thumb-drop-hover');
+                        });
+                        thumbWrap.addEventListener('drop', handleThumbDrop);
+                        thumbWrap.addEventListener('paste', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleThumbDrop(e);
+                        });
+                    }
+
                     thumbWrap.onclick = (e) => {
                         e.stopPropagation();
                         window.open(item.url, '_blank', 'noopener');
@@ -983,7 +1035,12 @@ function createCodeMirrorWidgets(documentView) {
                     const notesDiv = document.createElement('div');
                     notesDiv.className = 'md-gallery-card-notes';
 
+                    let linkThumbNoteSkipped = false;
                     for (const note of item.notes) {
+                        if (item.type === 'link' && note.type === 'image' && !linkThumbNoteSkipped) {
+                            linkThumbNoteSkipped = true;
+                            continue;
+                        }
                         const noteRow = document.createElement('div');
                         noteRow.className = 'md-gallery-card-note';
                         noteRow.dataset.noteFrom = note.from;
