@@ -987,8 +987,6 @@ const Store = {
 
             // Invalidate cache
             this._filteredBlocksCache.invalidate();
-            TimelineView.invalidateCache();
-            SelectionManager.updateTagCounts();
 
             // Record update command AFTER save (using the captured beforeState)
             if (isUpdate && beforeState) {

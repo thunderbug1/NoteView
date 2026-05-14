@@ -1115,6 +1115,9 @@ const App = {
             // Pass new content in options to allow Store.saveBlock to correctly capture before/after state
             await Store.saveBlock(block, { ...options, content });
 
+            TimelineView.invalidateCache();
+            SelectionManager.updateTagCounts();
+
             // Update deadline panel after content changes
             DeadlinePanel.render(Store.blocks);
             // Update backlinks panel after content changes
@@ -1260,6 +1263,9 @@ const App = {
         try {
             await Store.saveBlock(block, options);
 
+            TimelineView.invalidateCache();
+            SelectionManager.updateTagCounts();
+
             // Fast path: surgical metadata update without full re-render
             if (this._canSurgicalPropertyUpdate(property, id)) {
                 if (property === 'tags' && DocumentView.updateBlockTags(id)) return;
@@ -1323,6 +1329,9 @@ const App = {
             : { ...commitMessage, ...properties };
 
         await Store.saveBlock(block, options);
+
+        TimelineView.invalidateCache();
+        SelectionManager.updateTagCounts();
 
         // Fast path: surgical metadata update without full re-render
         const allSurgical = Object.keys(properties).every(p => this._canSurgicalPropertyUpdate(p, id));
