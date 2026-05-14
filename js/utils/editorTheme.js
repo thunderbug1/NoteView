@@ -7,6 +7,7 @@ window.EditorTheme = {
 
     get() {
         if (this._cached) return this._cached;
+        if (!window.CodeMirror?.EditorView) return null;
         const { EditorView } = window.CodeMirror;
         this._cached = EditorView.theme({
             "&": {
@@ -70,7 +71,7 @@ window.EditorTheme = {
             ".md-header-6": { fontSize: '0.9em', padding: '0.1em 0' },
             ".md-strong": {
                 fontWeight: '700',
-                color: 'var(--text-color, #0f172a)'
+                color: 'var(--text-primary)'
             },
             ".md-emphasis": {
                 fontStyle: 'italic'

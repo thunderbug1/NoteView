@@ -340,6 +340,7 @@ const AIAssistant = {
         const chat = this._chats.find(c => c.id === chatId);
         if (chat) {
             if (chat.abortController) chat.abortController.abort();
+            chat._abortRequested = true;
             if (chat.diffEditorView) {
                 try { chat.diffEditorView.destroy(); } catch { /* cleanup */ }
             }
@@ -733,6 +734,7 @@ const AIAssistant = {
                 const chat = this.getActiveChat();
                 if (chat?.state === 'streaming') {
                     if (chat.abortController) chat.abortController.abort();
+                    chat._abortRequested = true;
                 } else {
                     this.closePanel();
                 }
@@ -797,6 +799,7 @@ const AIAssistant = {
         if (actionBtn) actionBtn.addEventListener('click', () => {
             if (chat.state === 'streaming') {
                 if (chat.abortController) chat.abortController.abort();
+                chat._abortRequested = true;
                 return;
             }
             if (chat.state === 'error') {
@@ -1181,6 +1184,29 @@ const AIAssistant = {
         const decoder = new TextDecoder();
         let buffer = '';
 
+        const processLines = (lines) => {
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') return true;
+                try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content || '';
+                    if (content) {
+                        chat.streamingResponse += content;
+                        // Update streaming message in-place
+                        const msgEl = this._panelElement?.querySelector(`[data-streaming="${msgId}"]`);
+                        if (msgEl) {
+                            msgEl.textContent = chat.streamingResponse;
+                            const messagesContainer = msgEl.closest('.ai-chat-messages');
+                            if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        }
+                    }
+                } catch { /* skip malformed SSE data */ }
+            }
+            return false;
+        };
+
         try {
             while (true) {
                 const { done, value } = await reader.read();
@@ -1190,25 +1216,13 @@ const AIAssistant = {
                 const lines = buffer.split('\n');
                 buffer = lines.pop();
 
-                for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    const data = line.slice(6).trim();
-                    if (data === '[DONE]') return;
-                    try {
-                        const parsed = JSON.parse(data);
-                        const content = parsed.choices?.[0]?.delta?.content || '';
-                        if (content) {
-                            chat.streamingResponse += content;
-                            // Update streaming message in-place
-                            const msgEl = this._panelElement?.querySelector(`[data-streaming="${msgId}"]`);
-                            if (msgEl) {
-                                msgEl.textContent = chat.streamingResponse;
-                                const messagesContainer = msgEl.closest('.ai-chat-messages');
-                                if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                            }
-                        }
-                    } catch { /* skip */ }
-                }
+                if (processLines(lines)) return;
+            }
+
+            // Process any remaining data in the buffer after stream ends
+            if (buffer.trim()) {
+                buffer = buffer.trim();
+                processLines([buffer]);
             }
         } finally {
             reader.cancel().catch(() => {});
@@ -1300,7 +1314,7 @@ const AIAssistant = {
             if (chat) chat.diffEditorView = view;
         };
 
-        if (window.CodeMirror?.basicSetup) {
+        if (window.CodeMirrorReady || window.CodeMirror?.basicSetup) {
             create();
         } else {
             window.addEventListener('CodeMirrorReady', create, { once: true });
@@ -1409,6 +1423,8 @@ const AIAssistant = {
         return this._chats.map(chat => ({
             ...chat,
             contextBlockIds: [...chat.contextBlockIds],
+            // Remove streaming placeholder messages before persisting
+            messages: chat.messages.filter(m => m.type !== 'streaming'),
             abortController: undefined,
             diffEditorView: undefined,
             streamingResponse: '',
@@ -1508,6 +1524,17 @@ const AIAssistant = {
         this._renderActiveChat();
 
         for (let i = 0; i < contextIds.length; i++) {
+            // Check if a previous abort left the signal in aborted state
+            if (chat._abortRequested) {
+                chat._abortRequested = false;
+                chat.messages.push({
+                    id: 'msg-' + (++this._msgIdCounter),
+                    role: 'system', type: 'info',
+                    content: `Stopped after ${i} of ${total} notes`
+                });
+                break;
+            }
+
             const blockId = contextIds[i];
             const block = Store.blocks.find(b => b.id === blockId);
 
@@ -1642,6 +1669,7 @@ const AIAssistant = {
                         role: 'system', type: 'info',
                         content: `Stopped after ${i} of ${total} notes`
                     });
+                    chat._abortRequested = false;
                     chat.abortController = null;
                     break;
                 }
@@ -1770,7 +1798,7 @@ const AIAssistant = {
                 });
             };
 
-            if (window.CodeMirror?.basicSetup) create();
+            if (window.CodeMirrorReady || window.CodeMirror?.basicSetup) create();
             else window.addEventListener('CodeMirrorReady', create, { once: true });
         }
 

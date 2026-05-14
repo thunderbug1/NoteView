@@ -128,16 +128,29 @@ const Store = {
 
             request.onblocked = () => {
                 console.warn('IndexedDB upgrade blocked. Please close other tabs.');
-                // Don't alert here to avoid blocking initialization completely if possible,
-                // but logs will help debug.
+                // Mark as completed to prevent the timeout from firing later
+                if (!completed) {
+                    completed = true;
+                    clearTimeout(timeout);
+                    this.db = null;
+                    reject(new Error('IndexedDB upgrade blocked by another tab'));
+                }
             };
         });
     },
 
     // --- IndexedDB helpers ---
+    _dbInitFailedAt: 0,
+
     async _ensureDB() {
-        if (!this.db) {
+        if (this.db) return true;
+        // Back off for 30 seconds after a failed init to avoid repeated 5s timeouts
+        const now = Date.now();
+        if (this._dbInitFailedAt && now - this._dbInitFailedAt < 30000) return false;
+        try {
             await this.initDB();
+        } catch {
+            this._dbInitFailedAt = now;
         }
         return !!this.db;
     },
@@ -692,11 +705,13 @@ const Store = {
         }
 
         const prevHandle = this.directoryHandle;
+        const prevBlocks = [...this.blocks];
         this.directoryHandle = handle;
         try {
             await this._activateVault(handle, { clearUndo: true });
         } catch (err) {
             this.directoryHandle = prevHandle;
+            this.blocks = prevBlocks;
             throw err;
         }
     },
@@ -736,9 +751,16 @@ const Store = {
 
         const block = this.blocks[index];
 
-        const blockData = { ...block };
+        // Drain any in-flight save for this block to prevent it from
+        // re-creating the file after deletion.
+        if (this._saveQueue?.has(id)) {
+            try { await this._saveQueue.get(id); } catch { /* save may have failed, proceed */ }
+            this._deleteSentinels = this._deleteSentinels || new Set();
+            this._deleteSentinels.add(id);
+            this._saveQueue.delete(id);
+        }
 
-        RecentAccessTracker.recordDeletion(block);
+        const blockData = { ...block };
 
         const fileName = block.filename || `${block.id}.md`;
 
@@ -746,8 +768,12 @@ const Store = {
             await this.directoryHandle.removeEntry(fileName);
         } catch (e) {
             console.error('Failed to delete file', e);
+            this._deleteSentinels?.delete(id);
             throw e;
         }
+
+        // Record deletion in tracker only after file deletion succeeds
+        RecentAccessTracker.recordDeletion(block);
 
         // Record command AFTER successful file deletion
         if (!UndoRedoManager.isExecuting) {
@@ -768,6 +794,7 @@ const Store = {
 
         // Remove from memory only after file and git operations succeed
         this.blocks.splice(index, 1);
+        this._deleteSentinels?.delete(id);
         this.extractContacts();
         this._filteredBlocksCache.invalidate();
         TimelineView.invalidateCache();
@@ -924,6 +951,9 @@ const Store = {
 
         // Serialize concurrent saves for the same block via promise chain
         const saveKey = block.id;
+        if (this._deleteSentinels?.has(saveKey)) {
+            throw new Error(`Block ${saveKey} has been deleted, save aborted`);
+        }
         if (!this._saveQueue) this._saveQueue = new Map();
         const prev = this._saveQueue.get(saveKey) || Promise.resolve();
         let resolveSave = () => {};
@@ -1088,7 +1118,9 @@ const Store = {
                     console.warn('loadBlocks: skipping stale entry:', err.message);
                     continue;
                 }
-                throw err;
+                // Skip corrupted/unreadable files instead of halting the entire load
+                console.error('loadBlocks: skipping unreadable file:', entry?.name, err);
+                continue;
             }
         }
         this.extractContacts();
@@ -1136,7 +1168,7 @@ function parseFrontMatter(content) {
 
     // Ensure tags is always an array
     if (data.tags && !Array.isArray(data.tags)) {
-        data.tags = [];
+        data.tags = [String(data.tags)];
     }
 
     return {

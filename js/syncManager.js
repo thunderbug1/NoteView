@@ -30,6 +30,8 @@ const SyncManager = {
 
     async init() {
         this._stopIntervalSync();
+        clearTimeout(this._idleSyncTimer);
+        this._idleSyncTimer = null;
         this._status = 'idle';
         this._statusDetail = null;
         this._pendingCommits = 0;
@@ -70,11 +72,13 @@ const SyncManager = {
     },
 
     async saveConfig(updates) {
-        Object.assign(this._config, updates);
-
         const remoteConfig = await Store.getRemoteConfig() || {};
-        remoteConfig.sync = { ...this._config };
+        // Merge updates into a copy first
+        const newConfig = { ...this._config, ...updates };
+        remoteConfig.sync = newConfig;
         await Store.saveRemoteConfig(remoteConfig);
+        // Only update in-memory config after successful persistence
+        Object.assign(this._config, updates);
 
         // Restart interval if settings changed
         this._stopIntervalSync();
@@ -272,8 +276,9 @@ const SyncManager = {
     // --- Conflict help ---
 
     _isConflictError(err) {
+        if (err.code === 'MergeConflictError') return true;
         const msg = (err.message || err.data?.message || '').toLowerCase();
-        return msg.includes('conflict') || msg.includes('non-fast-forward') || msg.includes('merge conflict');
+        return msg.includes('conflict') || msg.includes('non-fast-forward');
     },
 
     _isOverwriteError(err) {
@@ -284,7 +289,8 @@ const SyncManager = {
 
     _isCorsError(err) {
         const msg = (err.message || '').toLowerCase();
-        return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('type: failed');
+        return msg.includes('failed to fetch') || msg.includes('networkerror') ||
+               msg.includes('typeerror') || msg.includes('load failed');
     },
 
     async _handleMergeConflict() {
@@ -310,10 +316,10 @@ const SyncManager = {
             const conflictData = await this._detectConflicts();
 
             if (conflictData.files.length === 0) {
-                // No actual file conflicts — try sync again
+                // No actual file conflicts — schedule retry instead of recursive sync
                 this._setStatus('idle', 'No conflicts found');
                 this._syncing = false;
-                this.sync();
+                this._scheduleIdleSync();
                 return;
             }
 
@@ -1065,16 +1071,27 @@ const SyncManager = {
     },
 
     _simpleDiff(localLines, remoteLines) {
+        // Build a hash map of remote lines for O(1) lookup
+        const remoteSet = new Set(remoteLines);
+        const localSet = new Set(localLines);
         const result = [];
-        const maxLen = Math.max(localLines.length, remoteLines.length);
-        for (let i = 0; i < maxLen; i++) {
-            const local = i < localLines.length ? localLines[i] : null;
-            const remote = i < remoteLines.length ? remoteLines[i] : null;
-            if (local === remote) {
-                result.push({ type: 'same', text: local });
-            } else {
-                if (local !== null) result.push({ type: 'removed', text: local });
-                if (remote !== null) result.push({ type: 'added', text: remote });
+
+        // Lines only in local = removed
+        for (const line of localLines) {
+            if (!remoteSet.has(line)) {
+                result.push({ type: 'removed', text: line });
+            }
+        }
+        // Lines only in remote = added
+        for (const line of remoteLines) {
+            if (!localSet.has(line)) {
+                result.push({ type: 'added', text: line });
+            }
+        }
+        // If no differences found, fall back to showing all as same
+        if (result.length === 0) {
+            for (const line of localLines) {
+                result.push({ type: 'same', text: line });
             }
         }
         return result;

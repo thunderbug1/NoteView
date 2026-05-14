@@ -17,6 +17,9 @@ const UndoRedoManager = {
     // Unique session ID for this browser session
     sessionId: null,
 
+    // Promise-based lock to serialize undo/redo operations
+    _operationLock: null,
+
     /**
      * Initialize the manager
      */
@@ -76,6 +79,22 @@ const UndoRedoManager = {
      * Undo the last command
      */
     async undo() {
+        // Serialize concurrent undo/redo calls via promise chain
+        const prev = this._operationLock || Promise.resolve();
+        let resolveOp = () => {};
+        this._operationLock = prev.then(() => new Promise(r => { resolveOp = r; }));
+        try {
+            await prev;
+        } catch { /* previous op failed, proceed */ }
+
+        try {
+            await this._doUndo();
+        } finally {
+            resolveOp();
+        }
+    },
+
+    async _doUndo() {
         console.log('UndoRedoManager: Undo called, stack size:', this.undoStack.length);
         if (this.undoStack.length === 0) {
             console.log('UndoRedoManager: Nothing to undo');
@@ -123,6 +142,22 @@ const UndoRedoManager = {
      * Redo the last undone command
      */
     async redo() {
+        // Serialize concurrent undo/redo calls via promise chain
+        const prev = this._operationLock || Promise.resolve();
+        let resolveOp = () => {};
+        this._operationLock = prev.then(() => new Promise(r => { resolveOp = r; }));
+        try {
+            await prev;
+        } catch { /* previous op failed, proceed */ }
+
+        try {
+            await this._doRedo();
+        } finally {
+            resolveOp();
+        }
+    },
+
+    async _doRedo() {
         console.log('UndoRedoManager: Redo called, stack size:', this.redoStack.length);
         if (this.redoStack.length === 0) {
             console.log('UndoRedoManager: Nothing to redo');

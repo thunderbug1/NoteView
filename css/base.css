@@ -19,32 +19,37 @@
     --text-primary: #0f172a;
     --text-secondary: #475569;
     --text-muted: #94a3b8;
-    --text-color: #0f172a;
 
     --accent: #3b82f6;
     --accent-hover: #2563eb;
     --accent-light: rgba(59, 130, 246, 0.08);
+    --accent-rgb: 59, 130, 246;
 
     --ai-accent: #8b5cf6;
     --ai-accent-light: rgba(139, 92, 246, 0.1);
     --danger: #ef4444;
+    --danger-color: #ef4444;
     --success: #22c55e;
+    --success-color: #22c55e;
+    --warning-color: #f59e0b;
 
     --border: #e2e8f0;
     --border-light: #cbd5e1;
 
     /* Shadows - Disabled for Flat Design */
-    --neu-upper: none;
-    --neu-lower: none;
-    --neu-inset-upper: none;
-    --neu-inset-lower: none;
-    
     --neu-flat: none;
     --neu-pressed: none;
 
     /* CodeMirror colors */
     --code-bg: #f1f5f9;
     --code-color: #0f172a;
+
+    /* Font */
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* Short aliases */
+    --bg: var(--bg-primary);
+    --text: var(--text-primary);
 
     /* Badge Colors */
     --badge-work-bg: #dbeafe;
@@ -94,29 +99,33 @@
     --text-primary: #f8fafc;
     --text-secondary: #cbd5e1;
     --text-muted: #94a3b8;
-    --text-color: #f8fafc;
 
     --accent: #60a5fa;
     --accent-hover: #93c5fd;
     --accent-light: rgba(96, 165, 250, 0.15);
+    --accent-rgb: 96, 165, 250;
 
     --ai-accent: #a78bfa;
     --ai-accent-light: rgba(167, 139, 250, 0.15);
     --danger: #f87171;
+    --danger-color: #f87171;
     --success: #4ade80;
+    --success-color: #4ade80;
+    --warning-color: #fbbf24;
 
     --border: #334155;
     --border-light: #475569;
 
-    /* Neumorphic Shadows - Disabled/Subtle */
-    --neu-upper: none;
-    --neu-lower: none;
-    --neu-inset-upper: none;
-    --neu-inset-lower: none;
-
     /* CodeMirror colors */
     --code-bg: #1e293b;
     --code-color: #e2e8f0;
+
+    /* Font */
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* Short aliases */
+    --bg: var(--bg-primary);
+    --text: var(--text-primary);
 
     /* Badge Colors */
     --badge-work-bg: rgba(29, 78, 216, 0.2);
@@ -142,6 +151,15 @@
     --badge-default-bg: #334155;
     --badge-default-text: #cbd5e1;
     --badge-default-border: #475569;
+}
+
+/* Respect reduced motion preference globally */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 body {

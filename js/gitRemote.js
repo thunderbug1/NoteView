@@ -4,6 +4,7 @@
 
 const GitRemote = {
     config: null, // { url, name, auth }
+    _syncing: false,
 
     async init() {
         this.config = await Store.getRemoteConfig();
@@ -147,6 +148,8 @@ const GitRemote = {
     },
 
     async sync() {
+        if (this._syncing) return false;
+        this._syncing = true;
         try {
             await this.pull();
             await this.push();
@@ -154,6 +157,8 @@ const GitRemote = {
         } catch (err) {
             console.error('Sync failed:', err);
             throw err;
+        } finally {
+            this._syncing = false;
         }
     },
 

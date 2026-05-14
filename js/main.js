@@ -1585,7 +1585,7 @@ const App = {
         a.href = url;
         a.download = `noteview-export-${date}.md`;
         a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
 
     // AI dictation & new note modal delegated to NewNoteModal module
@@ -1729,7 +1729,8 @@ document.addEventListener('DOMContentLoaded', () => App.init());
 
 // Close IndexedDB connection when page is unloaded to prevent blocking upgrades
 window.addEventListener('beforeunload', () => {
-    if (Store.db && !Store._saveQueue?.size) {
+    const hasPendingSaves = Store._saveQueue && Store._saveQueue.size > 0;
+    if (Store.db && !hasPendingSaves) {
         try {
             Store.db.close();
             Store.db = null;

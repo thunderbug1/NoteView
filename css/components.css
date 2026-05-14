@@ -31,27 +31,27 @@
 
 /* Badge color variants */
 .badge.work {
-    background: #dbeafe;
-    color: #1e40af;
-    border-color: #bfdbfe;
+    background: var(--badge-work-bg);
+    color: var(--badge-work-text);
+    border-color: var(--badge-work-border);
 }
 
 .badge.personal {
-    background: #fce7f3;
-    color: #9f1239;
-    border-color: #fbcfe8;
+    background: var(--badge-personal-bg);
+    color: var(--badge-personal-text);
+    border-color: var(--badge-personal-border);
 }
 
 .badge.ideas {
-    background: #fef3c7;
-    color: #92400e;
-    border-color: #fde68a;
+    background: var(--badge-ideas-bg);
+    color: var(--badge-ideas-text);
+    border-color: var(--badge-ideas-border);
 }
 
 .badge.todos {
-    background: #d1fae5;
-    color: #065f46;
-    border-color: #a7f3d0;
+    background: var(--badge-todos-bg);
+    color: var(--badge-todos-text);
+    border-color: var(--badge-todos-border);
 }
 
 /* Buttons */

@@ -4,6 +4,9 @@
  * Callers provide callbacks for applying changes and clearing values.
  */
 window.DatePopover = {
+    // Track the last close function for cleanup
+    _lastCloseByClass: {},
+
     /**
      * Build and show a date picker popover.
      * @param {Object} opts
@@ -17,6 +20,10 @@ window.DatePopover = {
      * @returns {{ popover: HTMLElement, dueInput: HTMLInputElement, startInput: HTMLInputElement, close: Function }}
      */
     create({ anchor, dueValue, startValue, cssClass, onApply, onClear, fieldClassNames }) {
+        // Properly close previous popover to remove its document listeners
+        if (this._lastCloseByClass[cssClass]) {
+            this._lastCloseByClass[cssClass]();
+        }
         document.querySelector(`.${cssClass}`)?.remove();
 
         const fc = fieldClassNames || {};
@@ -126,20 +133,31 @@ window.DatePopover = {
         popover.style.position = 'fixed';
         popover.style.zIndex = '1000';
 
-        // Close on outside click/tap
+        // Close on outside click/tap or Escape key
         function close() {
             popover.remove();
             document.removeEventListener('mousedown', closeOnOutside);
             document.removeEventListener('touchstart', closeOnOutside);
+            document.removeEventListener('keydown', closeOnEscape);
+            this._lastCloseByClass[cssClass] = null;
         }
 
         const closeOnOutside = (e) => {
             if (!popover.contains(e.target)) {
-                close();
+                close.call(window.DatePopover);
+            }
+        };
+
+        const closeOnEscape = (e) => {
+            if (e.key === 'Escape') {
+                close.call(window.DatePopover);
             }
         };
         document.addEventListener('mousedown', closeOnOutside);
         document.addEventListener('touchstart', closeOnOutside, { passive: true });
+        document.addEventListener('keydown', closeOnEscape);
+
+        this._lastCloseByClass[cssClass] = close.bind(this);
 
         dueInput.focus();
 

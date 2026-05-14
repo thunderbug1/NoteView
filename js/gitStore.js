@@ -76,6 +76,7 @@ const GitStore = {
             return sha;
         } catch (err) {
             console.error(`Failed to commit ${filename}:`, err);
+            return null;
         }
     },
 
@@ -94,6 +95,7 @@ const GitStore = {
             return sha;
         } catch (err) {
             console.error(`Failed to commit deletion of ${filename}:`, err);
+            return null;
         }
     },
     

@@ -1166,12 +1166,12 @@ body.is-dragging-wikilink * {
     50% { opacity: 0.6; }
 }
 
-@keyframes thinking-pulse {
+@keyframes doc-thinking-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
 }
 
-@keyframes ai-dot-pulse {
+@keyframes doc-ai-dot-pulse {
     0%, 100% { opacity: 0.3; }
     50% { opacity: 1; }
 }
@@ -1251,7 +1251,7 @@ body.is-dragging-wikilink * {
     border-color: var(--accent);
     background: var(--accent-light, rgba(59, 130, 246, 0.15));
     cursor: wait;
-    animation: thinking-pulse 1.5s ease-in-out infinite;
+    animation: doc-thinking-pulse 1.5s ease-in-out infinite;
 }
 
 .ai-thinking-dots::after {
@@ -1262,7 +1262,7 @@ body.is-dragging-wikilink * {
     border-radius: 50%;
     background: var(--accent);
     margin-left: 2px;
-    animation: ai-dot-pulse 1.2s ease-in-out infinite;
+    animation: doc-ai-dot-pulse 1.2s ease-in-out infinite;
 }
 
 /* AI mic button error state */
