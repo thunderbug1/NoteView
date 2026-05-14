@@ -110,19 +110,7 @@ const SyncManager = {
 
             this._setStatus('idle', 'Synced');
 
-            // Re-render to reflect pulled changes and update unpushed markers
-            try {
-                if (window.App && typeof App.render === 'function') {
-                    await Store.loadBlocks();
-                    Store._filteredBlocksCache.invalidate();
-                    SelectionManager.updateTagCounts();
-                    TimelineView.invalidateRawDataCache();
-                    TimelineView.invalidateCache();
-                    App.render();
-                }
-            } catch (renderErr) {
-                console.error('Post-sync render failed:', renderErr);
-            }
+            await this._postSyncRender();
             return true;
         } catch (err) {
             if (this._isOverwriteError(err)) {
@@ -252,6 +240,23 @@ const SyncManager = {
         return this._isOnline && navigator.onLine;
     },
 
+    async _postSyncRender(withLoading = false) {
+        if (!window.App || typeof App.render !== 'function') return;
+        if (withLoading) App.showViewLoading();
+        try {
+            await Store.loadBlocks();
+            Store._filteredBlocksCache.invalidate();
+            SelectionManager.updateTagCounts();
+            TimelineView.invalidateRawDataCache();
+            TimelineView.invalidateCache();
+            App.render();
+        } catch (renderErr) {
+            console.error('Post-sync render failed:', renderErr);
+        } finally {
+            if (withLoading) App.hideViewLoading();
+        }
+    },
+
     // --- Pending count reconciliation ---
 
     async _refreshPendingCount() {
@@ -307,6 +312,7 @@ const SyncManager = {
             if (conflictData.files.length === 0) {
                 // No actual file conflicts — try sync again
                 this._setStatus('idle', 'No conflicts found');
+                this._syncing = false;
                 this.sync();
                 return;
             }
@@ -520,19 +526,7 @@ const SyncManager = {
         this._lastError = null;
         this._setStatus('idle', 'Merge resolved');
 
-        if (window.App && typeof App.render === 'function') {
-            App.showViewLoading();
-            try {
-                await Store.loadBlocks();
-                Store._filteredBlocksCache.invalidate();
-                SelectionManager.updateTagCounts();
-                TimelineView.invalidateRawDataCache();
-                TimelineView.invalidateCache();
-                App.render();
-            } finally {
-                App.hideViewLoading();
-            }
-        }
+        await this._postSyncRender(true);
     },
 
     async _showConflictResolutionModal(conflictData) {
@@ -944,19 +938,7 @@ const SyncManager = {
                 this._lastError = null;
                 this._setStatus('idle', 'Force pull succeeded');
 
-                if (window.App && typeof App.render === 'function') {
-                    App.showViewLoading();
-                    try {
-                        await Store.loadBlocks();
-                        Store._filteredBlocksCache.invalidate();
-                        SelectionManager.updateTagCounts();
-                        TimelineView.invalidateRawDataCache();
-                        TimelineView.invalidateCache();
-                        App.render();
-                    } finally {
-                        App.hideViewLoading();
-                    }
-                }
+                await this._postSyncRender(true);
 
                 showToast('Updated to match remote.');
                 modal.close();

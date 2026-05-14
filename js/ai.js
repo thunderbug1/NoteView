@@ -16,6 +16,7 @@ const AIAssistant = {
     _chats: [],
     _activeChatId: null,
     _chatIdCounter: 0,
+    _msgIdCounter: 0,
     _panelOpen: false,
     _panelElement: null,
 
@@ -944,17 +945,20 @@ const AIAssistant = {
 
     async _sendToChat(chat, instruction) {
         if (chat.state === 'streaming') return;
+        chat.state = 'streaming';
 
         const profile = this.profiles.find(p => p.id === chat.modelId);
         if (!profile) {
             chat.messages.push({ id: 'msg-' + (++this._chatIdCounter), role: 'system', type: 'error', content: 'Model profile not found. It may have been deleted.' });
+            chat.state = 'idle';
             this._renderMessages(chat);
             return;
         }
 
         const apiKey = this._apiKeys[chat.modelId] || '';
         if (!apiKey) {
-            chat.messages.push({ id: 'msg-' + Date.now(), role: 'system', type: 'error', content: 'No API key configured. Edit the profile in Settings.' });
+            chat.messages.push({ id: 'msg-' + (++this._msgIdCounter), role: 'system', type: 'error', content: 'No API key configured. Edit the profile in Settings.' });
+            chat.state = 'idle';
             this._renderMessages(chat);
             return;
         }
@@ -969,7 +973,7 @@ const AIAssistant = {
 
         // Add user message
         chat.messages.push({
-            id: 'msg-' + Date.now(),
+            id: 'msg-' + (++this._msgIdCounter),
             role: 'user',
             content: instruction,
             contextCount: chat.contextBlockIds.size
@@ -982,7 +986,7 @@ const AIAssistant = {
         }
 
         // Add placeholder assistant message
-        const assistantMsgId = 'msg-' + Date.now() + '-resp';
+        const assistantMsgId = 'msg-' + (++this._msgIdCounter) + '-resp';
         chat.messages.push({
             id: assistantMsgId,
             role: 'assistant',
@@ -1038,7 +1042,7 @@ const AIAssistant = {
             chat.messages = chat.messages.filter(m => m.id !== assistantMsgId);
 
             if (!raw) {
-                chat.messages.push({ id: 'msg-' + Date.now(), role: 'system', type: 'info', content: 'No changes detected' });
+                chat.messages.push({ id: 'msg-' + (++this._msgIdCounter), role: 'system', type: 'info', content: 'No changes detected' });
                 chat.state = 'idle';
             } else if (chat.mode === 'ask') {
                 const createNotes = this._parseCreateNoteResponse(raw);
@@ -1046,7 +1050,7 @@ const AIAssistant = {
                     const textContent = raw.replace(/<<<CREATE_NOTE>>>([\s\S]*?)<<<END_CREATE>>>/g, '').trim();
                     if (textContent) {
                         chat.messages.push({
-                            id: 'msg-' + Date.now(),
+                            id: 'msg-' + (++this._msgIdCounter),
                             role: 'assistant',
                             content: textContent,
                             type: 'markdown',
@@ -1055,7 +1059,7 @@ const AIAssistant = {
                     }
                     for (const note of createNotes) {
                         chat.messages.push({
-                            id: 'msg-' + Date.now() + '-create',
+                            id: 'msg-' + (++this._msgIdCounter) + '-create',
                             role: 'assistant',
                             type: 'create',
                             noteContent: note.content,
@@ -1067,7 +1071,7 @@ const AIAssistant = {
                     chat.state = 'awaiting_input';
                 } else {
                     chat.messages.push({
-                        id: 'msg-' + Date.now(),
+                        id: 'msg-' + (++this._msgIdCounter),
                         role: 'assistant',
                         content: raw,
                         type: 'markdown',
@@ -1082,7 +1086,7 @@ const AIAssistant = {
                 if (contextIds.length === 0) {
                     const noteTitle = modified.match(/^#{1,6}\s+(.+)/m)?.[1] || modified.split('\n')[0] || 'New Note';
                     chat.messages.push({
-                        id: 'msg-' + Date.now(),
+                        id: 'msg-' + (++this._msgIdCounter),
                         role: 'assistant',
                         type: 'create',
                         noteContent: modified,
@@ -1107,7 +1111,7 @@ const AIAssistant = {
                     // Show diff card if the original note was modified
                     if (textWithoutMarkers && textWithoutMarkers !== original) {
                         chat.messages.push({
-                            id: 'msg-' + Date.now(),
+                            id: 'msg-' + (++this._msgIdCounter),
                             role: 'assistant',
                             type: 'diff',
                             blockId: contextIds[0],
@@ -1123,7 +1127,7 @@ const AIAssistant = {
                     // Show create cards for new notes
                     for (const note of createNotes) {
                         chat.messages.push({
-                            id: 'msg-' + Date.now() + '-create',
+                            id: 'msg-' + (++this._msgIdCounter) + '-create',
                             role: 'assistant',
                             type: 'create',
                             noteContent: note.content,
@@ -1135,7 +1139,7 @@ const AIAssistant = {
                     }
 
                     if (!hasChanges) {
-                        chat.messages.push({ id: 'msg-' + Date.now(), role: 'system', type: 'info', content: 'No changes detected' });
+                        chat.messages.push({ id: 'msg-' + (++this._msgIdCounter), role: 'system', type: 'info', content: 'No changes detected' });
                         chat.state = 'idle';
                     } else {
                         chat.state = 'awaiting_input';
@@ -1153,7 +1157,7 @@ const AIAssistant = {
             } else {
                 const isNetwork = err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('ERR_') || err.name === 'TypeError';
                 chat.messages.push({
-                    id: 'msg-' + Date.now(),
+                    id: 'msg-' + (++this._msgIdCounter),
                     role: 'system',
                     type: 'error',
                     content: isNetwork ? 'Network error — check your connection and retry.' : err.message,
@@ -1477,7 +1481,7 @@ const AIAssistant = {
 
         // Add user message
         chat.messages.push({
-            id: 'msg-' + Date.now(),
+            id: 'msg-' + (++this._msgIdCounter),
             role: 'user',
             content: instruction,
             contextCount: total
@@ -1516,7 +1520,7 @@ const AIAssistant = {
 
             if (!block) {
                 chat.messages.push({
-                    id: 'msg-' + Date.now() + '-' + i,
+                    id: 'msg-' + (++this._msgIdCounter) + '-' + i,
                     role: 'system', type: 'info',
                     content: `Skipped deleted note: ${blockId}`
                 });
@@ -1580,7 +1584,7 @@ const AIAssistant = {
 
                 if (!raw) {
                     chat.messages.push({
-                        id: 'msg-' + Date.now() + '-' + i,
+                        id: 'msg-' + (++this._msgIdCounter) + '-' + i,
                         role: 'system', type: 'info',
                         content: `No changes: ${this._extractTitle(block)}`
                     });
@@ -1595,7 +1599,7 @@ const AIAssistant = {
 
                     if (textWithoutMarkers && textWithoutMarkers !== block.content) {
                         chat.messages.push({
-                            id: 'msg-' + Date.now() + '-' + i,
+                            id: 'msg-' + (++this._msgIdCounter) + '-' + i,
                             role: 'assistant',
                             type: 'diff',
                             blockId,
@@ -1610,7 +1614,7 @@ const AIAssistant = {
 
                     for (const note of createNotes) {
                         chat.messages.push({
-                            id: 'msg-' + Date.now() + '-' + i + '-create',
+                            id: 'msg-' + (++this._msgIdCounter) + '-' + i + '-create',
                             role: 'assistant',
                             type: 'create',
                             noteContent: note.content,
@@ -1623,7 +1627,7 @@ const AIAssistant = {
 
                     if (!hasChanges) {
                         chat.messages.push({
-                            id: 'msg-' + Date.now() + '-' + i,
+                            id: 'msg-' + (++this._msgIdCounter) + '-' + i,
                             role: 'system', type: 'info',
                             content: `No changes: ${this._extractTitle(block)}`
                         });
@@ -1634,7 +1638,7 @@ const AIAssistant = {
 
                 if (err.name === 'AbortError') {
                     chat.messages.push({
-                        id: 'msg-' + Date.now(),
+                        id: 'msg-' + (++this._msgIdCounter),
                         role: 'system', type: 'info',
                         content: `Stopped after ${i} of ${total} notes`
                     });
@@ -1642,7 +1646,7 @@ const AIAssistant = {
                     break;
                 }
                 chat.messages.push({
-                    id: 'msg-' + Date.now() + '-' + i,
+                    id: 'msg-' + (++this._msgIdCounter) + '-' + i,
                     role: 'system', type: 'error',
                     content: `Error on "${this._extractTitle(block)}": ${err.message}`
                 });
@@ -1706,7 +1710,7 @@ const AIAssistant = {
         });
 
         chat.messages.push({
-            id: 'msg-' + Date.now(),
+            id: 'msg-' + (++this._msgIdCounter),
             role: 'assistant',
             type: 'batch',
             results: batchItems,

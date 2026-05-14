@@ -1009,7 +1009,7 @@ const SettingsView = {
                 }
             } else {
                 templates.push({
-                    id: 'tpl-' + Date.now(),
+                    id: 'tpl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
                     name,
                     content
                 });

@@ -11,6 +11,17 @@ window.BlockFilter = {
      * @returns {boolean}
      */
     blockPasses(block, opts) {
+        return this.getBlockingReasons(block, opts).length === 0;
+    },
+
+    /**
+     * Test whether a single block passes all active filters (fast path, no allocation).
+     * Used for hot paths like getFilteredBlocks where we don't need reasons.
+     * @param {Object} block
+     * @param {Object} opts — { contextSelection, excludedSelection, contactSelection, searchQuery, timeProperty }
+     * @returns {boolean}
+     */
+    _blockPassesFast(block, opts) {
         const { contextSelection, excludedSelection, contactSelection, searchQuery, timeProperty } = opts;
 
         // Derive time selection from context

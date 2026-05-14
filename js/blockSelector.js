@@ -366,31 +366,36 @@ const BlockSelector = {
 
             this._hideActionBar();
 
-            // Group tasks by block to batch content changes
-            const byBlock = new Map();
-            for (const taskId of ids) {
-                const task = this._getTaskById(taskId);
-                if (!task) continue;
-                if (!byBlock.has(task.blockId)) byBlock.set(task.blockId, []);
-                byBlock.get(task.blockId).push(task);
-            }
-
-            for (const [blockId, tasks] of byBlock) {
-                const block = Store.blocks.find(b => b.id === blockId);
-                if (!block) continue;
-                let content = block.content;
-                // Re-parse tasks from fresh content to get accurate matchIndex values
-                const freshTasks = KanbanView.extractTasks([block]);
-                const taskIds = new Set(tasks.map(t => t.id));
-                const freshMatch = freshTasks.filter(t => taskIds.has(t.id));
-                // Remove tasks in reverse matchIndex order to preserve positions
-                const sorted = freshMatch.sort((a, b) => b.matchIndex - a.matchIndex);
-                for (const task of sorted) {
-                    let nextNewline = content.indexOf('\n', task.matchIndex);
-                    if (nextNewline === -1) nextNewline = content.length;
-                    content = content.substring(0, task.matchIndex) + content.substring(nextNewline + 1);
+            try {
+                // Group tasks by block to batch content changes
+                const byBlock = new Map();
+                for (const taskId of ids) {
+                    const task = this._getTaskById(taskId);
+                    if (!task) continue;
+                    if (!byBlock.has(task.blockId)) byBlock.set(task.blockId, []);
+                    byBlock.get(task.blockId).push(task);
                 }
-                await App.saveBlockContent(blockId, content, { commit: true, commitMessage: `Delete ${tasks.length} task${tasks.length > 1 ? 's' : ''}` });
+
+                for (const [blockId, tasks] of byBlock) {
+                    const block = Store.blocks.find(b => b.id === blockId);
+                    if (!block) continue;
+                    let content = block.content;
+                    // Re-parse tasks from fresh content to get accurate matchIndex values
+                    const freshTasks = KanbanView.extractTasks([block]);
+                    const taskIds = new Set(tasks.map(t => t.id));
+                    const freshMatch = freshTasks.filter(t => taskIds.has(t.id));
+                    // Remove tasks in reverse matchIndex order to preserve positions
+                    const sorted = freshMatch.sort((a, b) => b.matchIndex - a.matchIndex);
+                    for (const task of sorted) {
+                        let nextNewline = content.indexOf('\n', task.matchIndex);
+                        if (nextNewline === -1) nextNewline = content.length;
+                        content = content.substring(0, task.matchIndex) + content.substring(nextNewline + 1);
+                    }
+                    await App.saveBlockContent(blockId, content, { commit: true, commitMessage: `Delete ${tasks.length} task${tasks.length > 1 ? 's' : ''}` });
+                }
+            } catch (err) {
+                console.error('Bulk delete tasks failed:', err);
+                showToast('Failed to delete some tasks');
             }
 
             this.selectedIds.clear();
@@ -406,8 +411,13 @@ const BlockSelector = {
 
             this._hideActionBar();
 
-            for (const id of ids) {
-                await Store.deleteBlock(id);
+            try {
+                for (const id of ids) {
+                    await Store.deleteBlock(id);
+                }
+            } catch (err) {
+                console.error('Bulk delete blocks failed:', err);
+                showToast('Failed to delete some notes');
             }
 
             TimelineView.invalidateCache();

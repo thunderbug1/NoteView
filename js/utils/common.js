@@ -26,7 +26,13 @@ function sanitizeHtml(html) {
     remove.forEach(el => el.remove());
     doc.querySelectorAll('*').forEach(el => {
         for (const attr of Array.from(el.attributes)) {
-            if (attr.name.startsWith('on') || attr.value.trim().toLowerCase().startsWith('javascript:')) {
+            const name = attr.name.toLowerCase();
+            const val = attr.value.trim().toLowerCase();
+            if (name.startsWith('on') ||
+                val.startsWith('javascript:') ||
+                val.startsWith('data:') ||
+                val.startsWith('vbscript:') ||
+                name === 'style') {
                 el.removeAttribute(attr.name);
             }
         }

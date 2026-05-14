@@ -184,14 +184,15 @@ const TagModal = {
 
             autocomplete.innerHTML = suggestions.map((s, i) => {
                 let display, hint;
+                const escapedText = escapeHtml(Common.capitalizeFirst(s.text));
                 if (s.isGroup) {
-                    display = `<span class="ac-group-icon">&#9654;</span> ${Common.capitalizeFirst(s.text)}`;
+                    display = `<span class="ac-group-icon">&#9654;</span> ${escapedText}`;
                     hint = ' <span class="ac-hint">group</span>';
                 } else if (s.isBareGroup) {
-                    display = `${Common.capitalizeFirst(s.text)}`;
+                    display = `${escapedText}`;
                     hint = ' <span class="ac-hint">tag</span>';
                 } else {
-                    display = Common.capitalizeFirst(s.text);
+                    display = escapedText;
                     hint = '';
                 }
                 return `<div class="ac-item" data-index="${i}" data-completed="${s.completed}">${display}${hint}</div>`;
@@ -638,7 +639,7 @@ const TagModal = {
                 selectedTags.add(newTag);
             }
 
-            if (allTags) {
+            if (allTags && Array.isArray(allTags)) {
                 const idx = allTags.indexOf(oldTag);
                 if (idx !== -1) allTags[idx] = newTag;
             }
@@ -818,14 +819,15 @@ const TagModal = {
             }
             autocomplete.innerHTML = suggestions.map((s, i) => {
                 let display, hint;
+                const escapedText = escapeHtml(Common.capitalizeFirst(s.text));
                 if (s.isGroup) {
-                    display = `<span class="ac-group-icon">&#9654;</span> ${Common.capitalizeFirst(s.text)}`;
+                    display = `<span class="ac-group-icon">&#9654;</span> ${escapedText}`;
                     hint = ' <span class="ac-hint">group</span>';
                 } else if (s.isBareGroup) {
-                    display = `${Common.capitalizeFirst(s.text)}`;
+                    display = `${escapedText}`;
                     hint = ' <span class="ac-hint">tag</span>';
                 } else {
-                    display = Common.capitalizeFirst(s.text);
+                    display = escapedText;
                     hint = '';
                 }
                 return `<div class="ac-item" data-index="${i}" data-completed="${s.completed}">${display}${hint}</div>`;

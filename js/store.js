@@ -302,12 +302,7 @@ const Store = {
                 }
                 if (permission === 'granted') {
                     this.directoryHandle = savedHandle;
-                    await this.saveVault(savedHandle);
-                    await this.setLastActiveVault(savedHandle.name);
-                    await GitStore.init(this.directoryHandle); // INIT GIT HERE
-                    await this.loadBlocks();
-                    RecentAccessTracker.init(this.directoryHandle.name);
-                    RecentAccessTracker.prune(this.blocks.map(b => b.id));
+                    await this._activateVault(savedHandle);
                     return true;
                 } else {
                     const error = new Error('Permission required to access saved folder');
@@ -383,12 +378,26 @@ const Store = {
     async openDirectory(handle) {
         this.directoryHandle = handle;
         if (window.AppSettings) AppSettings.invalidate();
+        await this._activateVault(handle);
+    },
+
+    async _activateVault(handle, options = {}) {
         await this.saveDirectoryHandle(handle);
-        await this.saveVault(handle);
+        await this.saveVault(handle, options.vaultType);
+        if (options.setLastActive !== false) {
+            await this.setLastActiveVault(handle.name);
+        }
         await GitStore.init(handle);
         await this.loadBlocks();
-        RecentAccessTracker.init(handle.name);
-        RecentAccessTracker.prune(this.blocks.map(b => b.id));
+        if (RecentAccessTracker) {
+            RecentAccessTracker.init(handle.name);
+            RecentAccessTracker.prune(this.blocks.map(b => b.id));
+        }
+        if (options.clearUndo) {
+            await UndoRedoManager.clear();
+        }
+        TimelineView.invalidateRawDataCache();
+        TimelineView.invalidateCache();
     },
 
     getDefaultViewPreferences() {
@@ -506,12 +515,7 @@ const Store = {
         try {
             const newHandle = await window.showDirectoryPicker();
             this.directoryHandle = newHandle;
-            await this.saveDirectoryHandle(this.directoryHandle);
-            await this.saveVault(this.directoryHandle);
-            await GitStore.init(this.directoryHandle);
-            await this.loadBlocks();
-            // Clear undo/redo stacks when changing directory
-            await UndoRedoManager.clear();
+            await this._activateVault(newHandle, { clearUndo: true });
             return true;
         } catch (err) {
             if (err.name === 'AbortError') {
@@ -687,33 +691,21 @@ const Store = {
             }
         }
 
+        const prevHandle = this.directoryHandle;
         this.directoryHandle = handle;
-        await this.saveDirectoryHandle(handle);
-        await this.saveVault(handle);
-        await this.setLastActiveVault(handle.name);
-        await GitStore.init(handle);
-        await this.loadBlocks();
-        RecentAccessTracker.init(handle.name);
-        RecentAccessTracker.prune(this.blocks.map(b => b.id));
-        await UndoRedoManager.clear();
-        TimelineView.invalidateRawDataCache();
-        TimelineView.invalidateCache();
+        try {
+            await this._activateVault(handle, { clearUndo: true });
+        } catch (err) {
+            this.directoryHandle = prevHandle;
+            throw err;
+        }
     },
 
     async createOPFSVault(name) {
         const opfsRoot = await navigator.storage.getDirectory();
         const vaultHandle = await opfsRoot.getDirectoryHandle(name, { create: true });
         this.directoryHandle = vaultHandle;
-        await this.saveDirectoryHandle(vaultHandle);
-        await this.saveVault(vaultHandle, 'opfs');
-        await this.setLastActiveVault(vaultHandle.name);
-        await GitStore.init(vaultHandle);
-        await this.loadBlocks();
-        RecentAccessTracker.init(vaultHandle.name);
-        RecentAccessTracker.prune(this.blocks.map(b => b.id));
-        await UndoRedoManager.clear();
-        TimelineView.invalidateRawDataCache();
-        TimelineView.invalidateCache();
+        await this._activateVault(vaultHandle, { vaultType: 'opfs', clearUndo: true });
         return vaultHandle;
     },
 
@@ -862,7 +854,7 @@ const Store = {
 
     // Create new block
     async createBlock(content = '', extraMetadata = {}) {
-        const id = extraMetadata.id || `${new Date().toISOString().split('T')[0]}-${Date.now()}`;
+        const id = extraMetadata.id || `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const block = {
             id,
             content,
@@ -909,7 +901,7 @@ const Store = {
         const opts = BlockFilter._currentOpts();
         const pinnedBlocks = this.blocks.filter(block => block.pinned);
         const unpinnedBlocks = this.blocks.filter(block => !block.pinned);
-        const filteredUnpinned = unpinnedBlocks.filter(block => BlockFilter.blockPasses(block, opts));
+        const filteredUnpinned = unpinnedBlocks.filter(block => BlockFilter._blockPassesFast(block, opts));
 
         const result = [...pinnedBlocks, ...filteredUnpinned];
         this._filteredBlocksCache.set(result);
@@ -947,9 +939,14 @@ const Store = {
             const beforeState = isUpdate ? JSON.parse(JSON.stringify(existingBlock)) : null;
             const keysBefore = isUpdate ? Object.keys(existingBlock) : null;
 
-            // Apply any updates provided in options
+            // Apply allowed updates from options (prevent arbitrary key leakage into frontmatter)
+            const allowedKeys = new Set(['content', 'tags', 'priority', 'assignee', 'due', 'start', 'status', 'creationDate', 'lastUpdated']);
             if (Object.keys(updates).length > 0) {
-                Object.assign(block, updates);
+                for (const key of Object.keys(updates)) {
+                    if (allowedKeys.has(key) || key.endsWith('Date') || key.endsWith('At')) {
+                        block[key] = updates[key];
+                    }
+                }
             }
 
             block.lastUpdated = new Date().toISOString();

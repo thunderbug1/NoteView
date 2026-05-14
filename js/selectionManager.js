@@ -616,12 +616,14 @@ const SelectionManager = {
     },
 
     async _toggleTagArchive(tag) {
-        if (this._archivedTags.has(tag)) {
-            this._archivedTags.delete(tag);
+        const updated = new Set(this._archivedTags);
+        if (updated.has(tag)) {
+            updated.delete(tag);
         } else {
-            this._archivedTags.add(tag);
+            updated.add(tag);
         }
-        await AppSettings.setArchivedTags(Array.from(this._archivedTags));
+        await AppSettings.setArchivedTags(Array.from(updated));
+        this._archivedTags = updated;
         this.renderContextSidebar();
     },
 

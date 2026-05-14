@@ -161,6 +161,7 @@ class GitFSAdapter {
 
             async rmdir(path) {
                 const parts = path.split('/').filter(p => p);
+                if (parts.length === 0) return;
                 const dirName = parts.pop();
                 const parentPath = parts.join('/');
                 try {
@@ -173,6 +174,7 @@ class GitFSAdapter {
 
             async unlink(path) {
                 const parts = path.split('/').filter(p => p);
+                if (parts.length === 0) throw new Error(`Cannot unlink root path: '${path}'`);
                 const fileName = parts.pop();
                 const parentPath = parts.join('/');
                 try {

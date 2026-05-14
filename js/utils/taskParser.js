@@ -679,7 +679,7 @@ window.TaskParser = {
     PRIORITY_RANKS,
     UPCOMING_DAYS,
     KNOWN_BADGE_KEYS,
-    get CHECKBOX_REGEX() { return /- \[([ xX\/bB\-])\]\s*(.*)/g; },
-    get BADGE_REGEX() { return /\[([a-zA-Z]+)::\s*([^\]]+)\]/g; },
+    get CHECKBOX_REGEX() { return /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm; },
+    get BADGE_REGEX() { return /\[([a-zA-Z0-9_]+)::\s*([^\]]+)\]/g; },
     toggleTaskOnLine
 };

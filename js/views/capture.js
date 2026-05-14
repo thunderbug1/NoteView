@@ -341,12 +341,15 @@ const CaptureView = {
                     try {
                         this._insertedTranscript = '';
                         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        const onresult = this._recognition.onresult;
+                        const onerror = this._recognition.onerror;
+                        const onend = this._recognition.onend;
                         this._recognition = new SR();
                         this._recognition.continuous = true;
                         this._recognition.interimResults = true;
-                        this._recognition.onresult = this._recognition.onresult;
-                        this._recognition.onerror = this._recognition.onerror;
-                        this._recognition.onend = this._recognition.onend;
+                        this._recognition.onresult = onresult;
+                        this._recognition.onerror = onerror;
+                        this._recognition.onend = onend;
                         this._recognitionSession++;
                         sessionId = this._recognitionSession;
                         this._recognition.start();

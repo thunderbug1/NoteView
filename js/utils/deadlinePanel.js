@@ -96,7 +96,7 @@ const DeadlinePanel = {
 
     renderDeadlineItem(task, urgency) {
         const dateLabel = TaskParser.getDueDateString(task);
-        return `<div class="deadline-item" data-block-id="${task.blockId}" data-task-id="${task.id}" data-match-index="${task.matchIndex}">
+        return `<div class="deadline-item" data-block-id="${escapeHtml(task.blockId)}" data-task-id="${escapeHtml(task.id)}" data-match-index="${escapeHtml(String(task.matchIndex))}">
             <span class="deadline-item-indicator deadline-indicator-${urgency}"></span>
             <div class="deadline-item-content">
                 <span class="deadline-item-text">${escapeHtml(task.text)}</span>

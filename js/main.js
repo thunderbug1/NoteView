@@ -157,6 +157,7 @@ const App = {
     },
 
     async completeInitialization() {
+        if (this._initInProgress) return;
         // Show sidebars and FAB now that a vault is open
         document.getElementById('app')?.classList.remove('no-vault');
         const fab = document.getElementById('fabNewNote');
@@ -181,18 +182,23 @@ const App = {
             });
             return;
         }
+        this._initInProgress = true;
         this.isInitialized = true;
-        await GitRemote.init();
-        await SyncManager.init();
-        this.setupEventListeners();
-        this.setupMobilePullToRefresh();
-        SelectionManager.init();
-        SelectionManager.updateTagCounts();
-        await AIAssistant.init();
-        this.updateVaultSwitcherName();
-        this.render();
-        // Collapse right sidebar on initial load when there are no deadlines
-        this._collapseRightIfNoDeadlines();
+        try {
+            await GitRemote.init();
+            await SyncManager.init();
+            this.setupEventListeners();
+            this.setupMobilePullToRefresh();
+            SelectionManager.init();
+            SelectionManager.updateTagCounts();
+            await AIAssistant.init();
+            this.updateVaultSwitcherName();
+            this.render();
+            // Collapse right sidebar on initial load when there are no deadlines
+            this._collapseRightIfNoDeadlines();
+        } finally {
+            this._initInProgress = false;
+        }
         console.log('[App] completeInitialization:done', {
             currentView: Store.currentView,
             context: Array.from(SelectionManager.selections.context)
@@ -1222,10 +1228,14 @@ const App = {
         if (!entry?.blockData) return;
 
         const block = JSON.parse(JSON.stringify(entry.blockData));
+        // saveBlock handles adding to Store.blocks if it's a new block
         await Store.saveBlock(block, { commit: true, commitMessage: `Restore deleted note ${block.id}` });
 
+        // Ensure the restored block is in the in-memory array
         if (!Store.blocks.some(b => b.id === block.id)) {
-            Store.blocks.push(block);
+            // saveBlock serialized a copy; push the reference we'll work with
+            const savedBlock = Store.blocks.find(b => b.id === block.id);
+            if (!savedBlock) Store.blocks.push(block);
         }
 
         RecentAccessTracker.removeFromTrash(blockId);
@@ -1328,16 +1338,21 @@ const App = {
             ? { commit: true, commitMessage, ...properties }
             : { ...commitMessage, ...properties };
 
-        await Store.saveBlock(block, options);
+        try {
+            await Store.saveBlock(block, options);
 
-        TimelineView.invalidateCache();
-        SelectionManager.updateTagCounts();
+            TimelineView.invalidateCache();
+            SelectionManager.updateTagCounts();
 
-        // Fast path: surgical metadata update without full re-render
-        const allSurgical = Object.keys(properties).every(p => this._canSurgicalPropertyUpdate(p, id));
-        if (allSurgical && DocumentView.updateBlockMetadata(id)) return;
+            // Fast path: surgical metadata update without full re-render
+            const allSurgical = Object.keys(properties).every(p => this._canSurgicalPropertyUpdate(p, id));
+            if (allSurgical && DocumentView.updateBlockMetadata(id)) return;
 
-        this.render();
+            this.render();
+        } catch (err) {
+            console.error('Failed to update block properties:', err);
+            showToast('Failed to save changes');
+        }
     },
 
     async createNewBlockWithId(targetId) {
@@ -1691,12 +1706,14 @@ const ThemeManager = {
     setTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('noteview-theme', theme);
-        
+
         const logoIcon = document.getElementById('appLogoIcon');
         if (logoIcon) {
             logoIcon.src = theme === 'dark' ? 'assets/icon-dark.svg' : 'assets/icon-light.svg';
         }
-        
+
+        if (!this.sunIcon || !this.moonIcon) return;
+
         if (theme === 'dark') {
             this.sunIcon.style.display = 'none';
             this.moonIcon.style.display = 'inline-block';
