@@ -75,11 +75,13 @@ const GitRemote = {
         try {
             await git.resolveRef({ fs, dir, ref: `refs/heads/${ref}` });
             hasLocalBranch = true;
-        } catch (e) { /* no local branch yet */ }
+        } catch (e) {
+            if (!(e.code === 'NotFoundError' || e.message?.includes('Could not resolve'))) throw e;
+        }
 
         if (!hasLocalBranch) {
             // Remove local config files only on fresh checkout to avoid conflicts
-            try { await fs.unlink('.noteview/settings.json'); } catch (e) {}
+            try { await fs.unlink('.noteview/settings.json'); } catch (e) { /* may not exist */ }
             console.log('Pull: no local branch, fetching and checking out from remote');
             await git.fetch({
                 fs, dir,

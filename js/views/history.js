@@ -38,7 +38,7 @@ const HistoryView = {
         this.renderModal();
         } catch (e) {
             console.error('Failed to load history:', e);
-            Common.toast('Failed to load version history', 'error');
+            Common.showToast('Failed to load version history', 'error');
         }
     },
     

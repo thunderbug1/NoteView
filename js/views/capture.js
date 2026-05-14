@@ -503,12 +503,14 @@ const CaptureView = {
             const desc = input.value.trim();
             if (!desc) { Common.showToast('Enter a task description'); return; }
             let content = `- [ ] ${desc}`;
-            if (selectedPriority) content += `\n[priority:: ${selectedPriority}]`;
+            const badges = [];
+            if (selectedPriority) badges.push(`[priority:: ${selectedPriority}]`);
             const dueDate = container.querySelector('[data-role="due-date"]').value;
-            if (dueDate) content += `\n[due:: ${dueDate}]`;
+            if (dueDate) badges.push(`[due:: ${dueDate}]`);
             const startDate = container.querySelector('[data-role="start-date"]').value;
-            if (startDate) content += `\n[start:: ${startDate}]`;
-            if (selectedAssignee) content += `\n[assignee:: ${selectedAssignee}]`;
+            if (startDate) badges.push(`[start:: ${startDate}]`);
+            if (selectedAssignee) badges.push(`[assignee:: ${selectedAssignee}]`);
+            if (badges.length) content += ' ' + badges.join(' ');
             this._saveNote(content, { tags: this._currentTags });
         });
 

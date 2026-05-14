@@ -47,7 +47,7 @@ const GitStore = {
                                 }
                             }
                         }
-                    } catch (e) { /* skip files that can't be staged */ }
+                    } catch (e) { console.warn('gitStore.commitAll: failed to stage', name, e.message); }
                 }
             }
             const sha = await this.git.commit({

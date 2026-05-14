@@ -25,7 +25,7 @@ const UndoRedoManager = {
         if (stored) {
             this.sessionId = stored;
         } else {
-            this.sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            this.sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
             sessionStorage.setItem('undoRedoSessionId', this.sessionId);
         }
     },
@@ -112,6 +112,7 @@ const UndoRedoManager = {
         } catch (e) {
             // Undo failed — push command back onto undo stack so it's not lost
             this.undoStack.push(command);
+            await this.saveState();
             console.error('UndoRedoManager: Undo failed, command restored to undo stack:', e);
         } finally {
             this.isExecuting = false;

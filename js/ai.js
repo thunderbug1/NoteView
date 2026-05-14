@@ -1115,7 +1115,7 @@ const AIAssistant = {
                             original,
                             modified: textWithoutMarkers,
                             accepted: null,
-                            meta: `${profile.model} · ${elapsed}s}`
+                            meta: `${profile.model} · ${elapsed}s`
                         });
                         hasChanges = true;
                     }

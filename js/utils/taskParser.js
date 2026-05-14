@@ -243,7 +243,7 @@ function isClosedTask(task) {
  * @returns {boolean} True when task has a non-empty assignee
  */
 function hasAssignee(task) {
-    return task.badges.some(b => b.type === 'assignee' && b.value && b.value.trim());
+    return task?.badges?.some(b => b.type === 'assignee' && b.value && b.value.trim()) ?? false;
 }
 
 /**

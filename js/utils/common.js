@@ -69,6 +69,7 @@ function truncateText(html, maxLength) {
  * @returns {string} Capitalized string
  */
 function capitalizeFirst(str) {
+    if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 

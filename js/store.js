@@ -962,7 +962,7 @@ const Store = {
             try {
                 fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
             } catch (fsError) {
-                if (fsError.name === 'NotFoundError' || fsError.name === 'NetworkError') {
+                if (fsError.name === 'NetworkError') {
                     fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
                 } else {
                     throw fsError;
@@ -1027,7 +1027,7 @@ const Store = {
         const affected = this.blocks.filter(b => b.tags?.includes(oldTag));
         for (const block of affected) {
             const newTags = block.tags.map(t => t === oldTag ? newTag : t);
-            await this.saveBlock(block, { commit: true, commitMessage: `Rename tag "${oldTag}" to "${newTag}"`, skipUndo: true, updates: { tags: newTags } });
+            await this.saveBlock(block, { commit: true, commitMessage: `Rename tag "${oldTag}" to "${newTag}"`, skipUndo: true, tags: newTags });
         }
         this._filteredBlocksCache.invalidate();
         SelectionManager.updateTagCounts();
@@ -1039,7 +1039,7 @@ const Store = {
         const affected = this.blocks.filter(b => b.tags?.includes(tag));
         for (const block of affected) {
             const newTags = block.tags.filter(t => t !== tag);
-            await this.saveBlock(block, { commit: true, commitMessage: `Remove tag "${tag}"`, skipUndo: true, updates: { tags: newTags } });
+            await this.saveBlock(block, { commit: true, commitMessage: `Remove tag "${tag}"`, skipUndo: true, tags: newTags });
         }
         this._filteredBlocksCache.invalidate();
         SelectionManager.updateTagCounts();

@@ -122,4 +122,7 @@ const RecentAccessTracker = {
     }
 };
 
+// Flush on page close to prevent data loss from the debounce timer
+window.addEventListener('beforeunload', () => RecentAccessTracker._flush());
+
 window.RecentAccessTracker = RecentAccessTracker;
