@@ -15,6 +15,8 @@ const SyncManager = {
     _lastError: null,
     _idleSyncScheduled: false,
     _syncing: false,
+    _networkListenersInstalled: false,
+    _idleSyncTimer: null,
 
     _config: {
         autoSync: false,
@@ -232,6 +234,8 @@ const SyncManager = {
     // --- Network ---
 
     _setupNetworkListeners() {
+        if (this._networkListenersInstalled) return;
+        this._networkListenersInstalled = true;
         window.addEventListener('online', () => {
             this._isOnline = true;
             if (this._config.autoSync && this._pendingCommits > 0 && GitRemote.config) {

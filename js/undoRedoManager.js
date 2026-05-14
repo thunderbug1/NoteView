@@ -109,6 +109,10 @@ const UndoRedoManager = {
             await this.saveState();
             this.updateUI();
             App.render();
+        } catch (e) {
+            // Undo failed — push command back onto undo stack so it's not lost
+            this.undoStack.push(command);
+            console.error('UndoRedoManager: Undo failed, command restored to undo stack:', e);
         } finally {
             this.isExecuting = false;
         }
@@ -197,7 +201,7 @@ const UndoRedoManager = {
                 await Store.directoryHandle.removeEntry(fileName);
             } catch (e) {
                 console.error('Failed to delete file during undo:', e);
-                return;
+                throw e;
             }
 
             // Remove from memory only after successful file deletion
@@ -225,20 +229,18 @@ const UndoRedoManager = {
             console.warn('redoCreate: block already exists, skipping');
             return;
         }
-        if (block) {
-            // Create file
-            await Store.saveBlock(block, { commit: true, commitMessage: `Redo: recreate ${block.id}` });
+        // Create file
+        await Store.saveBlock(block, { commit: true, commitMessage: `Redo: recreate ${block.id}` });
 
-            // Add to Store.blocks if not already there
-            if (!Store.blocks.find(b => b.id === block.id)) {
-                Store.blocks.push(block);
-            }
-
-            // Update contacts and cache
-            Store.extractContacts();
-            Store._filteredBlocksCache.invalidate();
-            SelectionManager.updateTagCounts();
+        // Add to Store.blocks if not already there
+        if (!Store.blocks.find(b => b.id === block.id)) {
+            Store.blocks.push(block);
         }
+
+        // Update contacts and cache
+        Store.extractContacts();
+        Store._filteredBlocksCache.invalidate();
+        SelectionManager.updateTagCounts();
     },
 
     /**

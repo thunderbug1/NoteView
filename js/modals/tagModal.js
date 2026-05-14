@@ -669,11 +669,9 @@ const TagModal = {
         });
 
         renameInput.addEventListener('blur', () => {
-            setTimeout(() => {
-                if (item.querySelector('.tag-rename-input')) {
-                    doCancel();
-                }
-            }, 100);
+            if (item.querySelector('.tag-rename-input')) {
+                doCancel();
+            }
         });
     },
 
@@ -993,7 +991,7 @@ const TagModal = {
         });
 
         input.addEventListener('blur', () => {
-            setTimeout(hideAutocomplete, 150);
+            hideAutocomplete();
         });
     }
 };

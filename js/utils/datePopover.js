@@ -131,7 +131,6 @@ window.DatePopover = {
             popover.remove();
             document.removeEventListener('mousedown', closeOnOutside);
             document.removeEventListener('touchstart', closeOnOutside);
-            document.removeEventListener('click', closeOnOutside);
         }
 
         const closeOnOutside = (e) => {

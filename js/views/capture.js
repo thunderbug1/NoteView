@@ -508,8 +508,7 @@ const CaptureView = {
             if (dueDate) content += `\n[due:: ${dueDate}]`;
             const startDate = container.querySelector('[data-role="start-date"]').value;
             if (startDate) content += `\n[start:: ${startDate}]`;
-            const assignee = container.querySelector('[data-role="assignee"]').value;
-            if (assignee) content += `\n[assignee:: ${assignee}]`;
+            if (selectedAssignee) content += `\n[assignee:: ${selectedAssignee}]`;
             this._saveNote(content, { tags: this._currentTags });
         });
 

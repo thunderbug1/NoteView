@@ -212,9 +212,15 @@ const VaultModal = {
             }
         };
 
+        let _vaultMenuCloseHandler = null;
+
         function closeVaultMenu() {
             const existing = document.getElementById('vaultContextMenu');
             if (existing) existing.remove();
+            if (_vaultMenuCloseHandler) {
+                document.removeEventListener('click', _vaultMenuCloseHandler);
+                _vaultMenuCloseHandler = null;
+            }
         }
 
         function showVaultContextMenu(btn, vaultName) {
@@ -276,9 +282,9 @@ const VaultModal = {
             const closeMenu = (e) => {
                 if (!menu.contains(e.target) && e.target !== btn) {
                     closeVaultMenu();
-                    document.removeEventListener('click', closeMenu);
                 }
             };
+            _vaultMenuCloseHandler = closeMenu;
             document.addEventListener('click', closeMenu);
         }
 

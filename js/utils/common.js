@@ -22,7 +22,7 @@ function escapeHtml(text) {
  */
 function sanitizeHtml(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const remove = doc.querySelectorAll('script, iframe, object, embed, form, base, meta, style');
+    const remove = doc.querySelectorAll('script, iframe, object, embed, form, base, meta, style, link');
     remove.forEach(el => el.remove());
     doc.querySelectorAll('*').forEach(el => {
         for (const attr of Array.from(el.attributes)) {

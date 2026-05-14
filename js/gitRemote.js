@@ -43,7 +43,7 @@ const GitRemote = {
     async push(force = false) {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
-        const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+        const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
 
         try {
             await git.push({
@@ -67,7 +67,7 @@ const GitRemote = {
     async pull() {
         if (!this.config) throw new Error('No remote configured');
         const { git, fs, dir } = GitStore;
-        const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+        const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
         const remoteName = this.config.name;
 
         // Check if local branch exists (fresh repos have none)
@@ -158,7 +158,7 @@ const GitRemote = {
     async getStatus() {
         if (!this.config) return { hasRemote: false };
         const { git, fs, dir } = GitStore;
-        const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+        const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
 
         try {
             const head = await git.resolveRef({ fs, dir, ref: 'HEAD' });

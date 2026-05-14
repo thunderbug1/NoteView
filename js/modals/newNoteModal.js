@@ -481,7 +481,7 @@ const NewNoteModal = {
                 self._createModalClose = null;
                 self._createModalPromote = null;
 
-                setTimeout(() => App.render(), 50);
+                requestAnimationFrame(() => App.render());
             }
         });
 

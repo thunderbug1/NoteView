@@ -1292,7 +1292,7 @@ const App = {
         const hasContext = sel?.context?.size > 0;
         const hasExcluded = sel?.excluded?.size > 0;
         const hasSearch = !!Store.searchQuery;
-        const hasTime = !!sel?.time;
+        const hasTime = sel?.context && Array.from(sel.context).some(t => t.startsWith('Time.'));
 
         // Tag additions cannot hide a visible block under AND-logic context filters.
         // Exception: Status.untagged filter — adding a tag to an untagged block would hide it.
@@ -1368,10 +1368,8 @@ const App = {
             content,
             modalClass: 'tag-modal content-modal',
             onClose: () => {
-                // If we were in Kanban, we might want to refresh the view to reflect changes.
-                // Small delay ensures modal DOM is fully cleared before we re-render the view.
                 if (Store.currentView === 'kanban') {
-                    setTimeout(() => this.render(), 50);
+                    requestAnimationFrame(() => this.render());
                 }
             }
         });

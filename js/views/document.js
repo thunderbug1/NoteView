@@ -3242,22 +3242,13 @@ const DocumentView = {
                         this.showMobileToolbar();
                     } else if (update.focusChanged && !update.view.hasFocus) {
                         if (this._focusedEditor === update.view) {
-                            // Delay to allow toolbar button clicks to register
-                            setTimeout(() => {
-                                if (this._focusedEditor === update.view) {
-                                    this._focusedEditor = null;
-                                    this.hideMobileToolbar();
-                                }
-                            }, 150);
+                            this._focusedEditor = null;
+                            this.hideMobileToolbar();
                         }
                         // Re-collapse block if it was expanded by click
                         if (this._autoCollapseOnBlur.has(blockId)) {
-                            setTimeout(() => {
-                                if (this._autoCollapseOnBlur.has(blockId) && !update.view.hasFocus) {
-                                    this._autoCollapseOnBlur.delete(blockId);
-                                    this.collapseBlock(blockId);
-                                }
-                            }, 150);
+                            this._autoCollapseOnBlur.delete(blockId);
+                            this.collapseBlock(blockId);
                         }
                     }
                 }),

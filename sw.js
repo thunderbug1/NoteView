@@ -4,6 +4,8 @@ const PRECACHE_URLS = [
   './',
   './index.html',
   './icon.svg',
+  './assets/icon-light.svg',
+  './assets/icon-dark.svg',
   './manifest.json',
   './css/base.css',
   './css/layout.css',

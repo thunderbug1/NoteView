@@ -99,10 +99,6 @@ const Store = {
                 }
             };
 
-            request.onblocked = () => {
-                console.warn('IndexedDB upgrade blocked — close other tabs');
-            };
-
             request.onsuccess = () => {
                 if (!completed) {
                     completed = true;
@@ -811,9 +807,15 @@ const Store = {
         const fileName = `${block.id}.md`;
 
         const fileHandle = await handle.getFileHandle(fileName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
+        let writable;
+        try {
+            writable = await fileHandle.createWritable();
+            await writable.write(content);
+            await writable.close();
+        } catch (writeError) {
+            if (writable) await writable.abort();
+            throw writeError;
+        }
 
         return { fileName, vaultName: targetVaultName };
     },
@@ -959,8 +961,12 @@ const Store = {
             let fileHandle;
             try {
                 fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
-            } catch { /* Retry once on intermittent FS error */
-                fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
+            } catch (fsError) {
+                if (fsError.name === 'NotFoundError' || fsError.name === 'NetworkError') {
+                    fileHandle = await this.directoryHandle.getFileHandle(fileName, { create: true });
+                } else {
+                    throw fsError;
+                }
             }
 
             let writable;
@@ -1020,8 +1026,8 @@ const Store = {
         if (oldTag === newTag) return;
         const affected = this.blocks.filter(b => b.tags?.includes(oldTag));
         for (const block of affected) {
-            block.tags = block.tags.map(t => t === oldTag ? newTag : t);
-            await this.saveBlock(block, { commit: true, commitMessage: `Rename tag "${oldTag}" to "${newTag}"`, skipUndo: true });
+            const newTags = block.tags.map(t => t === oldTag ? newTag : t);
+            await this.saveBlock(block, { commit: true, commitMessage: `Rename tag "${oldTag}" to "${newTag}"`, skipUndo: true, updates: { tags: newTags } });
         }
         this._filteredBlocksCache.invalidate();
         SelectionManager.updateTagCounts();
@@ -1032,8 +1038,8 @@ const Store = {
     async deleteTag(tag) {
         const affected = this.blocks.filter(b => b.tags?.includes(tag));
         for (const block of affected) {
-            block.tags = block.tags.filter(t => t !== tag);
-            await this.saveBlock(block, { commit: true, commitMessage: `Remove tag "${tag}"`, skipUndo: true });
+            const newTags = block.tags.filter(t => t !== tag);
+            await this.saveBlock(block, { commit: true, commitMessage: `Remove tag "${tag}"`, skipUndo: true, updates: { tags: newTags } });
         }
         this._filteredBlocksCache.invalidate();
         SelectionManager.updateTagCounts();
@@ -1042,9 +1048,16 @@ const Store = {
 
     // Override loadBlocks to invalidate cache
     async loadBlocks() {
-        if (this._isLoading) return;
-        this._isLoading = true;
+        if (this._loadPromise) return this._loadPromise;
+        this._loadPromise = this._loadBlocksInternal();
         try {
+            await this._loadPromise;
+        } finally {
+            this._loadPromise = null;
+        }
+    },
+
+    async _loadBlocksInternal() {
         this.blocks = [];
         this._filteredBlocksCache.invalidate();
 
@@ -1082,9 +1095,6 @@ const Store = {
         }
         this.extractContacts();
         console.log(`Loaded ${this.blocks.length} blocks`);
-        } finally {
-            this._isLoading = false;
-        }
     }
 };
 

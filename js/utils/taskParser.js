@@ -20,7 +20,7 @@ const KNOWN_BADGE_KEYS = ['due', 'assignee', 'priority', 'start', 'completed'];
 // Regex patterns (getters return fresh instances to avoid lastIndex issues)
 function getCheckboxRegex() { return /^(\s*[-*+]\s+)\[([ xX\/bB\-])\](.*)$/gm; }
 function getBadgeRegex() { return /\[([a-zA-Z0-9_]+)::\s*([^\]]+)\]/g; }
-const TASK_MENTION_REGEX = /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g;
+function getTaskMentionRegex() { return /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g; }
 const PRIORITY_RANKS = {
     urgent: 0,
     high: 1,
@@ -107,9 +107,9 @@ function extractMentionContacts(text) {
     const contacts = new Set();
     if (!text) return contacts;
 
+    const mentionRegex = getTaskMentionRegex();
     let match;
-    TASK_MENTION_REGEX.lastIndex = 0;
-    while ((match = TASK_MENTION_REGEX.exec(text)) !== null) {
+    while ((match = mentionRegex.exec(text)) !== null) {
         const normalized = normalizeContactToken(match[1]);
         if (normalized) {
             contacts.add(normalized);
@@ -574,7 +574,6 @@ function taskLineMatchesFilter(lineText, activeFilters, anyMatch = false) {
         if (!anyMatch && !matches) return false;
     }
     return !anyMatch;
-    return true;
 }
 
 /**

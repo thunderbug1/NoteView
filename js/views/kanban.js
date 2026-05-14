@@ -500,9 +500,9 @@ const KanbanView = {
 
         card.addEventListener('dragend', () => {
             card.classList.remove('dragging');
-            setTimeout(() => {
+            requestAnimationFrame(() => {
                 dragState.inProgress = false;
-            }, 0);
+            });
         });
     },
 
@@ -649,32 +649,27 @@ const KanbanView = {
                 const dataJson = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
 
                 if (dataJson && targetState !== null) {
-                    const data = JSON.parse(dataJson);
+                    let data;
+                    try { data = JSON.parse(dataJson); } catch { return; }
                     if (data.columnId === colContainer.dataset.columnId) {
                         return;
                     }
-                    const block = Store.blocks.find(b => b.id === data.blockId);
+                    const resolved = KanbanView._resolveCurrentTask(data);
+                    if (!resolved) { App.render(); return; }
 
-                    if (block && block.content) {
-                        // We need to update the file content
-                        // the exact character sequence to replace is: [prefix][oldState]
-                        // We can't use matchIndex blindly if file changed, but assuming no other edits happened it's fine.
-                        // A safer way: re-parse blocks or do string splice
-                        const content = block.content;
-                        const targetPos = data.matchIndex + data.prefix.length + 1; // +1 for the '['
+                    const { matchIndex, matchLength, prefix, block } = resolved;
+                    const content = block.content;
+                    const targetPos = matchIndex + prefix.length + 1;
 
-                        // Check if the bracket is indeed at targetPos
-                        if (content[targetPos - 1] === '[' && content[targetPos + 1] === ']') {
-                            const newStateLabel = targetColumn?.label || targetState;
-                            const commitMessage = `Move task to ${newStateLabel}`;
-                            let newContent = content.substring(0, targetPos) + targetState + content.substring(targetPos + 1);
-                            newContent = KanbanView.applyCompletedBadge(newContent, data.matchIndex, data.matchLength, targetState);
-                            await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
-                            App.render();
-                        } else {
-                            // Fallback: full re-render if indices don't match cleanly (e.g. concurrent edits)
-                            App.render();
-                        }
+                    if (content[targetPos - 1] === '[' && content[targetPos + 1] === ']') {
+                        const newStateLabel = targetColumn?.label || targetState;
+                        const commitMessage = `Move task to ${newStateLabel}`;
+                        let newContent = content.substring(0, targetPos) + targetState + content.substring(targetPos + 1);
+                        newContent = KanbanView.applyCompletedBadge(newContent, matchIndex, matchLength, targetState);
+                        await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
+                        App.render();
+                    } else {
+                        App.render();
                     }
                 }
             });
@@ -898,16 +893,17 @@ const KanbanView = {
                 const targetColumn = KanbanView.getColumnById(targetColumnId);
                 if (!targetColumn) return;
 
-                const block = Store.blocks.find(b => b.id === data.blockId);
-                if (!block || !block.content) { modal.close(); return; }
+                const resolved = KanbanView._resolveCurrentTask(data);
+                if (!resolved) { modal.close(); App.render(); return; }
 
+                const { matchIndex, matchLength, prefix, block } = resolved;
                 const blockContent = block.content;
-                const targetPos = data.matchIndex + data.prefix.length + 1;
+                const targetPos = matchIndex + prefix.length + 1;
 
                 if (blockContent[targetPos - 1] === '[' && blockContent[targetPos + 1] === ']') {
                     const commitMessage = `Move task to ${targetColumn.label}`;
                     let newContent = blockContent.substring(0, targetPos) + targetColumn.state + blockContent.substring(targetPos + 1);
-                    newContent = KanbanView.applyCompletedBadge(newContent, data.matchIndex, data.matchLength, targetColumn.state);
+                    newContent = KanbanView.applyCompletedBadge(newContent, matchIndex, matchLength, targetColumn.state);
                     await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
                 }
 
@@ -915,6 +911,20 @@ const KanbanView = {
                 App.render();
             });
         });
+    },
+
+    /**
+     * Re-resolve a task's position from current block content using the task ID.
+     * Returns { matchIndex, matchLength, prefix, block } or null if the task can't be found.
+     */
+    _resolveCurrentTask(data) {
+        const block = Store.blocks.find(b => b.id === data.blockId);
+        if (!block || !block.content) return null;
+        const tasks = TaskParser.parseTasksFromBlock(block);
+        const taskId = `task-${data.blockId}-${data.matchIndex}`;
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return null;
+        return { matchIndex: task.matchIndex, matchLength: task.matchLength, prefix: task.prefix, block };
     },
 
     /**

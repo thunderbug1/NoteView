@@ -7,13 +7,13 @@
  * Regex for matching @mentions at the start of words
  * Matches: @username (but not email@example.com)
  */
-const CONTACT_MENTION_REGEX = /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g;
+function getContactMentionRegex() { return /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g; }
 
 /**
  * Regex for matching [assignee::] badges in task text
  * Matches: [assignee:: username] or [assignee::@username]
  */
-const CONTACT_ASSIGNEE_REGEX = /\[assignee::\s*([^\]]+)\]/g;
+function getContactAssigneeRegex() { return /\[assignee::\s*([^\]]+)\]/g; }
 
 function normalizeContactName(contactName) {
     if (!contactName) return '';
@@ -35,10 +35,10 @@ function extractMentions(content) {
     const mentions = new Set();
     if (!content) return mentions;
 
+    const mentionRegex = getContactMentionRegex();
     let match;
-    CONTACT_MENTION_REGEX.lastIndex = 0;
 
-    while ((match = CONTACT_MENTION_REGEX.exec(content)) !== null) {
+    while ((match = mentionRegex.exec(content)) !== null) {
         mentions.add(match[1].toLowerCase());
     }
 
@@ -54,10 +54,10 @@ function extractAssignees(content) {
     const assignees = new Set();
     if (!content) return assignees;
 
+    const assigneeRegex = getContactAssigneeRegex();
     let match;
-    CONTACT_ASSIGNEE_REGEX.lastIndex = 0;
 
-    while ((match = CONTACT_ASSIGNEE_REGEX.exec(content)) !== null) {
+    while ((match = assigneeRegex.exec(content)) !== null) {
         let username = normalizeContactName(match[1]);
         assignees.add(username.toLowerCase());
     }
