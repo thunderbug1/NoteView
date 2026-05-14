@@ -983,9 +983,6 @@ const KanbanView = {
      * Show a floating menu to set the done column lookback period.
      */
     showLookbackMenu(btn) {
-        const existing = document.querySelector('.kanban-lookback-menu');
-        if (existing) existing.remove();
-
         const options = [
             { days: 7, label: 'Last 7 days' },
             { days: 30, label: 'Last 30 days' },
@@ -995,28 +992,16 @@ const KanbanView = {
 
         const currentDays = this.doneLookbackDays;
 
-        const menu = document.createElement('div');
-        menu.className = 'kanban-lookback-menu';
-        menu.innerHTML = options.map(opt => {
+        const html = options.map(opt => {
             const active = opt.days === currentDays ? ' kanban-lookback-option--active' : '';
             return `<button class="kanban-lookback-option${active}" data-days="${opt.days}">${opt.label}</button>`;
         }).join('');
 
-        const rect = btn.getBoundingClientRect();
-        menu.style.position = 'fixed';
-        menu.style.left = rect.left + 'px';
-        menu.style.top = (rect.bottom + 4) + 'px';
-        menu.style.zIndex = '1000';
-
-        document.body.appendChild(menu);
-
-        const close = (e) => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', close);
-            }
-        };
-        document.addEventListener('click', close);
+        const { menu, close } = FloatingMenu.create({
+            className: 'kanban-lookback-menu',
+            anchor: btn,
+            content: html
+        });
 
         menu.querySelectorAll('.kanban-lookback-option').forEach(opt => {
             opt.addEventListener('click', (e) => {
@@ -1024,8 +1009,7 @@ const KanbanView = {
                 const days = parseInt(opt.dataset.days, 10);
                 KanbanView.doneLookbackDays = days;
                 KanbanView.saveDoneLookback(days);
-                menu.remove();
-                document.removeEventListener('click', close);
+                close();
                 App.render();
             });
         });
@@ -1035,94 +1019,38 @@ const KanbanView = {
      * Show a floating menu with unified due/start date picker.
      */
     showDateMenu(badgeOrBtn, card) {
-        const existing = document.querySelector('.kanban-date-menu');
-        if (existing) existing.remove();
-
-        // Read current badge values from the card
         const dueBadge = card.querySelector('.kanban-badge[data-type="due"]');
         const startBadge = card.querySelector('.kanban-badge[data-type="start"]');
         const dueValue = dueBadge ? (dueBadge.dataset.value || '') : '';
         const startValue = startBadge ? (startBadge.dataset.value || '') : '';
-        const hasStart = !!startValue;
 
-        const menu = document.createElement('div');
-        menu.className = 'kanban-date-menu';
-
-        // Due row
-        const dueLabel = document.createElement('label');
-        dueLabel.className = 'kanban-date-field';
-        dueLabel.innerHTML = '<span>Due</span>';
-        const dueInput = document.createElement('input');
-        dueInput.type = 'date';
-        dueInput.value = dueValue;
-        dueLabel.appendChild(dueInput);
-
-        // Start toggle
-        const startToggle = document.createElement('button');
-        startToggle.type = 'button';
-        startToggle.className = 'kanban-date-start-toggle';
-        startToggle.innerHTML = hasStart
-            ? '<span class="kanban-date-arrow expanded">▸</span> Start date'
-            : '<span class="kanban-date-arrow">▸</span> Start date';
-
-        // Start row
-        const startRow = document.createElement('div');
-        startRow.className = 'kanban-date-start-row' + (hasStart ? ' expanded' : '');
-        const startLabel = document.createElement('label');
-        startLabel.className = 'kanban-date-field';
-        startLabel.innerHTML = '<span>Start</span>';
-        const startInput = document.createElement('input');
-        startInput.type = 'date';
-        startInput.value = startValue;
-        startLabel.appendChild(startInput);
-        startRow.appendChild(startLabel);
-
-        startToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isExpanded = startRow.classList.toggle('expanded');
-            startToggle.querySelector('.kanban-date-arrow').classList.toggle('expanded', isExpanded);
-            if (isExpanded) startInput.focus();
+        const { dueInput, startInput, close } = DatePopover.create({
+            anchor: badgeOrBtn,
+            dueValue,
+            startValue,
+            cssClass: 'kanban-date-menu',
+            fieldClassNames: {
+                field: 'kanban-date-field',
+                label: '',
+                input: '',
+                toggle: 'kanban-date-start-toggle',
+                arrow: 'kanban-date-arrow',
+                startRow: 'kanban-date-start-row',
+            },
+            onApply: ({ due, start }) => {
+                KanbanView.updateTaskBadge(card, 'due', due || null);
+                KanbanView.updateTaskBadge(card, 'start', start || null);
+            }
         });
 
-        menu.appendChild(dueLabel);
-        menu.appendChild(startToggle);
-        menu.appendChild(startRow);
-
-        const rect = badgeOrBtn.getBoundingClientRect();
-        menu.style.position = 'fixed';
-        menu.style.left = rect.left + 'px';
-        menu.style.top = (rect.bottom + 4) + 'px';
-        menu.style.zIndex = '1000';
-
-        document.body.appendChild(menu);
-
-        const close = (e) => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', close);
-            }
-        };
-        document.addEventListener('click', close);
-
-        // Apply changes on any date input change
+        // Kanban applies immediately on change (no Save button)
         dueInput.addEventListener('change', () => {
-            if (dueInput.value) {
-                KanbanView.updateTaskBadge(card, 'due', dueInput.value);
-            } else {
-                KanbanView.updateTaskBadge(card, 'due', null);
-            }
-            menu.remove();
-            document.removeEventListener('click', close);
+            KanbanView.updateTaskBadge(card, 'due', dueInput.value || null);
+            close();
         });
-
         startInput.addEventListener('change', () => {
-            if (startInput.value) {
-                KanbanView.updateTaskBadge(card, 'start', startInput.value);
-            } else {
-                KanbanView.updateTaskBadge(card, 'start', null);
-            }
-            menu.remove();
-            document.removeEventListener('click', close);
+            KanbanView.updateTaskBadge(card, 'start', startInput.value || null);
+            close();
         });
     },
 
@@ -1130,9 +1058,6 @@ const KanbanView = {
      * Show a floating priority picker near the action button or badge.
      */
     showPriorityMenu(btn, card) {
-        const existing = document.querySelector('.kanban-priority-menu');
-        if (existing) existing.remove();
-
         const priorities = [
             { value: 'Urgent', color: '#ef4444' },
             { value: 'High', color: '#f97316' },
@@ -1140,36 +1065,22 @@ const KanbanView = {
             { value: 'Low', color: '#94a3b8' }
         ];
 
-        const menu = document.createElement('div');
-        menu.className = 'kanban-priority-menu';
-        menu.innerHTML = priorities.map(p =>
+        const html = priorities.map(p =>
             `<button class="kanban-priority-option" data-priority="${p.value}" style="color: ${p.color};">${p.value}</button>`
         ).join('') + `<button class="kanban-priority-option" data-priority="" style="color: var(--text-muted);">Clear</button>`;
 
-        const rect = btn.getBoundingClientRect();
-        menu.style.position = 'fixed';
-        menu.style.left = rect.left + 'px';
-        menu.style.top = (rect.bottom + 4) + 'px';
-        menu.style.zIndex = '1000';
-
-        document.body.appendChild(menu);
-
-        // Close on outside click
-        const close = (e) => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', close);
-            }
-        };
-        document.addEventListener('click', close);
+        const { menu, close } = FloatingMenu.create({
+            className: 'kanban-priority-menu',
+            anchor: btn,
+            content: html
+        });
 
         menu.querySelectorAll('.kanban-priority-option').forEach(opt => {
             opt.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const val = opt.dataset.priority;
                 KanbanView.updateTaskBadge(card, 'priority', val || null);
-                menu.remove();
-                document.removeEventListener('click', close);
+                close();
             });
         });
     }

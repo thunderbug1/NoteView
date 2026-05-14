@@ -570,10 +570,10 @@ const SyncManager = {
 
             // Build preview snippets (first 3 non-empty lines of each version)
             const localSnippet = f.localContent
-                ? f.localContent.split('\n').filter(l => l.trim()).slice(0, 3).map(l => escapeHtml(l)).join('<br>')
+                ? Common.contentPreview(f.localContent)
                 : '<em style="color:var(--text-muted)">deleted</em>';
             const remoteSnippet = f.remoteContent
-                ? f.remoteContent.split('\n').filter(l => l.trim()).slice(0, 3).map(l => escapeHtml(l)).join('<br>')
+                ? Common.contentPreview(f.remoteContent)
                 : '<em style="color:var(--text-muted)">deleted</em>';
 
             // Diff preview
@@ -719,7 +719,7 @@ const SyncManager = {
                 if (resultDiv && fileData) {
                     const chosenContent = choice === 'local' ? fileData.localContent : fileData.remoteContent;
                     if (chosenContent) {
-                        const preview = chosenContent.split('\n').filter(l => l.trim()).slice(0, 3).map(l => escapeHtml(l)).join('<br>');
+                        const preview = Common.contentPreview(chosenContent);
                         resultDiv.innerHTML = `<span style="font-size:0.75rem;color:var(--text-muted)">Will use:</span><br><span style="font-size:0.8rem;color:var(--text-primary);font-family:monospace">${preview}</span>`;
                     } else {
                         resultDiv.innerHTML = `<span style="font-size:0.8rem;color:var(--text-muted)"><em>File will be deleted</em></span>`;

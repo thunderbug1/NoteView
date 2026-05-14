@@ -138,281 +138,113 @@ const Store = {
         });
     },
 
-    // Save directory handle to IndexedDB
-    async saveDirectoryHandle(handle) {
+    // --- IndexedDB helpers ---
+    async _ensureDB() {
         if (!this.db) {
             await this.initDB();
-            if (!this.db) {
-                console.warn('Cannot save directory handle - DB not available');
-                return;
-            }
         }
-
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(this.STORE_NAME);
-                const request = store.put(handle, 'lastDirectory');
-
-                request.onsuccess = () => resolve();
-                request.onerror = () => {
-                    console.warn('Error saving directory handle:', request.error);
-                    reject(request.error);
-                };
-            } catch (e) {
-                console.warn('Exception in saveDirectoryHandle:', e);
-                reject(e);
-            }
-        });
+        return !!this.db;
     },
 
-    // Get directory handle from IndexedDB
-    async getDirectoryHandle() {
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) {
-                return null;
-            }
+    async _dbPut(storeName, key, value, { warnOnMissing = true } = {}) {
+        if (!await this._ensureDB()) {
+            if (warnOnMissing) console.warn(`Cannot save to ${storeName} - DB not available`);
+            return;
         }
-
         return new Promise((resolve, reject) => {
             try {
-                const transaction = this.db.transaction([this.STORE_NAME], 'readonly');
-                const store = transaction.objectStore(this.STORE_NAME);
-                const request = store.get('lastDirectory');
-
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => {
-                    console.warn('Error getting directory handle:', request.error);
-                    reject(request.error);
-                };
-            } catch (e) {
-                console.warn('Exception in getDirectoryHandle:', e);
-                reject(e);
-            }
-        });
-    },
-    // Save remote config to IndexedDB
-    async saveRemoteConfig(config) {
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) {
-                console.warn('Cannot save remote config - DB not available');
-                return;
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(this.STORE_NAME);
-                const key = this.directoryHandle ? `remoteConfig:${this.directoryHandle.name}` : 'remoteConfig';
-                const request = store.put(config, key);
-
-                request.onsuccess = () => resolve();
-                request.onerror = () => {
-                    console.warn('Error saving remote config:', request.error);
-                    reject(request.error);
-                };
-            } catch (e) {
-                console.warn('Exception in saveRemoteConfig:', e);
-                reject(e);
-            }
-        });
-    },
-
-    // Get remote config from IndexedDB
-    async getRemoteConfig() {
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) {
-                return null;
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = this.db.transaction([this.STORE_NAME], 'readonly');
-                const store = transaction.objectStore(this.STORE_NAME);
-                const key = this.directoryHandle ? `remoteConfig:${this.directoryHandle.name}` : 'remoteConfig';
-                const request = store.get(key);
-
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => {
-                    console.warn('Error getting remote config:', request.error);
-                    reject(request.error);
-                };
-            } catch (e) {
-                console.warn('Exception in getRemoteConfig:', e);
-                reject(e);
-            }
-        });
-    },
-
-    // Save shortcuts to IndexedDB
-    async saveShortcuts(shortcuts) {
-        this.shortcuts = shortcuts;
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) {
-                console.warn('Cannot save shortcuts - DB not available');
-                return;
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(this.STORE_NAME);
-                const request = store.put(shortcuts, 'shortcuts');
-
-                request.onsuccess = () => resolve();
-                request.onerror = () => {
-                    console.warn('Error saving shortcuts:', request.error);
-                    reject(request.error);
-                };
-            } catch (e) {
-                console.warn('Exception in saveShortcuts:', e);
-                reject(e);
-            }
-        });
-    },
-
-    // Get shortcuts from IndexedDB
-    async getShortcuts() {
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) {
-                return null;
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = this.db.transaction([this.STORE_NAME], 'readonly');
-                const store = transaction.objectStore(this.STORE_NAME);
-                const request = store.get('shortcuts');
-
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => {
-                    console.warn('Error getting shortcuts:', request.error);
-                    reject(request.error);
-                };
-            } catch (e) {
-                console.warn('Exception in getShortcuts:', e);
-                reject(e);
-            }
-        });
-    },
-
-    // Save undo/redo state to IndexedDB
-    async saveUndoRedoState(state) {
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) {
-                console.warn('Cannot save undo/redo state - DB not available');
-                return;
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            try {
-                // Check if the object store exists before trying to transact
-                if (!this.db.objectStoreNames.contains('undoRedoState')) {
-                    console.warn('undoRedoState object store not found. Skipping save.');
+                if (!this.db.objectStoreNames.contains(storeName)) {
+                    if (warnOnMissing) console.warn(`${storeName} object store not found. Skipping.`);
                     return resolve();
                 }
-                const transaction = this.db.transaction(['undoRedoState'], 'readwrite');
-                const store = transaction.objectStore('undoRedoState');
-                const request = store.put(state, state.sessionId);
-
+                const transaction = this.db.transaction([storeName], 'readwrite');
+                const store = transaction.objectStore(storeName);
+                const request = store.put(value, key);
                 request.onsuccess = () => resolve();
                 request.onerror = () => {
-                    console.warn('Error saving undo/redo state:', request.error);
+                    console.warn(`Error putting ${key} in ${storeName}:`, request.error);
                     reject(request.error);
                 };
                 transaction.onerror = () => {
-                    console.warn('Transaction error saving undo/redo state');
+                    console.warn(`Transaction error putting ${key} in ${storeName}`);
                     reject(transaction.error);
                 };
             } catch (e) {
-                // If object store doesn't exist yet, fail silently
-                console.warn('Exception in saveUndoRedoState:', e.name, e.message);
+                console.warn(`Exception in _dbPut(${storeName}, ${key}):`, e.name, e.message);
                 reject(e);
             }
         });
     },
 
-    // Get undo/redo state from IndexedDB
-    async getUndoRedoState(sessionId) {
-        if (!this.db) await this.initDB();
-        if (!this.db) return null; // If initDB failed, return null
-
-        return new Promise((resolve, reject) => {
+    async _dbGet(storeName, key, { silent = false } = {}) {
+        if (!await this._ensureDB()) return null;
+        return new Promise((resolve) => {
             try {
-                if (!this.db.objectStoreNames.contains('undoRedoState')) {
+                if (!this.db.objectStoreNames.contains(storeName)) {
                     return resolve(null);
                 }
-                const transaction = this.db.transaction(['undoRedoState'], 'readonly');
-                const store = transaction.objectStore('undoRedoState');
-                const request = store.get(sessionId);
-
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
+                const transaction = this.db.transaction([storeName], 'readonly');
+                const store = transaction.objectStore(storeName);
+                const request = store.get(key);
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => {
+                    if (!silent) console.warn(`Error getting ${key} from ${storeName}:`, request.error);
+                    resolve(null);
+                };
                 transaction.onerror = () => {
-                    console.warn('Transaction error reading undo/redo state');
+                    if (!silent) console.warn(`Transaction error getting ${key} from ${storeName}`);
                     resolve(null);
                 };
             } catch (e) {
-                // If object store doesn't exist yet (e.g., during DB upgrade), return null
-                console.warn('Exception in getUndoRedoState:', e.name, e.message);
+                if (!silent) console.warn(`Exception in _dbGet(${storeName}, ${key}):`, e.name, e.message);
                 resolve(null);
             }
         });
+    },
+
+    // --- IndexedDB-backed key/value methods ---
+
+    async saveDirectoryHandle(handle) {
+        return this._dbPut(this.STORE_NAME, 'lastDirectory', handle);
+    },
+
+    async getDirectoryHandle() {
+        return this._dbGet(this.STORE_NAME, 'lastDirectory');
+    },
+
+    async saveRemoteConfig(config) {
+        const key = this.directoryHandle ? `remoteConfig:${this.directoryHandle.name}` : 'remoteConfig';
+        return this._dbPut(this.STORE_NAME, key, config);
+    },
+
+    async getRemoteConfig() {
+        const key = this.directoryHandle ? `remoteConfig:${this.directoryHandle.name}` : 'remoteConfig';
+        return this._dbGet(this.STORE_NAME, key);
+    },
+
+    async saveShortcuts(shortcuts) {
+        this.shortcuts = shortcuts;
+        return this._dbPut(this.STORE_NAME, 'shortcuts', shortcuts);
+    },
+
+    async getShortcuts() {
+        return this._dbGet(this.STORE_NAME, 'shortcuts');
+    },
+
+    async saveUndoRedoState(state) {
+        return this._dbPut('undoRedoState', state.sessionId, state);
+    },
+
+    async getUndoRedoState(sessionId) {
+        return this._dbGet('undoRedoState', sessionId, { silent: true });
     },
 
     async saveChatHistory(vaultName, chats) {
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) return;
-        }
-        return new Promise((resolve, reject) => {
-            try {
-                if (!this.db.objectStoreNames.contains('chatHistory')) {
-                    return resolve();
-                }
-                const transaction = this.db.transaction(['chatHistory'], 'readwrite');
-                const store = transaction.objectStore('chatHistory');
-                const request = store.put(chats, `chatHistory::${vaultName}`);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-                transaction.onerror = () => reject(transaction.error);
-            } catch (e) {
-                console.warn('Exception in saveChatHistory:', e.name, e.message);
-                reject(e);
-            }
-        });
+        return this._dbPut('chatHistory', `chatHistory::${vaultName}`, chats);
     },
 
     async loadChatHistory(vaultName) {
-        if (!this.db) await this.initDB();
-        if (!this.db) return null;
-        return new Promise((resolve) => {
-            try {
-                if (!this.db.objectStoreNames.contains('chatHistory')) {
-                    return resolve(null);
-                }
-                const transaction = this.db.transaction(['chatHistory'], 'readonly');
-                const store = transaction.objectStore('chatHistory');
-                const request = store.get(`chatHistory::${vaultName}`);
-                request.onsuccess = () => resolve(request.result || null);
-                request.onerror = () => resolve(null);
-                transaction.onerror = () => resolve(null);
-            } catch (e) {
-                console.warn('Exception in loadChatHistory:', e.name, e.message);
-                resolve(null);
-            }
-        });
+        return this._dbGet('chatHistory', `chatHistory::${vaultName}`);
     },
 
     // Initialize file system access
@@ -942,6 +774,8 @@ const Store = {
         this.blocks.splice(index, 1);
         this.extractContacts();
         this._filteredBlocksCache.invalidate();
+        TimelineView.invalidateCache();
+        SelectionManager.updateTagCounts();
 
         // Commit deletion to git
         try {
@@ -1042,6 +876,9 @@ const Store = {
         // Let's stick to commit: true for creation to ensure it exists in git history.
         await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: extraMetadata.skipUndo });
         this.blocks.push(block);
+        this._filteredBlocksCache.invalidate();
+        TimelineView.invalidateCache();
+        SelectionManager.updateTagCounts();
         RecentAccessTracker.touch(block.id);
 
         // Record command AFTER creation — failure should not prevent the block from being returned
@@ -1062,140 +899,16 @@ const Store = {
 
     // Get filtered blocks based on current selections
     getFilteredBlocks() {
-        // Check cache
         const cached = this._filteredBlocksCache.get();
         if (cached !== null) {
             return cached;
         }
 
-        // Separate pinned blocks (always shown regardless of filters)
+        const opts = BlockFilter._currentOpts();
         const pinnedBlocks = this.blocks.filter(block => block.pinned);
         const unpinnedBlocks = this.blocks.filter(block => !block.pinned);
+        const filteredUnpinned = unpinnedBlocks.filter(block => BlockFilter.blockPasses(block, opts));
 
-        // Filter only unpinned blocks
-        const filteredUnpinned = unpinnedBlocks.filter(block => {
-            // Get active selections from App
-            const contextSelection = SelectionManager.selections.context;
-            const contactSelection = SelectionManager.selections.contact;
-
-            // Derive time selection from context
-            const timeTag = TimeFilter.deriveTimeSelectionFromContext(contextSelection);
-
-            // Time filter (if selected)
-            if (timeTag) {
-                const property = this.timeProperty || 'lastUpdated';
-                let dateVal = block[property];
-
-                // Handle task badge dates (due, start, completed)
-                if (property === 'due' || property === 'start' || property === 'completed') {
-                    const tasks = TaskParser.parseTasksFromBlock(block);
-                    const dates = tasks
-                        .map(t => { const v = TaskParser.getBadgeValue(t, property).trim(); return v ? new Date(v).getTime() : Number.NaN; })
-                        .filter(d => !Number.isNaN(d));
-                    if (dates.length === 0) return false;
-                    dateVal = new Date(Math.min(...dates));
-                }
-
-                if (!dateVal) return false;
-
-                if (!TimeFilter.checkTimeFilter(dateVal, timeTag)) {
-                    return false;
-                }
-            }
-
-            // Context filter (multi-select)
-            // - Individual tags: AND (block must have each)
-            // - Group paths (path:X): OR within group (block must have ANY tag with that group)
-            // - Between items: AND
-            if (contextSelection.size > 0) {
-                const blockTags = block.tags || [];
-
-                for (const item of contextSelection) {
-                    if (SelectionManager.isComputedContextTag(item)) continue;
-
-                    if (item.startsWith('path:')) {
-                        // Group selection: block must have ANY tag in this group
-                        const group = item.slice(5);
-                        const hasMatch = blockTags.some(tag => {
-                            const { segments } = Common.parseHierarchicalTag(tag);
-                            return segments.length > 0 && segments[0] === group;
-                        });
-                        if (!hasMatch) return false;
-                    } else {
-                        // Individual tag: block must have this specific tag
-                        if (!blockTags.includes(item)) return false;
-                    }
-                }
-
-                // Block-level computed: untagged
-                if (contextSelection.has('Status.untagged')) {
-                    if (block.tags && block.tags.length > 0) return false;
-                }
-
-                // Task-level computed: filter at line level, hide block only if all content would be hidden
-                const activeTaskComputed = TaskParser.getActiveTaskFilter();
-                if (activeTaskComputed.size > 0) {
-                    const lines = (block.content || '').split('\n');
-                    const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
-                    const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskComputed, excludeFilters);
-                    const hasVisibleContent = lines.some((line, i) => !hidden.has(i) && line.trim());
-                    if (!hasVisibleContent) return false;
-                }
-            }
-
-            // Excluded tags: block must NOT have any excluded tag
-            const excludedSelection = SelectionManager.selections.excluded;
-            if (excludedSelection.size > 0) {
-                const blockTags = block.tags || [];
-
-                for (const item of excludedSelection) {
-                    if (SelectionManager.isComputedContextTag(item)) {
-                        // Todo.* exclusions are handled at line level via getHiddenTaskLineIndices
-                        if (item.startsWith('Todo.')) continue;
-                        if (item === 'Status.untagged') {
-                            if (!block.tags || block.tags.length === 0) return false;
-                        }
-                    } else if (item.startsWith('path:')) {
-                        const group = item.slice(5);
-                        if (blockTags.some(tag => {
-                            const { segments } = Common.parseHierarchicalTag(tag);
-                            return segments.length > 0 && segments[0] === group;
-                        })) return false;
-                    } else {
-                        if (blockTags.includes(item)) return false;
-                    }
-                }
-
-                // Check emptiness after line-level exclusion of todo tags
-                const excludedTaskFilters = TaskParser.getActiveExcludedTaskFilter();
-                if (excludedTaskFilters.size > 0) {
-                    const lines = (block.content || '').split('\n');
-                    const activeTaskFilters = TaskParser.getActiveTaskFilter();
-                    const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskFilters, excludedTaskFilters);
-                    const hasVisibleContent = lines.some((line, i) => !hidden.has(i) && line.trim());
-                    if (!hasVisibleContent) return false;
-                }
-            }
-
-            // Contact filter
-            if (contactSelection) {
-                if (!ContactHelper.hasContact(block.content || '', contactSelection)) {
-                    return false;
-                }
-            }
-
-            // Search filter
-            if (this.searchQuery) {
-                const searchLower = this.searchQuery.toLowerCase();
-                const contentMatch = block.content?.toLowerCase().includes(searchLower);
-                const tagMatch = block.tags?.some(tag => tag.toLowerCase().includes(searchLower));
-                if (!contentMatch && !tagMatch) return false;
-            }
-
-            return true;
-        });
-
-        // Combine: pinned blocks first (unfiltered), then filtered unpinned blocks
         const result = [...pinnedBlocks, ...filteredUnpinned];
         this._filteredBlocksCache.set(result);
         return result;
@@ -1206,141 +919,8 @@ const Store = {
      * Returns an array of { type, label } objects. Empty if the block passes all filters.
      */
     getBlockingFilters(block) {
-        const reasons = [];
-        if (block.pinned) return reasons;
-
-        const contextSelection = SelectionManager.selections.context;
-        const excludedSelection = SelectionManager.selections.excluded;
-        const contactSelection = SelectionManager.selections.contact;
-        const searchQuery = this.searchQuery;
-
-        // Derive time selection from context
-        const timeTag = TimeFilter.deriveTimeSelectionFromContext(contextSelection);
-
-        // Time filter
-        if (timeTag) {
-            const property = this.timeProperty || 'lastUpdated';
-            let dateVal = block[property];
-
-            if (property === 'due' || property === 'start' || property === 'completed') {
-                const tasks = TaskParser.parseTasksFromBlock(block);
-                const dates = tasks
-                    .map(t => { const v = TaskParser.getBadgeValue(t, property).trim(); return v ? new Date(v).getTime() : Number.NaN; })
-                    .filter(d => !Number.isNaN(d));
-                if (dates.length > 0) {
-                    dateVal = new Date(Math.min(...dates));
-                }
-            }
-
-            if (!dateVal || !TimeFilter.checkTimeFilter(dateVal, timeTag)) {
-                reasons.push({ type: 'time', label: SelectionManager.getTagDisplayName(timeTag) });
-            }
-        }
-
-        // Context tags (AND logic)
-        if (contextSelection.size > 0) {
-            const blockTags = block.tags || [];
-
-            for (const item of contextSelection) {
-                if (SelectionManager.isComputedContextTag(item)) continue;
-
-                if (item.startsWith('path:')) {
-                    const group = item.slice(5);
-                    const hasMatch = blockTags.some(tag => {
-                        const { segments } = Common.parseHierarchicalTag(tag);
-                        return segments.length > 0 && segments[0] === group;
-                    });
-                    if (!hasMatch) {
-                        reasons.push({ type: 'context', label: group });
-                    }
-                } else {
-                    if (!blockTags.includes(item)) {
-                        reasons.push({ type: 'context', label: item });
-                    }
-                }
-            }
-
-            // Computed context tags (Todo.*) — use line-level hiding semantics
-            const activeTaskComputed = TaskParser.getActiveTaskFilter();
-            if (activeTaskComputed.size > 0) {
-                const lines = (block.content || '').split('\n');
-                const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
-                const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskComputed, excludeFilters);
-                const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
-                if (!hasVisibleContent) {
-                    for (const filter of activeTaskComputed) {
-                        reasons.push({ type: 'context', label: filter });
-                    }
-                }
-            }
-            if (contextSelection.has('Status.untagged')) {
-                if (block.tags && block.tags.length > 0) {
-                    reasons.push({ type: 'context', label: 'Status.untagged' });
-                }
-            }
-        }
-
-        // Excluded tags
-        if (excludedSelection.size > 0) {
-            const blockTags = block.tags || [];
-
-            for (const item of excludedSelection) {
-                if (SelectionManager.isComputedContextTag(item)) {
-                    // Todo.* exclusions are handled at line level
-                    if (item.startsWith('Todo.')) continue;
-                    if (item === 'Status.untagged') {
-                        if (!block.tags || block.tags.length === 0) {
-                            reasons.push({ type: 'excluded', label: 'Status.untagged' });
-                        }
-                    }
-                } else if (item.startsWith('path:')) {
-                    const group = item.slice(5);
-                    if (blockTags.some(tag => {
-                        const { segments } = Common.parseHierarchicalTag(tag);
-                        return segments.length > 0 && segments[0] === group;
-                    })) {
-                        reasons.push({ type: 'excluded', label: item });
-                    }
-                } else {
-                    if (blockTags.includes(item)) {
-                        reasons.push({ type: 'excluded', label: item });
-                    }
-                }
-            }
-
-            // Excluded Todo.* tags — check at line level
-            const excludedTaskFilters = TaskParser.getActiveExcludedTaskFilter();
-            if (excludedTaskFilters.size > 0) {
-                const lines = (block.content || '').split('\n');
-                const activeTaskFilters = TaskParser.getActiveTaskFilter();
-                const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskFilters, excludedTaskFilters);
-                const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
-                if (!hasVisibleContent) {
-                    for (const filter of excludedTaskFilters) {
-                        reasons.push({ type: 'excluded', label: filter });
-                    }
-                }
-            }
-        }
-
-        // Contact filter
-        if (contactSelection) {
-            if (!ContactHelper.hasContact(block.content || '', contactSelection)) {
-                reasons.push({ type: 'contact', label: '@' + contactSelection });
-            }
-        }
-
-        // Search filter
-        if (searchQuery) {
-            const searchLower = searchQuery.toLowerCase();
-            const contentMatch = block.content?.toLowerCase().includes(searchLower);
-            const tagMatch = block.tags?.some(tag => tag.toLowerCase().includes(searchLower));
-            if (!contentMatch && !tagMatch) {
-                reasons.push({ type: 'search', label: '"' + searchQuery + '"' });
-            }
-        }
-
-        return reasons;
+        if (block.pinned) return [];
+        return BlockFilter.getBlockingReasons(block, BlockFilter._currentOpts());
     },
 
     // Override saveBlock to invalidate cache
@@ -1407,6 +987,8 @@ const Store = {
 
             // Invalidate cache
             this._filteredBlocksCache.invalidate();
+            TimelineView.invalidateCache();
+            SelectionManager.updateTagCounts();
 
             // Record update command AFTER save (using the captured beforeState)
             if (isUpdate && beforeState) {

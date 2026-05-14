@@ -10,159 +10,43 @@
  */
 function showDatePopover(documentView, event, view, dueFrom, dueTo, dueValue, startFrom, startTo, startValue, fallbackPos) {
     event.stopPropagation();
-    document.querySelector('.date-popover')?.remove();
 
-    const popover = document.createElement('div');
-    popover.className = 'date-popover';
+    const anchor = event.target instanceof HTMLElement ? event.target : event.target.parentElement;
 
-    // --- Due date row ---
-    const dueLabel = document.createElement('label');
-    dueLabel.className = 'date-popover-field';
-    dueLabel.innerHTML = '<span class="date-popover-label">Due</span>';
-    const dueInput = document.createElement('input');
-    dueInput.type = 'date';
-    dueInput.value = (dueValue || '').trim();
-    dueInput.className = 'date-popover-input';
-    dueInput.addEventListener('mousedown', (e) => e.stopPropagation());
-    dueLabel.appendChild(dueInput);
-
-    // --- Start date toggle + row ---
-    const hasStart = !!startValue;
-    const startToggle = document.createElement('button');
-    startToggle.className = 'date-popover-start-toggle';
-    startToggle.type = 'button';
-    startToggle.innerHTML = hasStart
-        ? '<span class="date-popover-arrow expanded">▸</span> Start date'
-        : '<span class="date-popover-arrow">▸</span> Start date';
-
-    const startRow = document.createElement('div');
-    startRow.className = 'date-popover-start-row' + (hasStart ? ' expanded' : '');
-    const startLabel = document.createElement('label');
-    startLabel.className = 'date-popover-field';
-    startLabel.innerHTML = '<span class="date-popover-label date-popover-label-start">Start</span>';
-    const startInput = document.createElement('input');
-    startInput.type = 'date';
-    startInput.value = (startValue || '').trim();
-    startInput.className = 'date-popover-input';
-    startInput.addEventListener('mousedown', (e) => e.stopPropagation());
-    startLabel.appendChild(startInput);
-    startRow.appendChild(startLabel);
-
-    startToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isExpanded = startRow.classList.toggle('expanded');
-        startToggle.querySelector('.date-popover-arrow').classList.toggle('expanded', isExpanded);
-        if (isExpanded) startInput.focus();
-    });
-
-    // --- Buttons ---
-    const btnRow = document.createElement('div');
-    btnRow.className = 'date-popover-actions';
-
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Save';
-    saveBtn.className = 'date-popover-btn date-popover-save';
-    saveBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        applyChanges();
-        popover.remove();
-    });
-
-    const clearBtn = document.createElement('button');
-    clearBtn.textContent = 'Clear';
-    clearBtn.className = 'date-popover-btn date-popover-clear';
-    clearBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const changes = [];
-        // Remove due badge (and preceding space)
-        if (dueFrom != null) {
-            let delFrom = dueFrom;
-            if (delFrom > 0 && view.state.doc.sliceString(delFrom - 1, delFrom) === ' ') delFrom -= 1;
-            changes.push({ from: delFrom, to: dueTo, insert: '' });
-        }
-        // Remove start badge (and preceding space)
-        if (startFrom != null) {
-            let delFrom = startFrom;
-            if (delFrom > 0 && view.state.doc.sliceString(delFrom - 1, delFrom) === ' ') delFrom -= 1;
-            // Adjust if start badge comes before due (positions shifted)
-            if (changes.length > 0 && startFrom < dueFrom) {
-                // start badge is before due — the positions are relative to original text
+    DatePopover.create({
+        anchor,
+        dueValue: dueValue || '',
+        startValue: startValue || '',
+        cssClass: 'date-popover',
+        onApply: ({ due, start }) => {
+            const changes = [];
+            if (dueFrom != null) {
+                if (due) changes.push({ from: dueFrom, to: dueTo, insert: `[due:: ${due}]` });
             }
-            changes.push({ from: delFrom, to: startTo, insert: '' });
+            if (startFrom != null) {
+                if (start) changes.push({ from: startFrom, to: startTo, insert: `[start:: ${start}]` });
+            }
+            if (changes.length) view.dispatch({ changes });
+
+            const refPos = dueFrom != null ? dueFrom : (startFrom != null ? startFrom : (fallbackPos || 0));
+            if (due && dueFrom == null) documentView.appendInlineField(view, refPos, refPos, 'due', due);
+            if (start && startFrom == null) documentView.appendInlineField(view, refPos, refPos, 'start', start);
+        },
+        onClear: () => {
+            const changes = [];
+            if (dueFrom != null) {
+                let delFrom = dueFrom;
+                if (delFrom > 0 && view.state.doc.sliceString(delFrom - 1, delFrom) === ' ') delFrom -= 1;
+                changes.push({ from: delFrom, to: dueTo, insert: '' });
+            }
+            if (startFrom != null) {
+                let delFrom = startFrom;
+                if (delFrom > 0 && view.state.doc.sliceString(delFrom - 1, delFrom) === ' ') delFrom -= 1;
+                changes.push({ from: delFrom, to: startTo, insert: '' });
+            }
+            if (changes.length) view.dispatch({ changes });
         }
-        if (changes.length) view.dispatch({ changes });
-        popover.remove();
     });
-
-    btnRow.appendChild(saveBtn);
-    btnRow.appendChild(clearBtn);
-
-    popover.appendChild(dueLabel);
-    popover.appendChild(startToggle);
-    popover.appendChild(startRow);
-    popover.appendChild(btnRow);
-    document.body.appendChild(popover);
-
-    // Position near the click/tap
-    const target = event.target instanceof HTMLElement ? event.target : event.target.parentElement;
-    const rect = target.getBoundingClientRect();
-    const popW = 240;
-    let left = rect.left + rect.width / 2 - popW / 2;
-    let top = rect.bottom + 6;
-    left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
-    if (top + 200 > window.innerHeight) top = rect.top - 200;
-    popover.style.left = left + 'px';
-    popover.style.top = top + 'px';
-
-    function applyChanges() {
-        const changes = [];
-
-        // Update or skip due
-        if (dueFrom != null) {
-            if (dueInput.value) {
-                changes.push({ from: dueFrom, to: dueTo, insert: `[due:: ${dueInput.value}]` });
-            }
-            // If due cleared while existing, remove it
-        } else if (dueInput.value) {
-            // No existing due badge — will append below
-        }
-
-        // Update or skip start
-        if (startFrom != null) {
-            if (startInput.value) {
-                changes.push({ from: startFrom, to: startTo, insert: `[start:: ${startInput.value}]` });
-            }
-        } else if (startInput.value) {
-            // No existing start badge — will append below
-        }
-
-        // Apply inline changes first
-        if (changes.length) view.dispatch({ changes });
-
-        // Append new badges that don't have an existing position
-        // Use the reference position (dueFrom or this.from) for line lookup
-        const refPos = dueFrom != null ? dueFrom : (startFrom != null ? startFrom : (fallbackPos || 0));
-        if (dueInput.value && dueFrom == null) {
-            documentView.appendInlineField(view, refPos, refPos, 'due', dueInput.value);
-        }
-        if (startInput.value && startFrom == null) {
-            documentView.appendInlineField(view, refPos, refPos, 'start', startInput.value);
-        }
-    }
-
-    // Close on outside click/tap
-    const closeOnOutside = (e) => {
-        if (!popover.contains(e.target)) {
-            popover.remove();
-            document.removeEventListener('mousedown', closeOnOutside);
-            document.removeEventListener('touchstart', closeOnOutside);
-        }
-    };
-    document.addEventListener('mousedown', closeOnOutside);
-    document.addEventListener('touchstart', closeOnOutside, { passive: true });
-
-    // Auto-focus the due input
-    dueInput.focus();
 }
 
 /**

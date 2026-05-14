@@ -279,9 +279,14 @@ function showToast(message, { action, actionLabel, duration } = {}) {
     }, timeout);
 }
 
+function contentPreview(text, maxLines = 3) {
+    return text.split('\n').filter(l => l.trim()).slice(0, maxLines).map(l => escapeHtml(l)).join('<br>');
+}
+
 // Export for use in other modules
 window.Common = {
     escapeHtml,
+    sanitizeHtml,
     formatDate,
     truncateText,
     capitalizeFirst,
@@ -292,5 +297,6 @@ window.Common = {
     formatTagDisplay,
     buildTagTree,
     buildMultiLevelTagTree,
-    showToast
+    showToast,
+    contentPreview
 };

@@ -547,7 +547,7 @@ const TagModal = {
             }
 
             const parentContainer = group.querySelector('.tag-modal-group-items');
-            newItem.innerHTML = `<span class="tag-badge">${Common.capitalizeFirst(leaf)}</span>`;
+            newItem.innerHTML = `<span class="tag-badge">${escapeHtml(Common.capitalizeFirst(leaf))}</span>`;
 
             const existingItems = Array.from(parentContainer.querySelectorAll(':scope > .tag-modal-item'));
             let inserted = false;
@@ -562,7 +562,7 @@ const TagModal = {
                 parentContainer.appendChild(newItem);
             }
         } else {
-            newItem.innerHTML = `<span class="tag-badge">${SelectionManager.getTagDisplayName(tag)}</span>`;
+            newItem.innerHTML = `<span class="tag-badge">${escapeHtml(SelectionManager.getTagDisplayName(tag))}</span>`;
             newItem.classList.add('tag-modal-flat-item');
             const flatItems = Array.from(list.querySelectorAll(':scope > .tag-modal-flat-item'));
             let inserted = false;
@@ -645,7 +645,7 @@ const TagModal = {
 
             item.dataset.tag = newTag;
             const { leaf } = Common.parseHierarchicalTag(newTag);
-            item.innerHTML = `<span class="tag-badge">${Common.capitalizeFirst(leaf)}</span>`;
+            item.innerHTML = `<span class="tag-badge">${escapeHtml(Common.capitalizeFirst(leaf))}</span>`;
 
             if (updateItemVisuals) updateItemVisuals();
 

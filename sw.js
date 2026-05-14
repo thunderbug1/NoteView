@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v35';
+const CACHE_NAME = 'noteview-v36';
 
 const PRECACHE_URLS = [
   './',
@@ -38,9 +38,14 @@ const PRECACHE_URLS = [
   './js/modals/tagModal.js',
   './js/modals/assigneeModal.js',
   './js/modals/vaultModal.js',
+  './js/modals/newNoteModal.js',
   './js/utils/cacheManager.js',
   './js/utils/recentAccessTracker.js',
   './js/utils/common.js',
+  './js/utils/blockFilter.js',
+  './js/utils/datePopover.js',
+  './js/utils/editorTheme.js',
+  './js/utils/floatingMenu.js',
   './js/utils/contactHelper.js',
   './js/utils/modal.js',
   './js/utils/taskParser.js',
