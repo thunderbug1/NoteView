@@ -285,6 +285,12 @@ const SyncManager = {
     async _handleMergeConflict() {
         this._setStatus('conflict', 'Analyzing conflicts...');
 
+        // Flush any pending saves to disk before resetting the working tree.
+        // This prevents data loss if auto-save hasn't fired yet.
+        if (window.Store && Store._saveQueue) {
+            await Promise.all(Array.from(Store._saveQueue.values()));
+        }
+
         // The failed pull may have left the index/working tree in a dirty merged state.
         // Reset to local HEAD so we can analyze cleanly.
         try {

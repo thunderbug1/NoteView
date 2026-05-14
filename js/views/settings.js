@@ -834,7 +834,7 @@ const SettingsView = {
         const otherVaults = vaultList.filter(v => v.name !== currentVaultName);
 
         if (otherVaults.length === 0) {
-            showToast('No other vaults available');
+            Common.showToast('No other vaults available');
             return;
         }
 
@@ -868,7 +868,7 @@ const SettingsView = {
     async _confirmImport(vaultName) {
         const data = await AIAssistant.importFromVault(vaultName);
         if (!data) {
-            showToast('No AI settings found in that vault');
+            Common.showToast('No AI settings found in that vault');
             return;
         }
 
@@ -909,7 +909,7 @@ const SettingsView = {
             await AIAssistant.applyImport(data);
             modal.close();
             this.render();
-            showToast('AI settings imported successfully');
+            Common.showToast('AI settings imported successfully');
         });
     },
 

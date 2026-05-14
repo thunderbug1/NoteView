@@ -968,10 +968,13 @@ const KanbanView = {
 
         if (value === null) {
             newText = newText.replace(fieldRegex, '');
-        } else if (fieldRegex.test(newText)) {
-            newText = newText.replace(new RegExp(`\\[${fieldName}::\\s*[^\\]]+\\]`), `[${fieldName}:: ${value}]`);
         } else {
-            newText += ` [${fieldName}:: ${value}]`;
+            const replaced = newText.replace(new RegExp(`\\[${fieldName}::\\s*[^\\]]+\\]`), `[${fieldName}:: ${value}]`);
+            if (replaced !== newText) {
+                newText = replaced;
+            } else {
+                newText += ` [${fieldName}:: ${value}]`;
+            }
         }
 
         const content = block.content;

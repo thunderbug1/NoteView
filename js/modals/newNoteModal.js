@@ -605,7 +605,7 @@ const NewNoteModal = {
                 const editor = DocumentView.editors.get(createdBlockId || modalBlockId);
                 const currentContent = editor ? editor.state.doc.toString() : '';
                 if (!createdBlockId && currentContent.trim()) {
-                    await Store.createBlock(currentContent.trim());
+                    await Store.createBlock(currentContent.trim(), { tags: modalTags });
                 }
                 modal.close();
 

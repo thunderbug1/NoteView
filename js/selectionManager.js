@@ -42,9 +42,9 @@ const SelectionManager = {
             existingContext: Array.from(this.selections.context)
         });
         this.loadSelectionState();
+        this.initHistory();
         this.normalizeContextSelection();
         this.updateSelectionUI();
-        this.initHistory();
         this.initClearContextBtn();
         this.initContextNavBtns();
         this.initTimePropertySelect();
@@ -948,7 +948,7 @@ const SelectionManager = {
             const groupClasses = ['tag-group-hierarchy', expandedClass];
             if (groupSelected) groupClasses.push('group-selected');
 
-            html += `<div class="${groupClasses.join(' ')}" data-group-path="${groupName}">`;
+            html += `<div class="${groupClasses.join(' ')}" data-group-path="${escapeHtml(groupName)}">`;
             html += `<div class="tag-group-parent">`;
             html += `<span class="tag-group-toggle">&#9654;</span>`;
             html += `<span class="tag-group-name">${Common.capitalizeFirst(groupName)}</span>`;

@@ -766,20 +766,20 @@ const Store = {
             });
         }
 
-        // Remove from memory only after file deletion attempt
-        this.blocks.splice(index, 1);
-        this.extractContacts();
-        this._filteredBlocksCache.invalidate();
-        TimelineView.invalidateCache();
-        SelectionManager.updateTagCounts();
-
-        // Commit deletion to git
+        // Commit deletion to git before mutating in-memory state
         try {
             await GitStore.commitDeletion(fileName, `Delete ${fileName}`);
             if (window.SyncManager) SyncManager.onCommit();
         } catch (e) {
             console.error('Failed to commit deletion to git:', e);
         }
+
+        // Remove from memory only after file and git operations succeed
+        this.blocks.splice(index, 1);
+        this.extractContacts();
+        this._filteredBlocksCache.invalidate();
+        TimelineView.invalidateCache();
+        SelectionManager.updateTagCounts();
     },
 
     // Copy a block's .md file to a different vault
@@ -930,14 +930,13 @@ const Store = {
     async saveBlock(block, options = {}) {
         const { commit = false, commitMessage = null, skipUndo = false, ...updates } = options;
 
-        // Serialize concurrent saves for the same block
+        // Serialize concurrent saves for the same block via promise chain
         const saveKey = block.id;
         if (!this._saveQueue) this._saveQueue = new Map();
-        while (this._saveQueue.has(saveKey)) {
-            await this._saveQueue.get(saveKey);
-        }
-        let resolveSave;
-        this._saveQueue.set(saveKey, new Promise(r => { resolveSave = r; }));
+        const prev = this._saveQueue.get(saveKey) || Promise.resolve();
+        let resolveSave = () => {};
+        const next = prev.then(() => new Promise(r => { resolveSave = r; }));
+        this._saveQueue.set(saveKey, next);
 
         try {
             // Capture state before save for undo/redo
@@ -1016,8 +1015,10 @@ const Store = {
                 if (window.SyncManager) SyncManager.onCommit();
             }
         } finally {
-            this._saveQueue.delete(saveKey);
             resolveSave();
+            if (this._saveQueue.get(saveKey) === next) {
+                this._saveQueue.delete(saveKey);
+            }
         }
     },
 

@@ -285,7 +285,7 @@ const DocumentView = {
             const existingView = container._cmView;
             if (existingView) { try { existingView.destroy(); } catch { /* */ } }
 
-            new EditorView({
+            container._cmView = new EditorView({
                 doc: modified,
                 extensions: [
                     basicSetup,

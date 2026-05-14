@@ -156,6 +156,11 @@ const UndoRedoManager = {
             await this.saveState();
             this.updateUI();
             App.render();
+        } catch (e) {
+            // Redo failed — push command back onto redo stack so it's not lost
+            this.redoStack.push(command);
+            await this.saveState();
+            console.error('UndoRedoManager: Redo failed, command restored to redo stack:', e);
         } finally {
             this.isExecuting = false;
         }
