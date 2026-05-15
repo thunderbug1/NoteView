@@ -76,7 +76,7 @@ window.DatePopover = {
         startToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             const isExpanded = startRow.classList.toggle('expanded');
-            startToggle.querySelector(`.${arrowCls.split(' ')[0]}`).classList.toggle('expanded', isExpanded);
+            startToggle.querySelector(`.${arrowCls.split(' ')[0]}`)?.classList.toggle('expanded', isExpanded);
             if (isExpanded) startInput.focus();
         });
 

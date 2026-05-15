@@ -292,7 +292,6 @@ const UndoRedoManager = {
         if (block && command.before) {
             // Revert only the fields that changed
             Object.assign(block, command.before);
-            block.lastUpdated = new Date().toISOString();
 
             // Save to disk
             await Store.saveBlock(block, { commit: true, commitMessage: `Undo: revert ${block.id}` });
@@ -311,7 +310,6 @@ const UndoRedoManager = {
         if (block && command.after) {
             // Apply after state
             Object.assign(block, command.after);
-            block.lastUpdated = new Date().toISOString();
 
             // Save to disk
             await Store.saveBlock(block, { commit: true, commitMessage: `Redo: re-apply ${block.id}` });

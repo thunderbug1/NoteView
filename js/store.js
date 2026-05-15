@@ -760,7 +760,7 @@ const Store = {
             this._saveQueue.delete(id);
         }
 
-        const blockData = { ...block };
+        const blockData = JSON.parse(JSON.stringify(block));
 
         const fileName = block.filename || `${block.id}.md`;
 
@@ -1109,7 +1109,7 @@ const Store = {
                     const content = await file.text();
                     const parsed = parseFrontMatter(content);
                     this.blocks.push({
-                        id: entry.name.replace('.md', ''),
+                        id: entry.name.endsWith('.md') ? entry.name.slice(0, -3) : entry.name,
                         filename: entry.name,
                         fileHandle: entry,
                         ...parsed

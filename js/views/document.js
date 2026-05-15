@@ -3897,6 +3897,7 @@ const DocumentView = {
                 if (failedIndicator) {
                     failedIndicator.textContent = 'Save failed';
                     failedIndicator.classList.remove('saving');
+                    failedIndicator.classList.remove('saved');
                 }
                 Common.showToast('Save failed: ' + (err.message || 'Unknown error'));
                 return;

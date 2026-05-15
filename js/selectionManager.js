@@ -893,7 +893,7 @@ const SelectionManager = {
             if (toggleEl) {
                 toggleEl.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    parentEl.closest('.tag-group-hierarchy').classList.toggle('expanded');
+                    parentEl.closest('.tag-group-hierarchy')?.classList.toggle('expanded');
                 });
             }
         });
@@ -1083,7 +1083,7 @@ const SelectionManager = {
             if (toggleEl) {
                 toggleEl.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    parentEl.closest('.tag-group-hierarchy').classList.toggle('expanded');
+                    parentEl.closest('.tag-group-hierarchy')?.classList.toggle('expanded');
                 });
             }
 
