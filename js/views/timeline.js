@@ -349,6 +349,16 @@ const TimelineView = {
      * Uses diff-based file discovery and supports incremental rebuilds.
      */
     async buildTimeline() {
+        if (this._buildPromise) return this._buildPromise;
+        this._buildPromise = this._buildTimelineInternal();
+        try {
+            return await this._buildPromise;
+        } finally {
+            this._buildPromise = null;
+        }
+    },
+
+    async _buildTimelineInternal() {
         const commits = await GitStore.getFullHistory(100);
         if (commits.length === 0) return [];
 

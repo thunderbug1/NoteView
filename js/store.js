@@ -1005,6 +1005,7 @@ const Store = {
                 await writable.write(content);
                 await writable.close();
             } catch (writeError) {
+                if (writable) { try { await writable.abort(); } catch { /* ignore */ } }
                 // Roll back in-memory changes on write failure
                 if (beforeState) {
                     Object.keys(block).forEach(key => delete block[key]);

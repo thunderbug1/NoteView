@@ -176,7 +176,10 @@ const SyncManager = {
                 this._syncing = false;
             }
         };
-        doPush();
+        doPush().catch(err => {
+            console.error('[SyncManager] unexpected push error:', err);
+            this._syncing = false;
+        });
     },
 
     // --- Scheduling ---

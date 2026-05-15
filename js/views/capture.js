@@ -4,6 +4,8 @@ const CaptureView = {
     _recognition: null,
     _isStopping: false,
     _recognitionSession: 0,
+    _restartCount: 0,
+    _maxRestarts: 10,
     _transcript: '',
     _interimTranscript: '',
     _currentTags: [],
@@ -289,6 +291,7 @@ const CaptureView = {
 
         const startRecording = () => {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            this._restartCount = 0;
             this._recognition = new SpeechRecognition();
             this._recognition.continuous = true;
             this._recognition.interimResults = true;
@@ -337,7 +340,8 @@ const CaptureView = {
 
             this._recognition.onend = () => {
                 if (this._recognitionSession !== sessionId) return;
-                if (!this._isStopping) {
+                if (!this._isStopping && this._restartCount < this._maxRestarts) {
+                    this._restartCount++;
                     try {
                         this._insertedTranscript = '';
                         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;

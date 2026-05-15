@@ -612,6 +612,8 @@ const TagModal = {
         item.style.pointerEvents = 'auto';
 
         const doSave = async () => {
+            if (item.dataset.renameSaving === 'true') return;
+            item.dataset.renameSaving = 'true';
             const newTag = renameInput.value.trim().toLowerCase();
             if (!newTag || newTag === oldTag) {
                 item.innerHTML = originalHtml;
@@ -621,11 +623,18 @@ const TagModal = {
             const existingTags = SelectionManager.getAllContextTags();
             if (existingTags.includes(newTag) && newTag !== oldTag) {
                 alert(`Tag "${newTag}" already exists.`);
+                item.dataset.renameSaving = '';
                 renameInput.focus();
                 return;
             }
 
-            await Store.renameTag(oldTag, newTag);
+            try {
+                await Store.renameTag(oldTag, newTag);
+            } catch (e) {
+                console.error('Tag rename failed:', e);
+                item.dataset.renameSaving = '';
+                return;
+            }
 
             // Carry archive status to new tag name
             if (SelectionManager._archivedTags.has(oldTag)) {
@@ -670,6 +679,7 @@ const TagModal = {
         });
 
         renameInput.addEventListener('blur', () => {
+            if (item.dataset.renameSaving === 'true') return;
             if (item.querySelector('.tag-rename-input')) {
                 doCancel();
             }

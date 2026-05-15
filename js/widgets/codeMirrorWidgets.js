@@ -244,7 +244,10 @@ function createCodeMirrorWidgets(documentView) {
                 view.dispatch({ selection: { anchor: this.from, head: this.to } });
                 view.focus();
             };
-            wrap.onmousedown = handleBadgeClick;
+            wrap.onmousedown = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+            };
             wrap.onclick = handleBadgeClick;
             wrap.ontouchend = (e) => {
                 e.preventDefault();
@@ -287,13 +290,16 @@ function createCodeMirrorWidgets(documentView) {
         toDOM(view) {
             const a = document.createElement("a");
             a.className = "md-link-text";
-            a.href = this.url;
+            const url = this.url;
+            const isSafe = /^https?:\/\//i.test(url) || url.startsWith('#') || url.startsWith('mailto:');
+            a.href = isSafe ? url : '';
             a.textContent = this.getDisplayText();
-            a.title = this.url;
+            a.title = isSafe ? url : '';
             a.target = "_blank";
             a.rel = "noopener noreferrer";
             a.onclick = (e) => {
                 e.stopPropagation();
+                if (!isSafe) e.preventDefault();
             };
             a.onmousedown = (e) => {
                 // Allow the link to open normally, prevent CodeMirror from stealing focus
@@ -392,7 +398,7 @@ function createCodeMirrorWidgets(documentView) {
                     const svg = btn.innerHTML;
                     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
                     setTimeout(() => { btn.innerHTML = svg; }, 1500);
-                });
+                }).catch(() => {});
             });
 
             return wrap;
@@ -720,7 +726,9 @@ function createCodeMirrorWidgets(documentView) {
             wrap.onclick = (e) => {
                 e.stopPropagation();
                 if (e.target.closest('.md-media-play-btn') || e.target === thumb) {
-                    window.open(this.url, '_blank', 'noopener');
+                    if (/^https?:\/\//i.test(this.url)) {
+                        window.open(this.url, '_blank', 'noopener');
+                    }
                 } else {
                     view.dispatch({ selection: { anchor: this.from }, scrollIntoView: true });
                     view.focus();
@@ -813,6 +821,25 @@ function createCodeMirrorWidgets(documentView) {
                         e.stopPropagation();
                         window.open(item.url, '_blank', 'noopener');
                     };
+                } else if (item.type === 'shadertoy') {
+                    const thumbWrap = document.createElement('div');
+                    thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-link';
+
+                    const icon = document.createElement('div');
+                    icon.className = 'md-gallery-card-shader-icon';
+                    icon.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/><path d="M12 2a7 7 0 0 1 0 14"/><path d="M12 2a4 4 0 0 1 0 8"/></svg>';
+
+                    const label = document.createElement('span');
+                    label.className = 'md-gallery-card-label md-gallery-card-label-inline';
+                    label.textContent = 'Shadertoy';
+
+                    thumbWrap.append(icon, label);
+                    card.appendChild(thumbWrap);
+
+                    thumbWrap.onclick = (e) => {
+                        e.stopPropagation();
+                        window.open(item.url, '_blank', 'noopener');
+                    };
                 } else if (item.type === 'image') {
                     const thumbWrap = document.createElement('div');
                     thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-image';
@@ -854,7 +881,7 @@ function createCodeMirrorWidgets(documentView) {
                     const imageNote = item.notes && item.notes.find(n => n.type === 'image');
 
                     if (imageNote) {
-                        thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-link md-gallery-card-thumb-link-image';
+                        thumbWrap.className = 'md-gallery-card-thumb md-gallery-card-thumb-link-image';
                         const img = document.createElement('img');
                         img.src = imageNote.url;
                         img.alt = imageNote.alt || '';

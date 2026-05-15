@@ -438,12 +438,20 @@ const AIAssistant = {
         const container = document.getElementById('aiChatActive');
         if (!container) return;
 
-        // Destroy any existing diff editor before DOM replacement
+        // Destroy any existing diff editors before DOM replacement
         const chat = this.getActiveChat();
         if (chat?.diffEditorView) {
             try { chat.diffEditorView.destroy(); } catch { /* cleanup */ }
             chat.diffEditorView = null;
         }
+        // Also destroy per-container diff editors from diff cards
+        const oldDiffContainers = container.querySelectorAll('[data-diff-viewer]');
+        oldDiffContainers.forEach(el => {
+            if (el._diffEditorView) {
+                try { el._diffEditorView.destroy(); } catch { /* cleanup */ }
+                el._diffEditorView = null;
+            }
+        });
         if (!chat) {
             container.innerHTML = '<div class="ai-empty-state"><p>No active chat</p></div>';
             return;
@@ -1444,7 +1452,7 @@ const AIAssistant = {
             abortController: null,
             diffEditorView: null,
             streamingResponse: '',
-            state: chat.state || 'idle'
+            state: (chat.state && chat.state !== 'streaming') ? chat.state : 'idle'
         }));
     },
 
@@ -1539,6 +1547,8 @@ const AIAssistant = {
                 });
                 break;
             }
+
+            chat._abortRequested = false;
 
             const blockId = contextIds[i];
             const block = Store.blocks.find(b => b.id === blockId);

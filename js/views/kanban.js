@@ -520,7 +520,7 @@ const KanbanView = {
                             btn.innerHTML = origSvg;
                             btn.style.color = '';
                         }, 1500);
-                    });
+                    }).catch(() => {});
                 }
 
                 if (action === 'delete') {

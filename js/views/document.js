@@ -1053,6 +1053,23 @@ const DocumentView = {
         }
         document.addEventListener('mousemove', this._dragMoveHandler);
         document.addEventListener('mouseup', this._dragEndHandler);
+        // Safety cleanup if mouseup never fires (e.g. window loses focus)
+        if (!this._dragBlurHandler) {
+            this._dragBlurHandler = () => {
+                if (this._dragState?.active !== undefined) {
+                    document.removeEventListener('mousemove', this._dragMoveHandler);
+                    document.removeEventListener('mouseup', this._dragEndHandler);
+                    this._dragState = { active: false };
+                    document.querySelectorAll('.wikilink-drop-target,.dragging-source').forEach(el => {
+                        el.classList.remove('wikilink-drop-target', 'dragging-source');
+                    });
+                    document.body.classList.remove('is-dragging-wikilink');
+                    const indicator = document.querySelector('.wikilink-drop-indicator');
+                    if (indicator) indicator.remove();
+                }
+            };
+            document.addEventListener('visibilitychange', this._dragBlurHandler);
+        }
     },
 
     _handleDragMove(e) {
@@ -1105,6 +1122,10 @@ const DocumentView = {
     _handleDragEnd(e) {
         document.removeEventListener('mousemove', this._dragMoveHandler);
         document.removeEventListener('mouseup', this._dragEndHandler);
+        if (this._dragBlurHandler) {
+            document.removeEventListener('visibilitychange', this._dragBlurHandler);
+            this._dragBlurHandler = null;
+        }
 
         const ds = this._dragState;
         if (!ds.active) {
@@ -2234,6 +2255,7 @@ const DocumentView = {
         const youtubePattern = /https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]+)/i;
         const vimeoPattern = /https?:\/\/(www\.)?vimeo\.com\/(\d+)/i;
         const steamPattern = /https?:\/\/store\.steampowered\.com\/app\/(\d+)/i;
+        const shadertoyPattern = /https?:\/\/(?:www\.)?shadertoy\.com\/view\/([\w-]+)/i;
         const videoFilePattern = /https?:\/\/\S+\.(mp4|webm|ogg|mov)(\?\S*)?(?=\s|$)/i;
         const imageMdPattern = /!\[([^\]]*)\]\(([^)]+)\)/;
 
@@ -2281,6 +2303,15 @@ const DocumentView = {
             if (match) {
                 url = match[0];
                 type = 'steam';
+                videoId = match[1];
+            }
+        }
+
+        if (!match) {
+            match = trimmed.match(shadertoyPattern);
+            if (match) {
+                url = match[0];
+                type = 'shadertoy';
                 videoId = match[1];
             }
         }
@@ -2388,14 +2419,26 @@ const DocumentView = {
         for (let i = 0; i < lines.length; i++) {
             if (skipSet.has(i)) { flushGroup(i - 1); continue; }
 
-            const item = this.parseMediaItem(lines[i]);
+            const lineText = lines[i];
+            const isIndented = lineText.length > 0 && (lineText[0] === ' ' || lineText[0] === '\t');
+
+            if (isIndented && currentItems.length > 0) {
+                const note = this.parseNoteLine(lineText);
+                if (note) {
+                    note.from = lineOffsets[i];
+                    currentItems[currentItems.length - 1].notes.push(note);
+                    continue;
+                }
+            }
+
+            const item = this.parseMediaItem(lineText);
             if (item) {
                 if (currentItems.length === 0) currentStartIdx = i;
                 item.from = lineOffsets[i];
                 item.notes = [];
                 currentItems.push(item);
             } else {
-                const note = this.parseNoteLine(lines[i]);
+                const note = this.parseNoteLine(lineText);
                 if (note && currentItems.length > 0) {
                     note.from = lineOffsets[i];
                     currentItems[currentItems.length - 1].notes.push(note);
