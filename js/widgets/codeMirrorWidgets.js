@@ -86,7 +86,7 @@ function createCodeMirrorWidgets(documentView) {
                 e.preventDefault();
                 e.stopPropagation();
                 this._touchHandled = true;
-                const newState = (this.state === 'x' || this.state === 'X') ? ' ' : 'x';
+                const newState = this.state === ' ' ? 'x' : ' ';
                 view.dispatch({
                     changes: { from: this.from, to: this.to, insert: `[${newState}]` },
                     scrollIntoView: false
@@ -105,7 +105,7 @@ function createCodeMirrorWidgets(documentView) {
                 }
                 e.preventDefault();
                 e.stopPropagation();
-                const newState = (this.state === 'x' || this.state === 'X') ? ' ' : 'x';
+                const newState = this.state === ' ' ? 'x' : ' ';
                 view.dispatch({
                     changes: { from: this.from, to: this.to, insert: `[${newState}]` },
                     scrollIntoView: false

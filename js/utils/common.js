@@ -34,7 +34,7 @@ function sanitizeHtml(html) {
             const val = attr.value.trim().toLowerCase();
             if (name.startsWith('on') ||
                 val.startsWith('javascript:') ||
-                val.startsWith('data:') ||
+                (val.startsWith('data:') && !val.startsWith('data:image/')) ||
                 val.startsWith('vbscript:') ||
                 name === 'style') {
                 el.removeAttribute(attr.name);

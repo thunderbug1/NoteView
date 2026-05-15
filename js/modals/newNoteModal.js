@@ -92,6 +92,7 @@ const NewNoteModal = {
         this._setAIButtonState(btn, 'recording');
 
         this._aiDictationActive = true;
+        this._isStoppingAIDictation = false;
         this._aiTranscript = '';
         this._aiDictationBlockId = modalBlockId;
 

@@ -290,6 +290,12 @@ const UndoRedoManager = {
         const block = Store.blocks.find(b => b.id === command.blockId);
         if (block && command.before) {
             // Revert only the fields that changed
+            // First, remove any properties that exist in 'after' but not in 'before'
+            for (const key of Object.keys(command.after || {})) {
+                if (!(key in command.before)) {
+                    delete block[key];
+                }
+            }
             Object.assign(block, command.before);
 
             // Save to disk
@@ -307,7 +313,12 @@ const UndoRedoManager = {
     async redoUpdate(command) {
         const block = Store.blocks.find(b => b.id === command.blockId);
         if (block && command.after) {
-            // Apply after state
+            // Remove any properties that exist in 'before' but not in 'after'
+            for (const key of Object.keys(command.before || {})) {
+                if (!(key in command.after)) {
+                    delete block[key];
+                }
+            }
             Object.assign(block, command.after);
 
             // Save to disk

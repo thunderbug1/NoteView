@@ -179,6 +179,13 @@ const DocumentView = {
         this._groupCollapseHandler = this.handleGroupCollapseClick.bind(this);
         container.addEventListener('click', this._groupCollapseHandler);
 
+        // AI Assistant button click delegation
+        if (this._aiBtnHandler) {
+            container.removeEventListener('click', this._aiBtnHandler);
+        }
+        this._aiBtnHandler = this.handleAiButtonClick.bind(this);
+        container.addEventListener('click', this._aiBtnHandler);
+
         // Drag handle mousedown delegation
         if (this._dragStartHandler) {
             container.removeEventListener('mousedown', this._dragStartHandler);
@@ -662,18 +669,6 @@ const DocumentView = {
                 if (id && id !== 'new') HistoryView.openHistory(id);
             });
         });
-        if (window.AIAssistant) {
-            newMetadata.querySelectorAll('.ai-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (btn.classList.contains('ai-btn-disabled')) {
-                        showToast('Enable AI Features in Settings first');
-                        return;
-                    }
-                    const id = btn.dataset.id;
-                    if (id && id !== 'new') AIAssistant.openPanel(id);
-                });
-            });
-        }
         // Task-toggle-btn clicks handled by container-level delegation in render()
         newMetadata.querySelectorAll('.block-menu-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -744,20 +739,6 @@ const DocumentView = {
                 this.originalContents.delete(id);
             }
         }
-
-        // AI Assistant buttons
-        container.querySelectorAll('.ai-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                if (btn.classList.contains('ai-btn-disabled')) {
-                    showToast('Enable AI Features in Settings first');
-                    return;
-                }
-                const blockId = btn.dataset.id;
-                if (blockId && blockId !== 'new') {
-                    AIAssistant.openPanel(blockId);
-                }
-            });
-        });
 
         // 3-dot block menu buttons
         container.querySelectorAll('.block-menu-btn').forEach(btn => {
@@ -1018,6 +999,20 @@ const DocumentView = {
             this.stopSpeechRecognition();
         } else {
             this.startSpeechRecognition(blockId, micBtn);
+        }
+    },
+
+    handleAiButtonClick(e) {
+        const btn = e.target.closest('.ai-btn');
+        if (!btn) return;
+        e.stopPropagation();
+        if (btn.classList.contains('ai-btn-disabled')) {
+            showToast('Enable AI Features in Settings first');
+            return;
+        }
+        const blockId = btn.dataset.id;
+        if (blockId && blockId !== 'new') {
+            AIAssistant.openPanel(blockId);
         }
     },
 

@@ -880,9 +880,10 @@ const Store = {
             lastUpdated: new Date().toISOString(),
             ...extraMetadata
         };
-        // Ensure id, content, tags, creationDate, lastUpdated are not overridden badly
+        // Ensure critical fields are not overridden by extraMetadata spread
         block.id = id;
         block.content = content;
+        if (!Array.isArray(block.tags)) block.tags = extraMetadata.tags || SelectionManager.getTagsForNewNote();
         // Initial create always commits? Or only on blur?
         // Let's stick to commit: true for creation to ensure it exists in git history.
         // Capture snapshot before save/push to avoid race with concurrent mutations

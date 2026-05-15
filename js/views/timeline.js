@@ -438,10 +438,11 @@ const TimelineView = {
         // Update raw data cache (limit snapshots to prevent unbounded memory growth)
         const MAX_SNAPSHOTS = 50;
         this._rawDataCache.headOid = currentHeadOid;
-        this._rawDataCache.commitCount = chronological.length;
         this._rawDataCache.commitSnapshots = commitSnapshots.length > MAX_SNAPSHOTS
             ? commitSnapshots.slice(-MAX_SNAPSHOTS)
             : commitSnapshots;
+        // Keep commitCount in sync with actual snapshot length so incremental check works
+        this._rawDataCache.commitCount = this._rawDataCache.commitSnapshots.length;
 
         // Return newest first
         allEvents.reverse();
