@@ -50,8 +50,8 @@ const AssigneeModal = {
             content
         });
 
-        const input = document.getElementById('assigneeModalInput');
-        const promptBtn = document.getElementById('assigneeModalCreatePrompt');
+        const input = modal.querySelector('#assigneeModalInput');
+        const promptBtn = modal.querySelector('#assigneeModalCreatePrompt');
 
         input.focus();
 

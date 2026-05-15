@@ -58,12 +58,16 @@ class GitFSAdapter {
             },
 
             async writeFile(path, data, options) {
+                let writable;
                 try {
                     const handle = await self._resolvePath(path, true, true);
-                    const writable = await handle.createWritable();
+                    writable = await handle.createWritable();
                     await writable.write(data);
                     await writable.close();
                 } catch (e) {
+                    if (writable) {
+                        try { await writable.abort(); } catch (abortErr) { /* ignore */ }
+                    }
                     if (e.name === 'NotFoundError') {
                         throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), { code: 'ENOENT' });
                     }

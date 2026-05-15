@@ -330,26 +330,7 @@ const KanbanView = {
 
     extractTasks(blocks) {
         const tasks = TaskParser.parseTasksFromBlocks(blocks);
-        const contextSelection = SelectionManager.selections?.context;
-        const contactSelection = SelectionManager.selections?.contact;
-
-        if ((!contextSelection || contextSelection.size === 0) && !contactSelection) {
-            return tasks;
-        }
-
-        return tasks.filter(task => {
-            if (contactSelection && !ContactHelper.hasTaskContact(task, contactSelection)) {
-                return false;
-            }
-            // State-based Todo.* tags are no-ops in kanban
-            if (contextSelection?.has('Todo.unblocked') && !TaskParser.isUnblockedTask(task)) {
-                return false;
-            }
-            if (contextSelection?.has('Todo.unassigned') && !TaskParser.isUnassignedTask(task)) {
-                return false;
-            }
-            return true;
-        });
+        return this.applyTaskFilters(tasks);
     },
 
     renderTaskCard(task, depth = 0, isOrphaned = false) {

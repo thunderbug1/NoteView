@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v36';
+const CACHE_NAME = 'noteview-v37';
 
 const PRECACHE_URLS = [
   './',
@@ -107,7 +107,7 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           if (response.ok) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)));
           }
           return response;
         })
@@ -133,7 +133,7 @@ self.addEventListener('fetch', (event) => {
       return fetch(event.request, { cache: 'no-cache' }).then((response) => {
         if (response.ok) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)));
         }
         return response;
       });
@@ -141,6 +141,7 @@ self.addEventListener('fetch', (event) => {
       if (event.request.mode === 'navigate') {
         return caches.match('./index.html');
       }
+      return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
     })
   );
 });

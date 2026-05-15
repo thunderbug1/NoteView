@@ -53,4 +53,4 @@ esbuild.build({
   minify: true,
 }).then(() => {
   console.log('CodeMirror bundled successfully!');
-}).catch(() => process.exit(1));
+}).catch((err) => { console.error('CodeMirror bundling failed:', err); process.exit(1); });

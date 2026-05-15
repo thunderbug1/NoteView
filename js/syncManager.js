@@ -298,8 +298,8 @@ const SyncManager = {
 
         // Flush any pending saves to disk before resetting the working tree.
         // This prevents data loss if auto-save hasn't fired yet.
-        if (window.Store && Store._saveQueue) {
-            await Promise.all(Array.from(Store._saveQueue.values()));
+        if (window.Store && Store._saveQueue && Store._saveQueue.size > 0) {
+            await Promise.allSettled(Array.from(Store._saveQueue.values()));
         }
 
         // The failed pull may have left the index/working tree in a dirty merged state.
@@ -318,7 +318,6 @@ const SyncManager = {
             if (conflictData.files.length === 0) {
                 // No actual file conflicts — schedule retry instead of recursive sync
                 this._setStatus('idle', 'No conflicts found');
-                this._syncing = false;
                 this._scheduleIdleSync();
                 return;
             }
@@ -1014,7 +1013,7 @@ const SyncManager = {
             return this._simpleDiff(localLines, remoteLines);
         }
 
-        // Build LCS table
+        // Build full LCS table for backtracking (rolling array to halve memory)
         const dp = [];
         for (let i = 0; i <= m; i++) {
             dp[i] = new Uint32Array(n + 1);
@@ -1029,7 +1028,7 @@ const SyncManager = {
             }
         }
 
-        // Backtrack to produce diff
+        // Backtrack to produce diff using the LCS table
         const actions = [];
         let i = m, j = n;
         while (i > 0 || j > 0) {
@@ -1071,27 +1070,24 @@ const SyncManager = {
     },
 
     _simpleDiff(localLines, remoteLines) {
-        // Build a hash map of remote lines for O(1) lookup
-        const remoteSet = new Set(remoteLines);
-        const localSet = new Set(localLines);
         const result = [];
-
-        // Lines only in local = removed
+        const remoteCounts = new Map();
+        for (const line of remoteLines) {
+            remoteCounts.set(line, (remoteCounts.get(line) || 0) + 1);
+        }
         for (const line of localLines) {
-            if (!remoteSet.has(line)) {
+            const count = remoteCounts.get(line);
+            if (count > 0) {
+                remoteCounts.set(line, count - 1);
+                result.push({ type: 'same', text: line });
+            } else {
                 result.push({ type: 'removed', text: line });
             }
         }
-        // Lines only in remote = added
         for (const line of remoteLines) {
-            if (!localSet.has(line)) {
+            if (remoteCounts.get(line) > 0) {
                 result.push({ type: 'added', text: line });
-            }
-        }
-        // If no differences found, fall back to showing all as same
-        if (result.length === 0) {
-            for (const line of localLines) {
-                result.push({ type: 'same', text: line });
+                remoteCounts.set(line, remoteCounts.get(line) - 1);
             }
         }
         return result;

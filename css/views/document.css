@@ -1505,7 +1505,7 @@ body.is-dragging-wikilink * {
     display: flex;
     gap: 0.35rem;
     padding: 0.35rem 0.5rem;
-    background: #d1d5db;
+    background: var(--bg-tertiary, #d1d5db);
     border-top: none;
     z-index: 1000;
     justify-content: center;
@@ -1513,10 +1513,8 @@ body.is-dragging-wikilink * {
     transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-@media (prefers-color-scheme: dark) {
-    .mobile-toolbar {
-        background: #2d2d2d;
-    }
+[data-theme="dark"] .mobile-toolbar {
+    background: var(--bg-tertiary, #2d2d2d);
 }
 
 .mobile-toolbar.hidden {
@@ -1526,9 +1524,9 @@ body.is-dragging-wikilink * {
 }
 
 .mobile-toolbar button {
-    background: #ffffff;
+    background: var(--bg-primary, #ffffff);
     border: none;
-    color: #1f2937;
+    color: var(--text-primary, #1f2937);
     padding: 0.5rem 1.2rem;
     border-radius: 6px;
     cursor: pointer;
@@ -1542,12 +1540,10 @@ body.is-dragging-wikilink * {
     transition: background 0.1s ease;
 }
 
-@media (prefers-color-scheme: dark) {
-    .mobile-toolbar button {
-        background: #4a4a4a;
-        color: #e5e5e5;
-        box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.3);
-    }
+[data-theme="dark"] .mobile-toolbar button {
+    background: var(--bg-secondary, #4a4a4a);
+    color: var(--text-primary, #e5e5e5);
+    box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.3);
 }
 
 .mobile-toolbar button:active {
@@ -1555,11 +1551,9 @@ body.is-dragging-wikilink * {
     color: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-    .mobile-toolbar button:active {
-        background: #666666;
-        color: #ffffff;
-    }
+[data-theme="dark"] .mobile-toolbar button:active {
+    background: #666666;
+    color: #ffffff;
 }
 
 /* Note modal (wikilink reference) */

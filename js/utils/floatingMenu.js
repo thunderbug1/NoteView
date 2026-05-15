@@ -50,7 +50,6 @@ window.FloatingMenu = {
             menu.remove();
             if (closeOnClick) {
                 document.removeEventListener('mousedown', handleOutside);
-                document.removeEventListener('click', handleOutsideClick);
             }
             if (closeOnEscape) document.removeEventListener('keydown', handleEscape);
             if (closeOnScroll) window.removeEventListener('scroll', handleScroll, true);
@@ -58,10 +57,6 @@ window.FloatingMenu = {
         }
 
         function handleOutside(e) {
-            if (!menu.contains(e.target)) close();
-        }
-
-        function handleOutsideClick(e) {
             if (!menu.contains(e.target)) close();
         }
 
@@ -78,7 +73,6 @@ window.FloatingMenu = {
 
         if (closeOnClick) {
             document.addEventListener('mousedown', handleOutside);
-            document.addEventListener('click', handleOutsideClick);
         }
         if (closeOnEscape) document.addEventListener('keydown', handleEscape);
         if (closeOnScroll) window.addEventListener('scroll', handleScroll, true);

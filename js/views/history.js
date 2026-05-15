@@ -79,7 +79,13 @@ const HistoryView = {
         `;
         
         document.body.appendChild(modal);
-        
+
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') this.closeHistory();
+        };
+        document.addEventListener('keydown', escapeHandler);
+        this._escapeHandler = escapeHandler;
+
         modal.querySelector('.close-history-btn').addEventListener('click', () => this.closeHistory());
         
         modal.querySelectorAll('.history-commit-item').forEach(item => {
@@ -160,6 +166,10 @@ const HistoryView = {
     },
     
     closeHistory() {
+        if (this._escapeHandler) {
+            document.removeEventListener('keydown', this._escapeHandler);
+            this._escapeHandler = null;
+        }
         const modal = document.getElementById('historyModal');
         if (modal) modal.remove();
         if (this.editorView) {

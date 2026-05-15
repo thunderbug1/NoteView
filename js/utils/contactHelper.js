@@ -59,7 +59,7 @@ function extractAssignees(content) {
 
     while ((match = assigneeRegex.exec(content)) !== null) {
         let username = normalizeContactName(match[1]);
-        assignees.add(username.toLowerCase());
+        assignees.add(username);
     }
 
     return assignees;

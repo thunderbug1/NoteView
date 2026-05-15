@@ -284,10 +284,6 @@
     letter-spacing: 0.04em;
 }
 
-.tag-group-toggle {
-    cursor: pointer;
-}
-
 .tag-group-name {
     cursor: pointer;
     border-radius: var(--radius-sm);
@@ -333,6 +329,7 @@
 }
 
 .tag-group-toggle {
+    cursor: pointer;
     font-size: 0.6rem;
     transition: transform 0.15s;
     width: 0.8em;
@@ -349,10 +346,6 @@
     flex-wrap: wrap;
     gap: 0.4rem;
     align-items: flex-start;
-}
-
-.tag-group-hierarchy:not(.expanded) > .tag-group-children {
-    display: none;
 }
 
 .tag-group-hierarchy.expanded > .tag-group-children {
@@ -944,7 +937,7 @@
 
 /* Danger-style context menu item */
 .task-context-menu .menu-item-danger {
-    color: #dc2626;
+    color: var(--danger-color, #dc2626);
 }
 
 .task-context-menu .menu-item-danger:hover {

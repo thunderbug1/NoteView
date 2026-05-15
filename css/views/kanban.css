@@ -480,6 +480,7 @@
 }
 
 .kanban-swimlane-label {
+    cursor: pointer;
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -509,10 +510,6 @@
 
 .kanban-swimlane-collapsed .kanban-board {
     display: none;
-}
-
-.kanban-swimlane-label {
-    cursor: pointer;
 }
 
 .kanban-swimlane-collapse {

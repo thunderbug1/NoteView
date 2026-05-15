@@ -268,7 +268,7 @@
 }
 
 .view-selector select:hover {
-    border-color: var(--border-light);
+    background: var(--bg-hover);
 }
 
 .view-selector select:focus {

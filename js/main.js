@@ -337,7 +337,7 @@ const App = {
             const dy = e.changedTouches[0].clientY - touchEdgeStartY;
             if (Math.abs(dy) > Math.abs(dx)) return;
             e.stopPropagation();
-            touchValid = false;
+            edgeHandled = true;
             openSidebar();
         }, { passive: true });
         sidebarEdgeRight?.addEventListener('touchstart', (e) => {
@@ -349,7 +349,7 @@ const App = {
             const dy = e.changedTouches[0].clientY - touchEdgeStartY;
             if (Math.abs(dy) > Math.abs(dx)) return;
             e.stopPropagation();
-            touchValid = false;
+            edgeHandled = true;
             openSidebarRight();
         }, { passive: true });
 
@@ -377,6 +377,7 @@ const App = {
         // Touch swipe for sidebars
         let touchStartX = 0, touchStartY = 0, touchStartTarget = null;
         let touchValid = false;
+        let edgeHandled = false;
         let touchEdgeStartX = 0, touchEdgeStartY = 0;
 
         document.addEventListener('touchstart', e => {
@@ -384,9 +385,10 @@ const App = {
             touchStartY = e.touches[0].clientY;
             touchStartTarget = e.target;
             touchValid = true;
+            edgeHandled = false;
         }, { passive: true });
         document.addEventListener('touchend', e => {
-            if (!touchValid) return;
+            if (!touchValid || edgeHandled) return;
             if (touchStartTarget?.closest(interactiveSelector) || e.target.closest(interactiveSelector)) return;
             const dx = e.changedTouches[0].clientX - touchStartX;
             const dy = e.changedTouches[0].clientY - touchStartY;
@@ -1383,6 +1385,12 @@ const App = {
             content,
             modalClass: 'tag-modal content-modal',
             onClose: () => {
+                // Destroy CodeMirror editor to prevent memory leak
+                const view = DocumentView.editors.get(blockId);
+                if (view) {
+                    view.destroy();
+                    DocumentView.editors.delete(blockId);
+                }
                 if (Store.currentView === 'kanban') {
                     requestAnimationFrame(() => this.render());
                 }

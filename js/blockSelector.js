@@ -268,6 +268,24 @@ const BlockSelector = {
             bar.className = 'select-action-bar';
             document.body.appendChild(bar);
             this._actionBar = bar;
+
+            // Single delegated click handler — survives innerHTML updates
+            bar.addEventListener('click', (e) => {
+                const btn = e.target.closest('.select-action-btn');
+                if (!btn) return;
+                e.stopPropagation();
+                switch (btn.dataset.action) {
+                    case 'selectall': this.selectAll(); break;
+                    case 'deselectall': this.deselectAll(); break;
+                    case 'collapseall': this.collapseAll(); break;
+                    case 'expandall': this.expandAll(); break;
+                    case 'delete': this.bulkDelete(); break;
+                    case 'tags': this.bulkAddTags(); break;
+                    case 'ai': this.bulkSendToAI(); break;
+                    case 'sendtovault': this.bulkSendToVault(); break;
+                    case 'done': this.deactivate(); break;
+                }
+            });
         }
 
         const count = this.selectedIds.size;
@@ -309,23 +327,6 @@ const BlockSelector = {
             </button>
             <button class="select-action-btn select-action-done" data-action="done"><span>Done</span></button>
         `;
-
-        bar.querySelectorAll('.select-action-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                switch (btn.dataset.action) {
-                    case 'selectall': this.selectAll(); break;
-                    case 'deselectall': this.deselectAll(); break;
-                    case 'collapseall': this.collapseAll(); break;
-                    case 'expandall': this.expandAll(); break;
-                    case 'delete': this.bulkDelete(); break;
-                    case 'tags': this.bulkAddTags(); break;
-                    case 'ai': this.bulkSendToAI(); break;
-                    case 'sendtovault': this.bulkSendToVault(); break;
-                    case 'done': this.deactivate(); break;
-                }
-            });
-        });
     },
 
     _hideActionBar() {

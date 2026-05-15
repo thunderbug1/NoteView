@@ -895,6 +895,8 @@ const Store = {
         block.content = content;
         // Initial create always commits? Or only on blur?
         // Let's stick to commit: true for creation to ensure it exists in git history.
+        // Capture snapshot before save/push to avoid race with concurrent mutations
+        const blockSnapshot = JSON.parse(JSON.stringify(block));
         await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: extraMetadata.skipUndo });
         this.blocks.push(block);
         this._filteredBlocksCache.invalidate();
@@ -908,7 +910,7 @@ const Store = {
                 await UndoRedoManager.executeCommand({
                     type: 'create',
                     blockId: block.id,
-                    blockData: { ...block }
+                    blockData: blockSnapshot
                 });
             } catch (undoErr) {
                 console.error('Failed to record undo for new block:', undoErr);
@@ -926,8 +928,8 @@ const Store = {
         }
 
         const opts = BlockFilter._currentOpts();
-        const pinnedBlocks = this.blocks.filter(block => block.pinned);
-        const unpinnedBlocks = this.blocks.filter(block => !block.pinned);
+        const pinnedBlocks = this.blocks.filter(block => block.pinned && !block._isTemp);
+        const unpinnedBlocks = this.blocks.filter(block => !block.pinned && !block._isTemp);
         const filteredUnpinned = unpinnedBlocks.filter(block => BlockFilter._blockPassesFast(block, opts));
 
         const result = [...pinnedBlocks, ...filteredUnpinned];
@@ -951,9 +953,6 @@ const Store = {
 
         // Serialize concurrent saves for the same block via promise chain
         const saveKey = block.id;
-        if (this._deleteSentinels?.has(saveKey)) {
-            throw new Error(`Block ${saveKey} has been deleted, save aborted`);
-        }
         if (!this._saveQueue) this._saveQueue = new Map();
         const prev = this._saveQueue.get(saveKey) || Promise.resolve();
         let resolveSave = () => {};
@@ -961,6 +960,11 @@ const Store = {
         this._saveQueue.set(saveKey, next);
 
         try {
+            // Check sentinel inside the chain for atomicity
+            if (this._deleteSentinels?.has(saveKey)) {
+                throw new Error(`Block ${saveKey} has been deleted, save aborted`);
+            }
+
             // Capture state before save for undo/redo
             const existingBlock = this.blocks.find(b => b.id === block.id);
             const isUpdate = !!existingBlock && !UndoRedoManager.isExecuting && !skipUndo;
@@ -1003,9 +1007,7 @@ const Store = {
             } catch (writeError) {
                 // Roll back in-memory changes on write failure
                 if (beforeState) {
-                    Object.keys(block).forEach(key => {
-                        if (keysBefore && !keysBefore.includes(key)) delete block[key];
-                    });
+                    Object.keys(block).forEach(key => delete block[key]);
                     Object.assign(block, beforeState);
                 }
                 this.extractContacts();
@@ -1183,6 +1185,7 @@ function serializeBlock(block) {
     delete metadata.id;
     delete metadata.filename;
     delete metadata.fileHandle;
+    delete metadata._isTemp;
 
     if (Object.keys(metadata).length > 0 || tags.length > 0) {
         const frontmatter = {

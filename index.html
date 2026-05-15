@@ -7,6 +7,8 @@
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://img.youtube.com https://cdn.cloudflare.steamstatic.com; connect-src * data: blob:; media-src 'self' blob: https:;">
+    <!-- Note: iOS Safari requires PNG for apple-touch-icon; SVG is provided as fallback -->
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
@@ -24,11 +26,12 @@
     <link rel="stylesheet" href="css/views/qr-transfer.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
 </head>
 <body>
     <div id="app">
         <!-- Sidebar -->
-        <aside id="sidebar">
+        <aside id="sidebar" aria-label="Navigation sidebar">
             <div class="app-header">
                 <a href="https://github.com/thunderbug1/NoteView" target="_blank" rel="noopener noreferrer" class="app-logo-link">
                     <img src="assets/icon-light.svg" alt="NoteView" class="app-logo-icon" id="appLogoIcon">
@@ -71,6 +74,7 @@
                     <h3>Search</h3>
                 </div>
                 <div class="search">
+                    <label for="searchInput" class="sr-only">Search blocks</label>
                     <input type="text" id="searchInput" placeholder="Search blocks...">
                 </div>
             </div>
@@ -161,7 +165,7 @@
         <div id="sidebarEdgeLeft" class="sidebar-edge sidebar-edge-left"></div>
         <div id="sidebarEdgeRight" class="sidebar-edge sidebar-edge-right"></div>
 
-        <main id="main">
+        <main id="main" aria-label="Note content">
             <div id="contentToolbar" class="content-toolbar">
                 <div class="content-toolbar-left">
                     <div class="undo-redo-controls">
@@ -218,7 +222,7 @@
         <button id="sidebarRightToggle" class="sidebar-right-toggle" title="Toggle details panel">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
         </button>
-        <aside id="sidebarRight">
+        <aside id="sidebarRight" aria-label="Details panel">
             <div class="sidebar-scroll">
                 <!-- Content placeholder -->
             </div>
@@ -318,7 +322,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js?v=36');
+            navigator.serviceWorker.register('./sw.js?v=37');
         }
     </script>
 

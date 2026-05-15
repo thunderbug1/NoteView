@@ -359,7 +359,7 @@ const UndoRedoManager = {
                 await Store.directoryHandle.removeEntry(fileName);
             } catch (e) {
                 console.error('Failed to delete file during redo delete:', e);
-                return;
+                throw e;
             }
 
             // THEN remove from memory

@@ -9,6 +9,17 @@
     box-sizing: border-box;
 }
 
+/* Screen reader only utility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 :root {
     /* Colors - Light Theme */
     --bg-primary: #ffffff;
@@ -84,6 +95,14 @@
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+    /* Z-index scale */
+    --z-sidebar: 10;
+    --z-overlay: 100;
+    --z-fab: 200;
+    --z-menu: 1000;
+    --z-modal: 5000;
+    --z-popover: 10000;
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }

@@ -49,15 +49,18 @@ const AIAssistant = {
         this._wirePanelHeader();
 
         // Handle viewport resize across mobile breakpoint
-        window.addEventListener('resize', () => {
-            if (this._panelOpen) {
-                if (window.innerWidth <= 768) {
-                    document.body.classList.add('ai-panel-open');
-                } else {
-                    document.body.classList.remove('ai-panel-open');
+        if (!this._resizeHandler) {
+            this._resizeHandler = () => {
+                if (this._panelOpen) {
+                    if (window.innerWidth <= 768) {
+                        document.body.classList.add('ai-panel-open');
+                    } else {
+                        document.body.classList.remove('ai-panel-open');
+                    }
                 }
-            }
-        });
+            };
+            window.addEventListener('resize', this._resizeHandler);
+        }
 
         // Load persisted chats for this vault
         const vaultName = Store.directoryHandle?.name;
@@ -952,7 +955,7 @@ const AIAssistant = {
 
         const profile = this.profiles.find(p => p.id === chat.modelId);
         if (!profile) {
-            chat.messages.push({ id: 'msg-' + (++this._chatIdCounter), role: 'system', type: 'error', content: 'Model profile not found. It may have been deleted.' });
+            chat.messages.push({ id: 'msg-' + (++this._msgIdCounter), role: 'system', type: 'error', content: 'Model profile not found. It may have been deleted.' });
             chat.state = 'idle';
             this._renderMessages(chat);
             return;

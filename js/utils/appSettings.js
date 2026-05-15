@@ -9,6 +9,7 @@
  */
 const AppSettings = {
     _cache: null,
+    _loadPromise: null,
     _DIR: '.noteview',
     _SETTINGS: 'settings.json',
     _KEYS: 'keys.json',
@@ -17,8 +18,14 @@ const AppSettings = {
 
     async load() {
         if (this._cache) return this._cache;
-        if (!Store.directoryHandle) return {};
+        if (this._loadPromise) return this._loadPromise;
+        this._loadPromise = this._doLoad();
+        try { return await this._loadPromise; }
+        finally { this._loadPromise = null; }
+    },
 
+    async _doLoad() {
+        if (!Store.directoryHandle) return {};
         try {
             const dir = await Store.directoryHandle.getDirectoryHandle(this._DIR);
             const handle = await dir.getFileHandle(this._SETTINGS);

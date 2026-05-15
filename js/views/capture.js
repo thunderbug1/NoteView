@@ -124,8 +124,8 @@ const CaptureView = {
 
     _openTagModal(container) {
         const tempId = 'capture-temp';
+        const tempBlock = { id: tempId, tags: [...this._currentTags], content: '', _isTemp: true };
         const existingIdx = Store.blocks.findIndex(b => b.id === tempId);
-        const tempBlock = { id: tempId, tags: [...this._currentTags], content: '' };
         if (existingIdx === -1) Store.blocks.push(tempBlock);
         else Store.blocks[existingIdx] = tempBlock;
         DocumentView.pendingNewTags = [...this._currentTags];

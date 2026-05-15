@@ -8,7 +8,7 @@ console.log('Reading index.html...');
 let html = fs.readFileSync(htmlPath, 'utf8');
 
 // 1. Inline CSS
-html = html.replace(/<link\s+rel="stylesheet"\s+href="([^"?]+)">/g, (match, href) => {
+html = html.replace(/<link\s+[^>]*rel="stylesheet"[^>]*href="([^"?]+)"[^>]*>/g, (match, href) => {
     console.log(`Inlining CSS: ${href}`);
     const cssPath = path.join(projectRoot, href);
     const cssContent = fs.readFileSync(cssPath, 'utf8');
@@ -16,7 +16,7 @@ html = html.replace(/<link\s+rel="stylesheet"\s+href="([^"?]+)">/g, (match, href
 });
 
 // 2. Inline JS
-html = html.replace(/<script\s+src="([^"]+?)(?:\?v=[0-9]+)?"><\/script>/g, (match, src) => {
+html = html.replace(/<script\s+[^>]*src="([^"]+?)(?:\?v=[0-9]+)?"[^>]*><\/script>/g, (match, src) => {
     console.log(`Inlining JS: ${src}`);
     const jsPath = path.join(projectRoot, src);
     const jsContent = fs.readFileSync(jsPath, 'utf8');

@@ -15,12 +15,23 @@ const GitRemote = {
     },
 
     async setRemote(name, url, auth = null) {
-        // Add remote to local git first
         if (!GitStore.git || !GitStore.fs) {
             console.error('GitRemote.setRemote: git not initialized');
             return false;
         }
         const { git, fs, dir } = GitStore;
+
+        // Persist config BEFORE adding remote so we don't end up in partial state
+        this.config = { name, url, auth };
+        window.GitHttp.setCredentials(auth);
+        try {
+            await Store.saveRemoteConfig(this.config);
+        } catch (err) {
+            console.error('Failed to persist remote config:', err);
+            this.config = null;
+            return false;
+        }
+
         try {
             await git.addRemote({
                 fs,
@@ -31,13 +42,12 @@ const GitRemote = {
             });
         } catch (err) {
             console.error('Failed to add remote:', err);
+            // Roll back persisted config
+            this.config = null;
+            try { await Store.saveRemoteConfig(null); } catch (e) { /* ignore */ }
             return false;
         }
 
-        // Only persist config after git operation succeeds
-        this.config = { name, url, auth };
-        window.GitHttp.setCredentials(auth);
-        await Store.saveRemoteConfig(this.config);
         return true;
     },
 
@@ -124,6 +134,12 @@ const GitRemote = {
             if (err instanceof Error && (err.name === 'CheckoutConflictError' || err.code === 'CheckoutConflictError' || err.message?.includes('would be overwritten'))) {
                 console.log('Pull conflict detected, attempting hard reset to remote');
                 try {
+                    // Preserve local settings before force checkout
+                    let localSettings = null;
+                    try {
+                        localSettings = await fs.readFile('.noteview/settings.json', { encoding: 'utf8' });
+                    } catch (e) { /* may not exist */ }
+
                     await git.fetch({
                         fs, dir,
                         http: window.GitHttp,
@@ -135,6 +151,14 @@ const GitRemote = {
                     const commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
                     await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
                     await git.checkout({ fs, dir, ref, force: true });
+
+                    // Restore local settings if they existed before
+                    if (localSettings) {
+                        try {
+                            await fs.writeFile('.noteview/settings.json', localSettings);
+                        } catch (e) { /* ignore */ }
+                    }
+
                     console.log('Hard reset to remote successful');
                     return true;
                 } catch (resetErr) {

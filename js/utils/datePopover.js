@@ -134,30 +134,30 @@ window.DatePopover = {
         popover.style.zIndex = '1000';
 
         // Close on outside click/tap or Escape key
-        function close() {
+        const close = () => {
             popover.remove();
             document.removeEventListener('mousedown', closeOnOutside);
             document.removeEventListener('touchstart', closeOnOutside);
             document.removeEventListener('keydown', closeOnEscape);
             this._lastCloseByClass[cssClass] = null;
-        }
+        };
 
         const closeOnOutside = (e) => {
             if (!popover.contains(e.target)) {
-                close.call(window.DatePopover);
+                close();
             }
         };
 
         const closeOnEscape = (e) => {
             if (e.key === 'Escape') {
-                close.call(window.DatePopover);
+                close();
             }
         };
         document.addEventListener('mousedown', closeOnOutside);
         document.addEventListener('touchstart', closeOnOutside, { passive: true });
         document.addEventListener('keydown', closeOnEscape);
 
-        this._lastCloseByClass[cssClass] = close.bind(this);
+        this._lastCloseByClass[cssClass] = close;
 
         dueInput.focus();
 

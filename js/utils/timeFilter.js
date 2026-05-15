@@ -45,7 +45,9 @@ function checkTimeFilter(date, timeTag) {
             const startOfWeek = new Date(now);
             startOfWeek.setDate(now.getDate() - now.getDay());
             startOfWeek.setHours(0, 0, 0, 0);
-            return checkDate >= startOfWeek;
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 7);
+            return checkDate >= startOfWeek && checkDate < endOfWeek;
         }
         case 'lastWeek': {
             const startOfThisWeek = new Date(now);

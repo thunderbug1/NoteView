@@ -6,6 +6,9 @@
 const SelectionManager = {
     STORAGE_KEY: 'noteview-selection-state',
 
+    // Render generation counter to cancel stale long-press timers
+    _renderGen: 0,
+
     // Selection state
     selections: {
         context: new Set(),
@@ -755,6 +758,7 @@ const SelectionManager = {
      * @param {string[]} tags - Time.* tags to render
      */
     _renderTimeTagList(container, tags) {
+        const gen = ++this._renderGen;
         if (tags.length === 0) {
             container.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:4px 8px;">No time filters</div>';
             return;
@@ -845,6 +849,7 @@ const SelectionManager = {
                 if (e.button !== 0 || e.shiftKey) return;
                 longPressed = false;
                 pressTimer = setTimeout(() => {
+                    if (this._renderGen !== gen) return;
                     longPressed = true;
                     const tag = option.dataset.tag;
                     this.toggleExcludedTag(tag, this.selections.excluded.has(tag));
@@ -929,6 +934,7 @@ const SelectionManager = {
      * @param {boolean} isComputedSection - Whether this is the computed tags section
      */
     _renderTagList(container, tags, isComputedSection, isArchivedSection = false) {
+        const gen = ++this._renderGen;
         if (tags.length === 0) {
             container.innerHTML = isComputedSection || isArchivedSection
                 ? ''
@@ -1008,6 +1014,7 @@ const SelectionManager = {
                 if (e.shiftKey) return; // Let shift+click handle via click handler
                 longPressed = false;
                 pressTimer = setTimeout(() => {
+                    if (this._renderGen !== gen) return;
                     longPressed = true;
                     const tag = option.dataset.tag;
                     const wasExcluded = this.selections.excluded.has(tag);
