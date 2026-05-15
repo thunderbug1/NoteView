@@ -9,7 +9,6 @@ const GitRemote = {
     async init() {
         this.config = await Store.getRemoteConfig();
         if (this.config) {
-            console.log('GitRemote initialized with config:', this.config.name);
             window.GitHttp.setCredentials(this.config.auth);
         }
     },
@@ -67,7 +66,6 @@ const GitRemote = {
                 corsProxy: this._getCorsProxy(),
                 onAuth: () => this.config.auth
             });
-            console.log('Push successful');
             return true;
         } catch (err) {
             console.error('Push failed:', err);
@@ -97,7 +95,6 @@ const GitRemote = {
                 localSettings = await fs.readFile('.noteview/settings.json', { encoding: 'utf8' });
             } catch (e) { /* may not exist */ }
             try { await fs.unlink('.noteview/settings.json'); } catch (e) { /* may not exist */ }
-            console.log('Pull: no local branch, fetching and checking out from remote');
             try {
                 await git.fetch({
                     fs, dir,
@@ -115,7 +112,6 @@ const GitRemote = {
                 }
                 await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
                 await git.checkout({ fs, dir, ref, force: true });
-                console.log('Checkout from remote successful');
                 return true;
             } catch (checkoutError) {
                 // Restore local settings if checkout failed
@@ -139,12 +135,10 @@ const GitRemote = {
                 fastForward: true,
                 singleBranch: true
             });
-            console.log('Pull successful');
             return true;
         } catch (err) {
             // If pull fails due to conflict or diverged history, try hard reset to remote
             if (err instanceof Error && (err.name === 'CheckoutConflictError' || err.code === 'CheckoutConflictError' || err.message?.includes('would be overwritten'))) {
-                console.log('Pull conflict detected, attempting hard reset to remote');
                 try {
                     // Preserve local settings before force checkout
                     let localSettings = null;
@@ -171,7 +165,6 @@ const GitRemote = {
                         } catch (e) { /* ignore */ }
                     }
 
-                    console.log('Hard reset to remote successful');
                     return true;
                 } catch (resetErr) {
                     console.error('Hard reset also failed:', resetErr);

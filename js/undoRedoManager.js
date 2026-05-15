@@ -40,11 +40,8 @@ const UndoRedoManager = {
     async executeCommand(command) {
         // Don't record if we're currently executing an undo/redo
         if (this.isExecuting) {
-            console.log('UndoRedoManager: Skipping command recording during undo/redo execution');
             return;
         }
-
-        console.log('UndoRedoManager: Recording command:', command.type, command.blockId);
 
         // Add timestamp if not present
         if (!command.timestamp) {
@@ -61,8 +58,6 @@ const UndoRedoManager = {
         if (this.undoStack.length > this.MAX_STACK_SIZE) {
             this.undoStack.shift();
         }
-
-        console.log('UndoRedoManager: Stack size - undo:', this.undoStack.length, 'redo:', this.redoStack.length);
 
         // Persist to IndexedDB
         try {
@@ -95,14 +90,11 @@ const UndoRedoManager = {
     },
 
     async _doUndo() {
-        console.log('UndoRedoManager: Undo called, stack size:', this.undoStack.length);
         if (this.undoStack.length === 0) {
-            console.log('UndoRedoManager: Nothing to undo');
             return;
         }
 
         const command = this.undoStack.pop();
-        console.log('UndoRedoManager: Undoing command:', command.type, command.blockId);
         this.isExecuting = true;
 
         try {
@@ -158,14 +150,11 @@ const UndoRedoManager = {
     },
 
     async _doRedo() {
-        console.log('UndoRedoManager: Redo called, stack size:', this.redoStack.length);
         if (this.redoStack.length === 0) {
-            console.log('UndoRedoManager: Nothing to redo');
             return;
         }
 
         const command = this.redoStack.pop();
-        console.log('UndoRedoManager: Redoing command:', command.type, command.blockId);
         this.isExecuting = true;
 
         try {
@@ -475,10 +464,8 @@ const UndoRedoManager = {
      * Load state from IndexedDB
      */
     async loadState() {
-        console.log('UndoRedoManager: Loading state...');
         try {
             const state = await Store.getUndoRedoState(this.sessionId);
-            console.log('UndoRedoManager: State loaded:', state);
             // State might be null if object store doesn't exist yet (DB upgrade)
             if (state && state.sessionId === this.sessionId) {
                 this.undoStack = state.undoStack || [];
@@ -495,7 +482,6 @@ const UndoRedoManager = {
             this.redoStack = [];
         }
         this.updateUI();
-        console.log('UndoRedoManager: Load complete');
     },
 
     /**

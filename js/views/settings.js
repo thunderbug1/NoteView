@@ -719,9 +719,19 @@ const SettingsView = {
             if (isEdit) {
                 const updates = { name, endpointUrl, model };
                 if (apiKey) updates.apiKey = apiKey;  // only update key if provided
-                await AIAssistant.updateProfile(existingProfile.id, updates);
+                try {
+                    await AIAssistant.updateProfile(existingProfile.id, updates);
+                } catch (err) {
+                    alert('Failed to update profile: ' + (err.message || 'Unknown error'));
+                    return;
+                }
             } else {
-                await AIAssistant.createProfile({ name, endpointUrl, apiKey, model });
+                try {
+                    await AIAssistant.createProfile({ name, endpointUrl, apiKey, model });
+                } catch (err) {
+                    alert('Failed to create profile: ' + (err.message || 'Unknown error'));
+                    return;
+                }
             }
 
             container.innerHTML = '';

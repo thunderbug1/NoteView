@@ -122,6 +122,10 @@ const HistoryView = {
 
         const parsedOld = this.parseFrontMatter(oldContent);
         const block = Store.blocks.find(b => b.id === this.currentBlockId);
+        if (!block) {
+            container.innerHTML = '<div style="padding:2rem;color:var(--text-secondary)">Block no longer exists.</div>';
+            return;
+        }
 
         const container = document.getElementById('diffEditorContainer');
         if (!container) return;
@@ -168,7 +172,13 @@ const HistoryView = {
         });
         if (!confirmed) return;
 
-        await App.updateBlockProperty(this.currentBlockId, 'content', this.selectedOldContent, 'Restore version');
+        try {
+            await App.updateBlockProperty(this.currentBlockId, 'content', this.selectedOldContent, 'Restore version');
+        } catch (err) {
+            console.error('Restore version failed:', err);
+            Common.showToast('Failed to restore version: ' + (err.message || 'Unknown error'));
+            return;
+        }
         this.closeHistory();
         App.render();
     },

@@ -490,7 +490,7 @@ function createCodeMirrorWidgets(documentView) {
                 showDatePopover(documentView, e, view, null, null, '', null, null, '', this.from);
             };
 
-            wrap.onmousedown = handleClick;
+            wrap.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); };
             wrap.onclick = handleClick;
             wrap.ontouchend = (e) => {
                 e.preventDefault();
@@ -531,7 +531,7 @@ function createCodeMirrorWidgets(documentView) {
                     }
                 }, tags);
             };
-            wrap.onmousedown = handleClick;
+            wrap.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); };
             wrap.onclick = handleClick;
             wrap.ontouchend = (e) => {
                 e.preventDefault();
@@ -566,7 +566,7 @@ function createCodeMirrorWidgets(documentView) {
                 const ty = e.changedTouches?.[0]?.pageY ?? e.pageY;
                 documentView.showPriorityMenu(tx, ty, view, this.from, this.to);
             };
-            wrap.onmousedown = handleClick;
+            wrap.onmousedown = (e) => { e.stopPropagation(); e.preventDefault(); };
             wrap.onclick = handleClick;
             wrap.ontouchend = (e) => {
                 e.preventDefault();

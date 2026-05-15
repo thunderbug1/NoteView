@@ -65,7 +65,7 @@ const RecentAccessTracker = {
         this._trashLog.unshift({
             id: block.id,
             timestamp: Date.now(),
-            blockData: { ...block }
+            blockData: { id: block.id, tags: block.tags, lastUpdated: block.lastUpdated, creationDate: block.creationDate }
         });
         if (this._trashLog.length > this.MAX_TRASH) {
             this._trashLog.length = this.MAX_TRASH;
@@ -110,6 +110,8 @@ const RecentAccessTracker = {
             this._dirty = false;
         } catch (e) {
             console.warn('RecentAccessTracker: failed to save', e);
+            // Reset dirty to prevent infinite retry loop on quota errors
+            this._dirty = false;
         }
     },
 

@@ -41,9 +41,6 @@ const SelectionManager = {
      * Initialize the selection manager
      */
     init() {
-        console.log('[SelectionManager] init:start', {
-            existingContext: Array.from(this.selections.context)
-        });
         this.loadSelectionState();
         this.initHistory();
         this.normalizeContextSelection();
@@ -56,15 +53,11 @@ const SelectionManager = {
             this.renderContextSidebar();
             this.initArchiveToggle();
         });
-        console.log('[SelectionManager] init:complete', {
-            restoredContext: Array.from(this.selections.context)
-        });
     },
 
     loadSelectionState() {
         try {
             const raw = localStorage.getItem(this.STORAGE_KEY);
-            console.log('[SelectionManager] loadSelectionState:raw', raw);
             if (!raw) {
                 return;
             }
@@ -97,11 +90,6 @@ const SelectionManager = {
                 const migrated = timeMigration[parsed.time];
                 if (migrated) this.selections.context.add(migrated);
             }
-
-            console.log('[SelectionManager] loadSelectionState:parsed', {
-                context: Array.from(this.selections.context),
-                excluded: Array.from(this.selections.excluded)
-            });
         } catch (error) {
             console.warn('Could not load selection state:', error);
             this.selections.context = new Set();
@@ -115,7 +103,6 @@ const SelectionManager = {
                 excluded: Array.from(this.selections.excluded)
             });
             localStorage.setItem(this.STORAGE_KEY, payload);
-            console.log('[SelectionManager] saveSelectionState', payload);
         } catch (error) {
             console.warn('Could not save selection state:', error);
         }
@@ -130,12 +117,6 @@ const SelectionManager = {
         this.selections.excluded = new Set(
             Array.from(this.selections.excluded).filter(tag => typeof tag === 'string' && tag.trim() !== '')
         );
-
-        console.log('[SelectionManager] normalizeContextSelection', {
-            before,
-            after: Array.from(this.selections.context),
-            excluded: Array.from(this.selections.excluded)
-        });
 
         this.saveSelectionState();
     },
@@ -163,10 +144,6 @@ const SelectionManager = {
      * @param {string} tag - Tag to add
      */
     addContextTag(tag) {
-        console.log('[SelectionManager] addContextTag:before', {
-            tag,
-            context: Array.from(this.selections.context)
-        });
         if (tag === 'Status.untagged') {
             for (const t of Array.from(this.selections.context)) {
                 if (this.isComputedContextTag(t)) this.selections.context.delete(t);
@@ -188,10 +165,6 @@ const SelectionManager = {
         this.selections.excluded.delete(tag);
         this.saveSelectionState();
         this.updateSelectionUI();
-        console.log('[SelectionManager] addContextTag:after', {
-            tag,
-            context: Array.from(this.selections.context)
-        });
     },
 
     /**
@@ -199,17 +172,9 @@ const SelectionManager = {
      * @param {string} tag - Tag to remove
      */
     removeContextTag(tag) {
-        console.log('[SelectionManager] removeContextTag:before', {
-            tag,
-            context: Array.from(this.selections.context)
-        });
         this.selections.context.delete(tag);
         this.saveSelectionState();
         this.updateSelectionUI();
-        console.log('[SelectionManager] removeContextTag:after', {
-            tag,
-            context: Array.from(this.selections.context)
-        });
     },
 
     /**
@@ -716,13 +681,6 @@ const SelectionManager = {
 
         const computedTags = this.getComputedContextTags();
         const timeTags = this.getTimeTags();
-
-        console.log('[SelectionManager] renderContextSidebar', {
-            userTags,
-            computedTags,
-            timeTags,
-            selectedContext: Array.from(this.selections.context)
-        });
 
         // Split user tags into active and archived
         const activeUserTags = userTags.filter(tag => !this._archivedTags.has(tag));

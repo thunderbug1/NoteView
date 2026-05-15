@@ -396,7 +396,7 @@ const BlockSelector = {
                 }
             } catch (err) {
                 console.error('Bulk delete tasks failed:', err);
-                showToast('Failed to delete some tasks');
+                Common.showToast('Failed to delete some tasks');
             }
 
             this.selectedIds.clear();
@@ -418,7 +418,7 @@ const BlockSelector = {
                 }
             } catch (err) {
                 console.error('Bulk delete blocks failed:', err);
-                showToast('Failed to delete some notes');
+                Common.showToast('Failed to delete some notes');
             }
 
             TimelineView.invalidateCache();
