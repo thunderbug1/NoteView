@@ -195,7 +195,7 @@ const TagModal = {
                     display = escapedText;
                     hint = '';
                 }
-                return `<div class="ac-item" data-index="${i}" data-completed="${s.completed}">${display}${hint}</div>`;
+                return `<div class="ac-item" data-index="${i}" data-completed="${escapeHtml(s.completed)}">${display}${hint}</div>`;
             }).join('');
             autocomplete.style.display = 'block';
 
@@ -450,14 +450,14 @@ const TagModal = {
             const selClass = allSelected ? 'group-selected' : '';
 
             html += `<div class="tag-modal-group ${selClass}" data-group-path="${escapeHtml(groupName)}">`;
-            html += `<div class="tag-modal-group-header">${Common.capitalizeFirst(groupName)}</div>`;
+            html += `<div class="tag-modal-group-header">${escapeHtml(Common.capitalizeFirst(groupName))}</div>`;
             html += `<div class="tag-modal-group-items">`;
 
             groupTags.forEach(tag => {
                 const { leaf } = Common.parseHierarchicalTag(tag);
                 const selClass = selectedTags.has(tag) ? ' selected' : '';
                 html += `<div class="tag-modal-item${selClass}" data-tag="${escapeHtml(tag)}">`;
-                html += `<span class="tag-badge">${Common.capitalizeFirst(leaf)}</span>`;
+                html += `<span class="tag-badge">${escapeHtml(Common.capitalizeFirst(leaf))}</span>`;
                 html += `</div>`;
             });
 
@@ -468,7 +468,7 @@ const TagModal = {
         flat.forEach(tag => {
             const selClass = selectedTags.has(tag) ? ' selected' : '';
             html += `<div class="tag-modal-item tag-modal-flat-item${selClass}" data-tag="${escapeHtml(tag)}">`;
-            html += `<span class="tag-badge">${SelectionManager.getTagDisplayName(tag)}</span>`;
+            html += `<span class="tag-badge">${escapeHtml(SelectionManager.getTagDisplayName(tag))}</span>`;
             html += `</div>`;
         });
 
@@ -509,7 +509,7 @@ const TagModal = {
                 group.className = 'tag-modal-group';
                 group.dataset.groupPath = groupName;
                 group.innerHTML = `
-                    <div class="tag-modal-group-header">${Common.capitalizeFirst(groupName)}</div>
+                    <div class="tag-modal-group-header">${escapeHtml(Common.capitalizeFirst(groupName))}</div>
                     <div class="tag-modal-group-items"></div>
                 `;
                 const firstFlat = list.querySelector(':scope > .tag-modal-flat-item');
@@ -830,7 +830,7 @@ const TagModal = {
                     display = escapedText;
                     hint = '';
                 }
-                return `<div class="ac-item" data-index="${i}" data-completed="${s.completed}">${display}${hint}</div>`;
+                return `<div class="ac-item" data-index="${i}" data-completed="${escapeHtml(s.completed)}">${display}${hint}</div>`;
             }).join('');
             autocomplete.style.display = 'block';
 

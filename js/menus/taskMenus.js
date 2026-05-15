@@ -109,6 +109,7 @@ function createTaskMenus(documentView) {
             const items = [...menu.querySelectorAll('.menu-item')];
             const idx = items.indexOf(document.activeElement);
             if (evt.key === 'Escape') {
+                document.removeEventListener('click', closeMenu);
                 menu.remove();
                 view.focus();
             } else if (evt.key === 'ArrowDown') {
@@ -225,6 +226,7 @@ function createTaskMenus(documentView) {
             const items = [...menu.querySelectorAll('.menu-item')];
             const idx = items.indexOf(document.activeElement);
             if (evt.key === 'Escape') {
+                document.removeEventListener('click', closeMenu);
                 menu.remove();
                 view.focus();
             } else if (evt.key === 'ArrowDown') {

@@ -959,7 +959,7 @@ const SelectionManager = {
             html += `<div class="${groupClasses.join(' ')}" data-group-path="${escapeHtml(groupName)}">`;
             html += `<div class="tag-group-parent">`;
             html += `<span class="tag-group-toggle">&#9654;</span>`;
-            html += `<span class="tag-group-name">${Common.capitalizeFirst(groupName)}</span>`;
+            html += `<span class="tag-group-name">${escapeHtml(Common.capitalizeFirst(groupName))}</span>`;
             html += `</div>`;
             html += `<div class="tag-group-children">`;
 
