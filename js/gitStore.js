@@ -21,6 +21,7 @@ const GitStore = {
         
         try {
             await this.git.init({ fs: this.fs, dir: this.dir });
+            Logger.log('Git initialized successfully');
             return true;
         } catch (err) {
             console.error('Failed to init Git:', err);
@@ -52,6 +53,7 @@ const GitStore = {
             const sha = await this.git.commit({
                 fs: this.fs, dir: this.dir, author: this.author, message
             });
+            Logger.log('Commit all as ' + sha);
             return sha;
         } catch (err) {
             console.error('Failed to commit all:', err);
@@ -70,6 +72,7 @@ const GitStore = {
                 author: this.author,
                 message: message
             });
+            Logger.log('Committed ' + filename + ' as ' + sha);
             return sha;
         } catch (err) {
             console.error(`Failed to commit ${filename}:`, err);
@@ -88,6 +91,7 @@ const GitStore = {
                 author: this.author,
                 message: message
             });
+            Logger.log('Committed deletion of ' + filename + ' as ' + sha);
             return sha;
         } catch (err) {
             console.error(`Failed to commit deletion of ${filename}:`, err);

@@ -52,6 +52,13 @@ const SyncManager = {
             this._startIntervalSync();
         }
 
+        Logger.log('[SyncManager] initialized', {
+            autoSync: this._config.autoSync,
+            interval: this._config.syncInterval,
+            hasRemote: !!GitRemote.config,
+            pendingCommits: this._pendingCommits
+        });
+
         this._setStatus(this._status, this._statusDetail);
     },
 

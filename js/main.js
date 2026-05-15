@@ -163,6 +163,11 @@ const App = {
         document.getElementById('app')?.classList.remove('no-vault');
         const fab = document.getElementById('fabNewNote');
         if (fab) fab.style.display = '';
+        Logger.log('[App] completeInitialization:start', {
+            isInitialized: this.isInitialized,
+            currentView: Store.currentView,
+            blockCount: Store.blocks.length
+        });
         if (this.isInitialized) {
             try {
                 AppSettings.invalidate();
@@ -173,6 +178,10 @@ const App = {
                 SelectionManager.updateTagCounts();
                 this.updateVaultSwitcherName();
                 this.render();
+                Logger.log('[App] completeInitialization:reenter', {
+                    currentView: Store.currentView,
+                    context: Array.from(SelectionManager.selections.context)
+                });
             } finally {
                 this._initInProgress = false;
             }
@@ -190,6 +199,10 @@ const App = {
             this.render();
             // Collapse right sidebar on initial load when there are no deadlines
             this._collapseRightIfNoDeadlines();
+            Logger.log('[App] completeInitialization:done', {
+                currentView: Store.currentView,
+                context: Array.from(SelectionManager.selections.context)
+            });
             this.isInitialized = true;
         } finally {
             this._initInProgress = false;
@@ -798,6 +811,10 @@ const App = {
 
     setView(view) {
         const previousView = Store.currentView;
+        Logger.log('[App] setView', {
+            requestedView: view,
+            previousView
+        });
 
         // Leaving settings: restore sidebars
         if (previousView === 'settings' && view !== 'settings') {
@@ -827,6 +844,9 @@ const App = {
         if (recentBtn) recentBtn.hidden = view !== 'document';
 
         this.render({ loading: true });
+        Logger.log('[App] setView:done', {
+            currentView: Store.currentView
+        });
     },
 
     _saveSidebarState() {

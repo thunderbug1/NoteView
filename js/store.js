@@ -104,21 +104,25 @@ const Store = {
                     completed = true;
                     clearTimeout(timeout);
                     this.db = request.result;
+                    Logger.log('IndexedDB opened successfully, version:', this.db.version);
                     resolve();
                 }
             };
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
+                Logger.log('IndexedDB upgrade needed, old version:', event.oldVersion, 'new version:', event.newVersion);
                 if (!db.objectStoreNames.contains(this.STORE_NAME)) {
                     db.createObjectStore(this.STORE_NAME);
                 }
                 // Add store for undo/redo state (new in version 2)
                 if (!db.objectStoreNames.contains('undoRedoState')) {
                     db.createObjectStore('undoRedoState');
+                    Logger.log('Creating undoRedoState object store');
                 }
                 if (!db.objectStoreNames.contains('chatHistory')) {
                     db.createObjectStore('chatHistory');
+                    Logger.log('Creating chatHistory object store');
                 }
             };
 
@@ -324,6 +328,7 @@ const Store = {
                 if (err.needsPermission) {
                     throw err;
                 }
+                Logger.log('Could not restore directory handle:', err);
             }
         }
 
@@ -344,6 +349,7 @@ const Store = {
             } else {
                 this.currentView = allowedViews.has(savedView) ? savedView : 'document';
             }
+            Logger.log('[Store] loadCurrentView', { savedView, resolvedView: this.currentView });
         } catch (error) {
             console.warn('Could not load current view:', error);
             this.currentView = isMobile ? 'capture' : 'document';
@@ -355,6 +361,7 @@ const Store = {
     saveCurrentView() {
         try {
             localStorage.setItem(this.CURRENT_VIEW_STORAGE_KEY, this.currentView);
+            Logger.log('[Store] saveCurrentView', { currentView: this.currentView });
         } catch (error) {
             console.warn('Could not save current view:', error);
         }
@@ -364,8 +371,10 @@ const Store = {
 
     setCurrentView(view) {
         const allowedViews = new Set(['document', 'timeline', 'kanban', 'settings', 'capture']);
+        Logger.log('[Store] setCurrentView:before', { requestedView: view, currentView: this.currentView });
         this.currentView = allowedViews.has(view) ? view : 'document';
         this.saveCurrentView();
+        Logger.log('[Store] setCurrentView:after', { currentView: this.currentView });
         return this.currentView;
     },
 
@@ -1108,6 +1117,7 @@ const Store = {
             }
         }
         this.extractContacts();
+        Logger.log('Loaded ' + this.blocks.length + ' blocks');
     }
 };
 
