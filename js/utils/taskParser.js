@@ -58,8 +58,12 @@ function extractBadges(text) {
         if (KNOWN_BADGE_KEYS.includes(key)) {
             badges.push({ type: key, value: val });
         }
-        cleanText = cleanText.replace(match[0], '');
     }
+
+    // Remove all badges in a single pass to avoid position shifts from sequential replace
+    cleanText = text.replace(BADGE_REGEX, (m, key) => {
+        return KNOWN_BADGE_KEYS.includes(key) ? '' : m;
+    });
 
     return { badges, cleanText: cleanText.trim() };
 }

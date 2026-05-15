@@ -158,6 +158,7 @@ const App = {
 
     async completeInitialization() {
         if (this._initInProgress) return;
+        this._initInProgress = true;
         // Show sidebars and FAB now that a vault is open
         document.getElementById('app')?.classList.remove('no-vault');
         const fab = document.getElementById('fabNewNote');
@@ -168,21 +169,24 @@ const App = {
             blockCount: Store.blocks.length
         });
         if (this.isInitialized) {
-            AppSettings.invalidate();
-            await GitRemote.init();
-            await SyncManager.init();
-            await AIAssistant.init();
-            SelectionManager.init();
-            SelectionManager.updateTagCounts();
-            this.updateVaultSwitcherName();
-            this.render();
-            console.log('[App] completeInitialization:reenter', {
-                currentView: Store.currentView,
-                context: Array.from(SelectionManager.selections.context)
-            });
+            try {
+                AppSettings.invalidate();
+                await GitRemote.init();
+                await SyncManager.init();
+                await AIAssistant.init();
+                SelectionManager.init();
+                SelectionManager.updateTagCounts();
+                this.updateVaultSwitcherName();
+                this.render();
+                console.log('[App] completeInitialization:reenter', {
+                    currentView: Store.currentView,
+                    context: Array.from(SelectionManager.selections.context)
+                });
+            } finally {
+                this._initInProgress = false;
+            }
             return;
         }
-        this._initInProgress = true;
         this.isInitialized = true;
         try {
             await GitRemote.init();

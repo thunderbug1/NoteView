@@ -135,7 +135,7 @@ function hasContact(content, contactName) {
 // Export for use in other modules
 window.ContactHelper = {
     get CONTACT_MENTION_REGEX() { return /(?:^|\s)@([a-zA-Z0-9_]+)(?!\S)/g; },
-    get CONTACT_ASSIGNEE_REGEX() { return /\[assignee::\s*(@?[a-zA-Z0-9_]+)\]/g; },
+    get CONTACT_ASSIGNEE_REGEX() { return /\[assignee::\s*([^\]]+)\]/g; },
     normalizeContactName,
     extractMentions,
     extractAssignees,

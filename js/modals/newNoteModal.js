@@ -232,16 +232,18 @@ const NewNoteModal = {
                 const lines = buffer.split('\n');
                 buffer = lines.pop();
 
+                let streamDone = false;
                 for (const line of lines) {
                     if (!line.startsWith('data: ')) continue;
                     const data = line.slice(6).trim();
-                    if (data === '[DONE]') break;
+                    if (data === '[DONE]') { streamDone = true; break; }
                     try {
                         const parsed = JSON.parse(data);
                         const chunk = parsed.choices?.[0]?.delta?.content || '';
                         if (chunk) fullContent += chunk;
                     } catch { /* skip malformed chunks */ }
                 }
+                if (streamDone) break;
             }
 
             let noteContent = fullContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```\s*$/i, '').trim();

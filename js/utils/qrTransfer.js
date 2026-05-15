@@ -424,8 +424,9 @@ const QRTransfer = {
     // --- Camera lifecycle ---
 
     async _startScanner(video, canvas, statusEl, container, onResult) {
+        let stream;
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+            stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' }
             });
             this._stream = stream;
@@ -455,6 +456,11 @@ const QRTransfer = {
 
             this._scanRafId = requestAnimationFrame(scanFrame);
         } catch (e) {
+            // Clean up stream if setup failed after getUserMedia succeeded
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                this._stream = null;
+            }
             container.style.display = 'none';
             if (e.name === 'NotAllowedError') {
                 statusEl.textContent = 'Camera permission denied. Use paste instead.';

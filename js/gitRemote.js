@@ -91,27 +91,39 @@ const GitRemote = {
         }
 
         if (!hasLocalBranch) {
-            // Remove local config files only on fresh checkout to avoid conflicts
+            // Read local settings before fresh checkout so we can restore on failure
+            let localSettings = null;
+            try {
+                localSettings = await fs.readFile('.noteview/settings.json', { encoding: 'utf8' });
+            } catch (e) { /* may not exist */ }
             try { await fs.unlink('.noteview/settings.json'); } catch (e) { /* may not exist */ }
             console.log('Pull: no local branch, fetching and checking out from remote');
-            await git.fetch({
-                fs, dir,
-                http: window.GitHttp,
-                remote: remoteName,
-                corsProxy: this._getCorsProxy(),
-                onAuth: () => this.config.auth
-            });
-            const remoteRef = `refs/remotes/${remoteName}/${ref}`;
-            let commitOid;
             try {
-                commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
-            } catch (e) {
-                throw new Error(`Remote branch '${ref}' not found. Push some commits first.`);
+                await git.fetch({
+                    fs, dir,
+                    http: window.GitHttp,
+                    remote: remoteName,
+                    corsProxy: this._getCorsProxy(),
+                    onAuth: () => this.config.auth
+                });
+                const remoteRef = `refs/remotes/${remoteName}/${ref}`;
+                let commitOid;
+                try {
+                    commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
+                } catch (e) {
+                    throw new Error(`Remote branch '${ref}' not found. Push some commits first.`);
+                }
+                await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
+                await git.checkout({ fs, dir, ref, force: true });
+                console.log('Checkout from remote successful');
+                return true;
+            } catch (checkoutError) {
+                // Restore local settings if checkout failed
+                if (localSettings !== null) {
+                    try { await fs.writeFile('.noteview/settings.json', localSettings, { encoding: 'utf8' }); } catch (e) { /* best effort */ }
+                }
+                throw checkoutError;
             }
-            await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
-            await git.checkout({ fs, dir, ref, force: true });
-            console.log('Checkout from remote successful');
-            return true;
         }
 
         try {

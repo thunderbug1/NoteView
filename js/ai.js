@@ -1295,9 +1295,10 @@ const AIAssistant = {
     _createDiffEditor(container, original, modified) {
         const create = () => {
             const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
-            const chat = this.getActiveChat();
-            if (chat?.diffEditorView) {
-                try { chat.diffEditorView.destroy(); } catch { /* cleanup */ }
+            // Destroy any previous diff editor on this container
+            const prevView = container._diffEditorView;
+            if (prevView) {
+                try { prevView.destroy(); } catch { /* cleanup */ }
             }
             const view = new EditorView({
                 doc: modified,
@@ -1314,7 +1315,8 @@ const AIAssistant = {
                 ],
                 parent: container
             });
-            if (chat) chat.diffEditorView = view;
+            // Track per-container so each diff card's editor is independently managed
+            container._diffEditorView = view;
         };
 
         if (window.CodeMirrorReady || window.CodeMirror?.basicSetup) {

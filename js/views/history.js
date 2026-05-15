@@ -80,6 +80,10 @@ const HistoryView = {
         
         document.body.appendChild(modal);
 
+        // Remove previous handler to prevent listener accumulation
+        if (this._escapeHandler) {
+            document.removeEventListener('keydown', this._escapeHandler);
+        }
         const escapeHandler = (e) => {
             if (e.key === 'Escape') this.closeHistory();
         };

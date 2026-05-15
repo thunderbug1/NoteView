@@ -9,7 +9,8 @@
  * @returns {Object} Cache object with get, set, invalidate, and isValid methods
  */
 function createCache(keyGenerator) {
-    let _cache = null;
+    const UNSET = Symbol('cache-unset');
+    let _cache = UNSET;
     let _cacheKey = null;
 
     return {
@@ -19,7 +20,7 @@ function createCache(keyGenerator) {
          */
         get() {
             const currentKey = keyGenerator();
-            if (_cache !== null && _cacheKey === currentKey) {
+            if (_cache !== UNSET && _cacheKey === currentKey) {
                 return _cache;
             }
             return null;
@@ -39,14 +40,14 @@ function createCache(keyGenerator) {
          * @returns {boolean} True if cache exists and key matches
          */
         isValid() {
-            return _cache !== null && _cacheKey === keyGenerator();
+            return _cache !== UNSET && _cacheKey === keyGenerator();
         },
 
         /**
          * Invalidate the cache
          */
         invalidate() {
-            _cache = null;
+            _cache = UNSET;
             _cacheKey = null;
         },
 

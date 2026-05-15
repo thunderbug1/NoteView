@@ -42,7 +42,7 @@ const GitStore = {
                         } else if (stat.isDirectory() && name === '.noteview') {
                             const subEntries = await this.fs.readdir(`${this.dir}/${name}`);
                             for (const sub of subEntries) {
-                                if (sub.endsWith('.json')) {
+                                if (sub.endsWith('.json') && sub !== 'keys.json') {
                                     await this.git.add({ fs: this.fs, dir: this.dir, filepath: `${name}/${sub}` });
                                 }
                             }

@@ -956,7 +956,7 @@ const Store = {
         if (!this._saveQueue) this._saveQueue = new Map();
         const prev = this._saveQueue.get(saveKey) || Promise.resolve();
         let resolveSave = () => {};
-        const next = prev.then(() => new Promise(r => { resolveSave = r; }));
+        const next = Promise.resolve(prev).then(() => new Promise(r => { resolveSave = r; }));
         this._saveQueue.set(saveKey, next);
 
         try {

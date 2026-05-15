@@ -39,7 +39,7 @@ const BlockSelector = {
         document.querySelectorAll('.kanban-card').forEach(c => c.setAttribute('draggable', 'false'));
 
         this._clickHandler = (e) => this._handleClick(e);
-        vc.addEventListener('click', this._clickHandler, true);
+        if (vc) vc.addEventListener('click', this._clickHandler, true);
 
         // Block mousedown on blocks to prevent editor focus in select mode
         this._mouseDownHandler = (e) => {
@@ -75,12 +75,12 @@ const BlockSelector = {
         }
 
         if (this._clickHandler) {
-            vc.removeEventListener('click', this._clickHandler, true);
+            if (vc) vc.removeEventListener('click', this._clickHandler, true);
             this._clickHandler = null;
         }
 
         if (this._mouseDownHandler) {
-            vc.removeEventListener('mousedown', this._mouseDownHandler, true);
+            if (vc) vc.removeEventListener('mousedown', this._mouseDownHandler, true);
             this._mouseDownHandler = null;
         }
 

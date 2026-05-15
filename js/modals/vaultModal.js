@@ -3,6 +3,8 @@
  */
 
 const VaultModal = {
+    _closeDropdownHandler: null,
+
     updateVaultSwitcherName() {
         const nameEl = document.getElementById('vaultSwitcherName');
         if (nameEl) {
@@ -11,9 +13,13 @@ const VaultModal = {
     },
 
     async showDropdown(btn) {
-        // Remove any existing dropdown
+        // Remove any existing dropdown and its listener
         const existing = document.getElementById('vaultDropdown');
-        if (existing) { existing.remove(); return; }
+        if (existing) {
+            this._removeCloseDropdownHandler();
+            existing.remove();
+            return;
+        }
 
         const vaultList = await Store.getVaultList();
         const currentName = Store.directoryHandle?.name || '';
@@ -97,11 +103,19 @@ const VaultModal = {
         // Close on outside click
         const closeDropdown = (e) => {
             if (!menu.contains(e.target) && e.target !== btn) {
+                this._removeCloseDropdownHandler();
                 menu.remove();
-                document.removeEventListener('click', closeDropdown);
             }
         };
         document.addEventListener('click', closeDropdown);
+        this._closeDropdownHandler = closeDropdown;
+    },
+
+    _removeCloseDropdownHandler() {
+        if (this._closeDropdownHandler) {
+            document.removeEventListener('click', this._closeDropdownHandler);
+            this._closeDropdownHandler = null;
+        }
     },
 
     async switchVault(name) {

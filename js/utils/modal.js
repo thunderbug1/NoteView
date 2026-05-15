@@ -206,6 +206,7 @@ function createPrompt(options) {
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') submit();
             if (e.key === 'Escape') {
+                e.stopPropagation();
                 resolve(null);
                 modal.close();
             }

@@ -10,7 +10,7 @@ const SendToVault = {
         const otherVaults = vaultList.filter(v => v.name !== currentVaultName);
 
         if (otherVaults.length === 0) {
-            Common.showToast('No other vaults available', 'info');
+            Common.showToast('No other vaults available');
             return;
         }
 
@@ -144,7 +144,7 @@ const SendToVault = {
             if (choice === 'skip') {
                 idsToCopy = blockIds.filter(id => !duplicateIds.includes(id));
                 if (idsToCopy.length === 0) {
-                    Common.showToast('All notes already exist in ' + vaultName, 'info');
+                    Common.showToast('All notes already exist in ' + vaultName);
                     return;
                 }
             }
@@ -192,7 +192,7 @@ const SendToVault = {
         const noun = copied === 1 ? 'note' : 'notes';
         const skipped = duplicateIds.length > 0 && idsToCopy.length < blockIds.length
             ? ` (${duplicateIds.length} skipped)` : '';
-        Common.showToast(`${verb} ${copied} ${noun} to ${vaultName}${skipped}`, 'success');
+        Common.showToast(`${verb} ${copied} ${noun} to ${vaultName}${skipped}`);
     },
 
     _showDuplicateSingleDialog(vaultName) {

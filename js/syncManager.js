@@ -164,12 +164,19 @@ const SyncManager = {
     onTabHidden() {
         if (this._syncing || !this._config.autoSync || !GitRemote.config || this._pendingCommits <= 0) return;
         this._syncing = true;
-        GitRemote.push().then(() => {
-            this._refreshPendingCount().catch(() => {});
-        }).catch(err => {
-            this._lastError = err.message;
-            console.warn('[SyncManager] background push failed:', err);
-        }).finally(() => { this._syncing = false; });
+        // Serialize through the same promise chain as sync() to prevent concurrent git operations
+        const doPush = async () => {
+            try {
+                await GitRemote.push();
+                await this._refreshPendingCount();
+            } catch (err) {
+                this._lastError = err.message;
+                console.warn('[SyncManager] background push failed:', err);
+            } finally {
+                this._syncing = false;
+            }
+        };
+        doPush();
     },
 
     // --- Scheduling ---
