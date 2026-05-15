@@ -100,14 +100,16 @@ const HistoryView = {
             });
         });
         
-        document.getElementById('restoreVersionBtn').addEventListener('click', () => {
+        const restoreBtn = document.getElementById('restoreVersionBtn');
+        if (restoreBtn) restoreBtn.addEventListener('click', () => {
             this.restoreVersion();
         });
-        
+
         if (this.commits.length > 0) {
             this.loadDiff(this.commits[0].oid);
         } else {
-            document.getElementById('diffEditorContainer').innerHTML = '<div style="padding:2rem;color:var(--text-secondary)">Save this note to create the first version in history.</div>';
+            const diffContainer = document.getElementById('diffEditorContainer');
+            if (diffContainer) diffContainer.innerHTML = '<div style="padding:2rem;color:var(--text-secondary)">Save this note to create the first version in history.</div>';
         }
     },
     
@@ -122,6 +124,7 @@ const HistoryView = {
         const block = Store.blocks.find(b => b.id === this.currentBlockId);
 
         const container = document.getElementById('diffEditorContainer');
+        if (!container) return;
         container.innerHTML = '';
 
         const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
@@ -145,7 +148,8 @@ const HistoryView = {
             parent: container
         });
 
-        document.getElementById('restoreVersionBtn').disabled = false;
+        const restoreBtn = document.getElementById('restoreVersionBtn');
+        if (restoreBtn) restoreBtn.disabled = false;
         this.selectedOid = oid;
         this.selectedOldContent = parsedOld.content;
         } catch (e) {

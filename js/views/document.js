@@ -3413,7 +3413,7 @@ const DocumentView = {
 
         // 2. Add-field widgets for task lines
         if (isTaskLine) {
-            if (!text.includes('[due::') || !text.includes('[start::')) {
+            if (!text.includes('[due::') && !text.includes('[start::')) {
                 builder.push(Decoration.widget({
                     widget: new widgets.AddDeadlineWidget(from, line.to),
                     side: 1

@@ -213,6 +213,7 @@ function createCodeMirrorWidgets(documentView) {
                 }
 
                 if (this.type === 'assignee') {
+                    if (!view.dom.parentElement) return;
                     const blockId = view.dom.parentElement.dataset.id;
                     const block = Store.blocks.find(b => b.id === blockId);
                     const tags = block ? block.tags : [];
@@ -514,6 +515,7 @@ function createCodeMirrorWidgets(documentView) {
             const handleClick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (!view.dom.parentElement) return;
                 const blockId = view.dom.parentElement.dataset.id;
                 const block = Store.blocks.find(b => b.id === blockId);
                 const tags = block ? block.tags : [];

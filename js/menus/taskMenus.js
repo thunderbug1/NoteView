@@ -98,7 +98,7 @@ function createTaskMenus(documentView) {
             }
             if (action === 'copy-task') {
                 const line = view.state.doc.lineAt(from);
-                navigator.clipboard.writeText(line.text);
+                navigator.clipboard.writeText(line.text).catch(() => {});
             }
             menu.remove();
             document.removeEventListener('click', closeMenu);

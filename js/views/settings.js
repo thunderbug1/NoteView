@@ -499,7 +499,7 @@ const SettingsView = {
                     if (confirm('Delete this model profile?')) {
                         AIAssistant.deleteProfile(id).then(() => {
                             profileList.innerHTML = this._renderProfiles();
-                        });
+                        }).catch(() => {});
                     }
                 }
             });
@@ -775,7 +775,7 @@ const SettingsView = {
                     AIAssistant.deletePreset(presetId).then(() => {
                         modal.close();
                         this._openPresetModal();
-                    });
+                    }).catch(() => {});
                 }
             });
         }

@@ -1517,7 +1517,7 @@ const App = {
                     } else if (action === 'copy') {
                         const editor = DocumentView.editors.get(blockId);
                         const content = editor ? editor.state.doc.toString() : (block.content || '');
-                        navigator.clipboard.writeText(content);
+                        navigator.clipboard.writeText(content).catch(() => {});
                     } else if (action === 'history') {
                         HistoryView.openHistory(blockId);
                     } else if (action === 'sendtovault') {
