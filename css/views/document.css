@@ -737,7 +737,15 @@
     background: color-mix(in srgb, var(--accent) 10%, var(--bg-secondary)) !important;
 }
 
-.md-gallery-card-link-icon {
+.md-gallery-card-link-icon,
+.md-gallery-card-shader-icon {
+    color: var(--text-secondary);
+}
+
+.md-gallery-card-label-inline {
+    position: static;
+    font-size: 0.72em;
+    background: none;
     color: var(--text-secondary);
 }
 
