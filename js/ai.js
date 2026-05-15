@@ -72,6 +72,15 @@ const AIAssistant = {
                     const num = parseInt(c.id.replace('chat-', ''));
                     return isNaN(num) ? 0 : num;
                 }), 0) + 1;
+                // Recalculate _msgIdCounter to avoid ID collisions with persisted messages
+                let maxMsgNum = 0;
+                for (const c of this._chats) {
+                    for (const m of c.messages) {
+                        const match = m.id?.match(/^msg-(\d+)/);
+                        if (match) maxMsgNum = Math.max(maxMsgNum, parseInt(match[1]));
+                    }
+                }
+                this._msgIdCounter = maxMsgNum;
                 this._activeChatId = this._chats[this._chats.length - 1].id;
             } else {
                 this._chats = [];
@@ -1508,6 +1517,8 @@ const AIAssistant = {
         const contextIds = [...chat.contextBlockIds];
         const total = contextIds.length;
 
+        try {
+
         // Add user message
         chat.messages.push({
             id: 'msg-' + (++this._msgIdCounter),
@@ -1709,6 +1720,21 @@ const AIAssistant = {
         this._renderTabs();
         this.showInlineDiffs();
         this.saveChats();
+
+        } catch (err) {
+            console.error('[AI] _sendPerNote unexpected error:', err);
+            chat.state = 'error';
+            chat.messages.push({
+                id: 'msg-' + (++this._msgIdCounter),
+                role: 'system', type: 'error',
+                content: 'Unexpected error: ' + (err.message || 'Unknown error'),
+                canRetry: true,
+                retryInstruction: instruction
+            });
+            this._renderActiveChat();
+            this._renderTabs();
+            this.saveChats();
+        }
     },
 
     // ==============================

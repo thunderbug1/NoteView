@@ -167,7 +167,7 @@ const GitRemote = {
                     // Restore local settings if they existed before
                     if (localSettings) {
                         try {
-                            await fs.writeFile('.noteview/settings.json', localSettings);
+                            await fs.writeFile('.noteview/settings.json', localSettings, { encoding: 'utf8' });
                         } catch (e) { /* ignore */ }
                     }
 

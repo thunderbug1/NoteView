@@ -964,7 +964,7 @@ const Store = {
             const keysBefore = isUpdate ? Object.keys(existingBlock) : null;
 
             // Apply allowed updates from options (prevent arbitrary key leakage into frontmatter)
-            const allowedKeys = new Set(['content', 'tags', 'priority', 'assignee', 'due', 'start', 'status', 'creationDate', 'lastUpdated']);
+            const allowedKeys = new Set(['content', 'tags', 'priority', 'assignee', 'due', 'start', 'status', 'creationDate', 'lastUpdated', 'pinned']);
             if (Object.keys(updates).length > 0) {
                 for (const key of Object.keys(updates)) {
                     if (allowedKeys.has(key) || key.endsWith('Date') || key.endsWith('At')) {

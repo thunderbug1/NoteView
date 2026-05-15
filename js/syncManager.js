@@ -126,7 +126,7 @@ const SyncManager = {
                 });
             } else if (this._isConflictError(err)) {
                 this._lastError = err.message;
-                this._handleMergeConflict();
+                await this._handleMergeConflict();
             } else {
                 this._lastError = err.message;
                 this._setStatus('error', err.message);
@@ -300,7 +300,7 @@ const SyncManager = {
     _isCorsError(err) {
         const msg = (err.message || '').toLowerCase();
         return msg.includes('failed to fetch') || msg.includes('networkerror') ||
-               msg.includes('typeerror') || msg.includes('load failed');
+               msg.includes('load failed');
     },
 
     async _handleMergeConflict() {

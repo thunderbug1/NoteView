@@ -104,6 +104,7 @@ const SelectionManager = {
         } catch (error) {
             console.warn('Could not load selection state:', error);
             this.selections.context = new Set();
+            this.selections.excluded = new Set();
         }
     },
 
