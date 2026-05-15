@@ -311,6 +311,13 @@ const SyncManager = {
         if (window.Store && Store._saveQueue && Store._saveQueue.size > 0) {
             await Promise.allSettled(Array.from(Store._saveQueue.values()));
         }
+        // Also flush debounced saves from editors (1-second timers)
+        if (window.DocumentView && typeof DocumentView.cancelAllPendingSaves === 'function') {
+            DocumentView.cancelAllPendingSaves();
+            if (Store._saveQueue && Store._saveQueue.size > 0) {
+                await Promise.allSettled(Array.from(Store._saveQueue.values()));
+            }
+        }
 
         // The failed pull may have left the index/working tree in a dirty merged state.
         // Reset to local HEAD so we can analyze cleanly.

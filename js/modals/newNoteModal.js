@@ -473,8 +473,19 @@ const NewNoteModal = {
                     self._isStoppingAIDictation = true;
                     if (self._aiRecognition) { self._aiRecognition.stop(); self._aiRecognition = null; }
                     self._aiTranscript = '';
-                    if (rawTranscript && !createdBlockId) {
-                        promoteModalBlock(rawTranscript);
+                    if (rawTranscript) {
+                        if (createdBlockId) {
+                            // Append transcript to existing promoted block
+                            const block = Store.blocks.find(b => b.id === createdBlockId);
+                            if (block) {
+                                await Store.saveBlock(block, {
+                                    content: (block.content || '') + '\n' + rawTranscript,
+                                    commit: true
+                                });
+                            }
+                        } else {
+                            promoteModalBlock(rawTranscript);
+                        }
                     }
                     self._cleanupAIDictation();
                 }

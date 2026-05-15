@@ -741,12 +741,14 @@ const Store = {
 
         const block = this.blocks[index];
 
+        // Set sentinel BEFORE draining save queue to block any racing saves.
+        this._deleteSentinels = this._deleteSentinels || new Set();
+        this._deleteSentinels.add(id);
+
         // Drain any in-flight save for this block to prevent it from
         // re-creating the file after deletion.
         if (this._saveQueue?.has(id)) {
             try { await this._saveQueue.get(id); } catch { /* save may have failed, proceed */ }
-            this._deleteSentinels = this._deleteSentinels || new Set();
-            this._deleteSentinels.add(id);
             this._saveQueue.delete(id);
         }
 
