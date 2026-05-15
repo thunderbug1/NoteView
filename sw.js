@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v37';
+const CACHE_NAME = 'noteview-v38';
 
 const PRECACHE_URLS = [
   './',
@@ -69,6 +69,7 @@ const PRECACHE_URLS = [
   './js/views/settings.js',
   './js/views/capture.js',
   './js/main.js',
+  './js/sw-register.js',
 ];
 
 function shouldUseNetworkFirst(request) {
