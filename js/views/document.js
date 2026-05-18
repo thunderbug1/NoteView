@@ -64,8 +64,8 @@ const DocumentView = {
     },
 
     async render(blocks, options = {}) {
-        // Cancel pending auto-saves before DOM rebuild to prevent stale writes
-        this.cancelAllPendingSaves();
+        // Flush and commit pending auto-saves before DOM rebuild to prevent stale writes and guarantee data persistence
+        await this.flushAllPendingSaves();
 
         // Clear stale highlight positions from previous render
         this._highlightPositions.clear();
@@ -3117,7 +3117,9 @@ const DocumentView = {
                 const content = view.state.doc.toString();
                 if (currentId !== 'new' && currentId !== 'new-modal') {
                     // Skip blur handling during undo/redo or AI streaming
-                    if (UndoRedoManager.isExecuting || NewNoteModal._aiIsStreaming || NewNoteModal._aiDictationActive) {
+                    const isUndoRedo = typeof UndoRedoManager !== 'undefined' && UndoRedoManager.isExecuting;
+                    const isAiActive = typeof NewNoteModal !== 'undefined' && (NewNoteModal._aiIsStreaming || NewNoteModal._aiDictationActive);
+                    if (isUndoRedo || isAiActive) {
                         return;
                     }
                     // Guard against double-blur: skip if block was already deleted
@@ -3911,6 +3913,22 @@ const DocumentView = {
         this.saveTimeouts.clear();
     },
 
+    async flushAllPendingSaves() {
+        if (!this.saveTimeouts || this.saveTimeouts.size === 0) return;
+
+        const promises = [];
+        for (const [blockId, timeout] of this.saveTimeouts) {
+            clearTimeout(timeout);
+            const editor = this.editors.get(blockId);
+            if (editor) {
+                const content = editor.state.doc.toString();
+                promises.push(App.saveBlockContent(blockId, content, { commit: true }));
+            }
+        }
+        this.saveTimeouts.clear();
+        await Promise.allSettled(promises);
+    },
+
     scheduleSave(blockId, content) {
         const indicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
         if (indicator) {
@@ -3970,8 +3988,8 @@ const DocumentView = {
         await Store.createBlock(content);
         this.newBlockContent = '';
 
-        // Cancel pending saves before destroying editors to prevent stale writes
-        this.cancelAllPendingSaves();
+        // Flush and commit pending saves before destroying editors to prevent stale writes and data loss
+        await this.flushAllPendingSaves();
         for (const editor of this.editors.values()) {
             editor.destroy();
         }

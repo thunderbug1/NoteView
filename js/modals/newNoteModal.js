@@ -465,7 +465,7 @@ const NewNoteModal = {
             title: 'Create Note',
             content,
             modalClass: 'tag-modal content-modal active-recording-preventer',
-            onClose: () => {
+            onClose: async () => {
                 DocumentView.stopSpeechRecognition();
                 if (self._aiDictationActive && !self._aiIsProcessing) {
                     const rawTranscript = (self._aiTranscript || '').trim();

@@ -680,6 +680,10 @@ const Store = {
     },
 
     async switchToVault(handle) {
+        // Flush any pending saves before we switch vaults!
+        if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
+            await DocumentView.flushAllPendingSaves();
+        }
         // Check / request permission — skip for OPFS vaults
         const vaultList = await this.getVaultList();
         const vaultEntry = vaultList.find(v => v.name === handle.name);

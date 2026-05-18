@@ -1786,10 +1786,14 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Also close when page becomes hidden (user switches tabs)
-document.addEventListener('visibilitychange', () => {
+document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
+        if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
+            await DocumentView.flushAllPendingSaves();
+        }
         if (window.SyncManager && typeof SyncManager.onTabHidden === 'function') SyncManager.onTabHidden();
     } else if (window.SyncManager && typeof SyncManager.onTabVisible === 'function') {
         SyncManager.onTabVisible();
     }
 });
+

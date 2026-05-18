@@ -56,6 +56,8 @@ const GitRemote = {
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
 
+        await this._ensureCorrectBranch();
+
         try {
             await git.push({
                 fs,
@@ -80,6 +82,8 @@ const GitRemote = {
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
         const remoteName = this.config.name;
+
+        await this._ensureCorrectBranch();
 
         // Check if local branch exists (fresh repos have none)
         let hasLocalBranch = false;
@@ -203,6 +207,8 @@ const GitRemote = {
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
 
+        await this._ensureCorrectBranch();
+
         try {
             const head = await git.resolveRef({ fs, dir, ref: 'HEAD' });
             let remoteHead;
@@ -232,6 +238,55 @@ const GitRemote = {
         } catch (err) {
             console.error('Failed to get sync status:', err);
             return { hasRemote: true, error: err.message };
+        }
+    },
+
+    async _ensureCorrectBranch() {
+        if (!GitStore.git || !GitStore.fs) return;
+        const { git, fs, dir } = GitStore;
+        const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
+
+        // Check if the configured branch already exists locally
+        try {
+            await git.resolveRef({ fs, dir, ref: `refs/heads/${ref}` });
+            return; // Configured branch already exists, nothing to do
+        } catch (e) {
+            // Configured branch does not exist locally
+        }
+
+        // If the configured branch is 'main', and 'master' exists locally, rename 'master' to 'main'
+        if (ref === 'main') {
+            try {
+                const masterOid = await git.resolveRef({ fs, dir, ref: 'refs/heads/master' });
+                Logger.log(`[GitRemote] Found local 'master' branch but expected 'main'. Renaming to 'main'...`);
+                
+                // 1. Write the new ref pointing to the current master commit
+                await git.writeRef({
+                    fs,
+                    dir,
+                    ref: 'refs/heads/main',
+                    value: masterOid,
+                    force: true
+                });
+                
+                // 2. Point HEAD to the new ref
+                await git.writeRef({
+                    fs,
+                    dir,
+                    ref: 'HEAD',
+                    value: 'refs/heads/main',
+                    symbolic: true,
+                    force: true
+                });
+                
+                // 3. Delete the old master ref
+                await git.deleteRef({ fs, dir, ref: 'refs/heads/master' });
+                
+                Logger.log(`[GitRemote] Local branch 'master' successfully renamed to 'main'.`);
+            } catch (e) {
+                // 'master' branch does not exist either, meaning it's a completely fresh repo.
+                // We'll let the checkout/pull logic handle creating the branch.
+            }
         }
     },
 

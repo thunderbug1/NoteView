@@ -104,6 +104,20 @@ const SyncManager = {
         this._setStatus('syncing', 'Syncing...');
         if (window.App) App.showViewLoading();
         try {
+            // Flush and commit any pending edits first
+            if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
+                await DocumentView.flushAllPendingSaves();
+            }
+
+            // Auto-stage and commit any other unstaged local files before sync
+            if (window.GitStore && typeof GitStore.commitAll === 'function') {
+                try {
+                    await GitStore.commitAll('Auto-commit local changes before sync');
+                } catch (commitErr) {
+                    console.warn('[SyncManager] Auto-commit skipped/failed (possibly nothing to commit):', commitErr);
+                }
+            }
+
             await GitRemote.pull();
             await GitRemote.push();
             this._lastSyncTime = new Date().toISOString();
@@ -311,12 +325,9 @@ const SyncManager = {
         if (window.Store && Store._saveQueue && Store._saveQueue.size > 0) {
             await Promise.allSettled(Array.from(Store._saveQueue.values()));
         }
-        // Also flush debounced saves from editors (1-second timers)
-        if (window.DocumentView && typeof DocumentView.cancelAllPendingSaves === 'function') {
-            DocumentView.cancelAllPendingSaves();
-            if (Store._saveQueue && Store._saveQueue.size > 0) {
-                await Promise.allSettled(Array.from(Store._saveQueue.values()));
-            }
+        // Also flush and commit debounced saves from editors (1-second timers)
+        if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
+            await DocumentView.flushAllPendingSaves();
         }
 
         // The failed pull may have left the index/working tree in a dirty merged state.

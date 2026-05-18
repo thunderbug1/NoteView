@@ -20,7 +20,7 @@ const GitStore = {
         this.fs = adapter.promises;
         
         try {
-            await this.git.init({ fs: this.fs, dir: this.dir });
+            await this.git.init({ fs: this.fs, dir: this.dir, defaultBranch: 'main' });
             Logger.log('Git initialized successfully');
             return true;
         } catch (err) {
