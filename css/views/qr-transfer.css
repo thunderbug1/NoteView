@@ -8,7 +8,7 @@
     padding: 1rem 0;
 }
 
-.qr-transfer-display svg {
+.qr-transfer-display > svg {
     max-width: 500px;
     width: 100%;
     border-radius: var(--radius-md, 8px);
@@ -122,14 +122,8 @@
 .qr-import-confirm {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 1rem;
     padding: 0.5rem 0;
-}
-
-.qr-import-confirm .qr-transfer-summary {
-    background: var(--bg-secondary);
-    padding: 0.75rem;
-    border-radius: var(--radius-sm, 4px);
 }
 
 .qr-import-actions {
@@ -137,3 +131,75 @@
     gap: 0.5rem;
     justify-content: flex-end;
 }
+
+/* Premium additions for QR transfer */
+.qr-transfer-display > svg {
+    max-width: 320px;
+    width: 100%;
+    border-radius: var(--radius-md, 12px);
+    background: #fff;
+    padding: 1.5rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qr-transfer-display > svg:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.4), 0 12px 15px -8px rgba(0, 0, 0, 0.4);
+}
+
+.qr-transfer-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.qr-transfer-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 8px);
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.qr-transfer-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.qr-transfer-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.qr-transfer-card-header svg {
+    color: var(--accent);
+}
+
+.qr-transfer-card-value {
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 500;
+    word-break: break-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Custom indicator states */
+.qr-transfer-card.vault .qr-transfer-card-header svg { color: #3b82f6; }
+.qr-transfer-card.git .qr-transfer-card-header svg { color: #10b981; }
+.qr-transfer-card.ai .qr-transfer-card-header svg { color: #8b5cf6; }
+.qr-transfer-card.sync .qr-transfer-card-header svg { color: #f59e0b; }

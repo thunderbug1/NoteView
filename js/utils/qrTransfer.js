@@ -59,14 +59,21 @@ const QRTransfer = {
     _validateData(raw) {
         if (typeof raw !== 'string') return null;
 
+        let payload = raw;
+        if (raw.includes('#import=')) {
+            payload = raw.split('#import=')[1];
+        } else if (raw.includes('?import=')) {
+            payload = raw.split('?import=')[1].split('#')[0];
+        }
+
         let jsonString;
-        if (raw.startsWith('Z:')) {
+        if (payload.startsWith('Z:')) {
             try {
-                jsonString = LZString.decompressFromEncodedURIComponent(raw.slice(2));
+                jsonString = LZString.decompressFromEncodedURIComponent(payload.slice(2));
             } catch { return null; }
             if (!jsonString) return null;
         } else {
-            jsonString = raw;
+            jsonString = payload;
         }
 
         let data;
@@ -142,6 +149,51 @@ const QRTransfer = {
         return parts;
     },
 
+    _describePayloadWithIcons(data) {
+        const items = [];
+        if (data.n) {
+            items.push({
+                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`,
+                label: 'Vault Name',
+                value: escapeHtml(data.n),
+                class: 'vault'
+            });
+        }
+        if (data.g) {
+            const url = data.g.u || '(unknown)';
+            const displayUrl = url.length > 40 ? url.slice(0, 37) + '...' : url;
+            items.push({
+                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>`,
+                label: 'Git Sync Remote',
+                value: escapeHtml(displayUrl),
+                class: 'git'
+            });
+        }
+        if (data.a) {
+            const profiles = (data.a.p || []).length;
+            const presets = (data.a.pr || []).length;
+            const keys = Object.keys(data.a.k || {}).length;
+            let val = `${profiles} profile${profiles !== 1 ? 's' : ''}`;
+            if (presets) val += `, ${presets} preset${presets !== 1 ? 's' : ''}`;
+            if (keys) val += ` (${keys} API key${keys !== 1 ? 's' : ''})`;
+            items.push({
+                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>`,
+                label: 'AI Setup',
+                value: val,
+                class: 'ai'
+            });
+        }
+        if (data.s) {
+            items.push({
+                icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`,
+                label: 'Sync Config',
+                value: `${data.s.a ? 'Auto-sync' : 'Manual sync'} (every ${data.s.i}m)`,
+                class: 'sync'
+            });
+        }
+        return items;
+    },
+
     // --- QR generation ---
 
     _generateQR(text) {
@@ -168,9 +220,12 @@ const QRTransfer = {
         }
 
         const compressed = LZString.compressToEncodedURIComponent(json);
-        const qrPayload = 'Z:' + compressed;
+        const importPayload = 'Z:' + compressed;
 
-        if (compressed.length > 2300) {
+        const currentUrl = window.location.origin + window.location.pathname;
+        const qrPayload = currentUrl + '#import=' + importPayload;
+
+        if (qrPayload.length > 2500) {
             showToast('Settings too large for a single QR code. Remove some AI profiles or presets.');
             return;
         }
@@ -184,7 +239,7 @@ const QRTransfer = {
         }
 
         const parsed = JSON.parse(json);
-        const summary = this._describePayload(parsed);
+        const items = this._describePayloadWithIcons(parsed);
 
         const modal = Modal.create({
             title: 'Transfer Settings',
@@ -192,16 +247,39 @@ const QRTransfer = {
             content: `
                 <div class="qr-transfer-display">
                     ${svgMarkup}
-                    <button class="settings-btn secondary" id="qrCopyJsonBtn" style="margin-top:0.25rem">Copy JSON</button>
-                    <div class="qr-transfer-warning">
-                        This QR code contains API keys and git credentials. Only scan on a trusted device.
+                    <div style="display:flex;gap:0.5rem;width:100%;justify-content:center;margin-top:0.25rem;">
+                        <button class="settings-btn secondary" id="qrCopyLinkBtn">Copy Transfer Link</button>
+                        <button class="settings-btn secondary" id="qrCopyJsonBtn">Copy JSON</button>
                     </div>
-                    <div class="qr-transfer-summary">
-                        ${summary.map(s => '<span>' + s + '</span>').join('')}
+                    <div class="qr-transfer-warning">
+                        This QR code/link contains API keys and git credentials. Only share with trusted devices.
+                    </div>
+                    <div class="qr-transfer-cards">
+                        ${items.map(item => `
+                            <div class="qr-transfer-card ${item.class}">
+                                <div class="qr-transfer-card-header">
+                                    ${item.icon}
+                                    <span class="qr-transfer-card-label">${item.label}</span>
+                                </div>
+                                <div class="qr-transfer-card-value">${item.value}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `
         });
+
+        const copyLinkBtn = modal.querySelector('#qrCopyLinkBtn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(qrPayload);
+                    showToast('Transfer link copied to clipboard.');
+                } catch {
+                    showToast('Failed to copy link.');
+                }
+            });
+        }
 
         const copyBtn = modal.querySelector('#qrCopyJsonBtn');
         if (copyBtn) {
@@ -279,11 +357,11 @@ const QRTransfer = {
     _handleScanResult(raw) {
         const data = this._validateData(raw);
         if (!data) {
-            showToast('Could not read settings from QR code.');
+            showToast('Could not read settings from QR code or link.');
             return;
         }
 
-        const summary = this._describePayload(data);
+        const items = this._describePayloadWithIcons(data);
         const hasVault = !!Store.directoryHandle;
         const hasLocalPicker = 'showDirectoryPicker' in window;
 
@@ -291,20 +369,20 @@ const QRTransfer = {
         if (!hasVault) {
             vaultActions = `
                 <div class="qr-vault-setup" style="margin-top:0.75rem">
-                    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem">Choose where to store the new vault:</p>
+                    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem">Choose where to store the new vault:</p>
                     <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-                        ${hasLocalPicker ? '<button class="settings-btn secondary" id="qrNewFolderBtn">Select Folder...</button>' : ''}
-                        <button class="settings-btn secondary" id="qrNewBrowserBtn">Browser Vault...</button>
+                        ${hasLocalPicker ? '<button class="settings-btn primary" id="qrNewFolderBtn">Select Local Folder...</button>' : ''}
+                        <button class="settings-btn ${hasLocalPicker ? 'secondary' : 'primary'}" id="qrNewBrowserBtn">Create Browser Vault...</button>
                     </div>
                 </div>
             `;
         } else {
             vaultActions = `
                 <div class="qr-vault-setup" style="margin-top:0.75rem">
-                    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem">Apply to current vault or create a new one:</p>
+                    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem">Apply to current vault or create a new one:</p>
                     <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-                        <button class="settings-btn" id="qrApplyCurrentBtn">Apply to Current Vault</button>
-                        ${hasLocalPicker ? '<button class="settings-btn secondary" id="qrNewFolderBtn">New Folder...</button>' : ''}
+                        <button class="settings-btn primary" id="qrApplyCurrentBtn">Apply to Current Vault</button>
+                        ${hasLocalPicker ? '<button class="settings-btn secondary" id="qrNewFolderBtn">New Local Folder...</button>' : ''}
                         <button class="settings-btn secondary" id="qrNewBrowserBtn">New Browser Vault...</button>
                     </div>
                 </div>
@@ -313,15 +391,24 @@ const QRTransfer = {
 
         const modal = Modal.create({
             title: 'Import Settings',
+            width: 'min(550px, 90vw)',
             content: `
                 <div class="qr-import-confirm">
-                    <div class="qr-transfer-summary">
-                        ${summary.map(s => '<span>' + s + '</span>').join('')}
+                    <div class="qr-transfer-cards">
+                        ${items.map(item => `
+                            <div class="qr-transfer-card ${item.class}">
+                                <div class="qr-transfer-card-header">
+                                    ${item.icon}
+                                    <span class="qr-transfer-card-label">${item.label}</span>
+                                </div>
+                                <div class="qr-transfer-card-value">${item.value}</div>
+                            </div>
+                        `).join('')}
                     </div>
                     ${data.g && (data.g.pw || data.g.un) ? '<div class="qr-transfer-warning">This includes git credentials that will be stored locally.</div>' : ''}
                     ${data.a && data.a.k && Object.keys(data.a.k).length ? '<div class="qr-transfer-warning">This includes API keys that will be stored locally.</div>' : ''}
                     ${vaultActions}
-                    <div class="qr-import-actions">
+                    <div class="qr-import-actions" style="margin-top:0.5rem">
                         <button class="settings-btn secondary" id="qrImportCancel">Cancel</button>
                     </div>
                 </div>

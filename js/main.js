@@ -96,6 +96,39 @@ const App = {
         document.getElementById('app')?.classList.add('no-vault');
         const fab = document.getElementById('fabNewNote');
         if (fab) fab.style.display = 'none';
+
+        // Check for import hash/query parameter on startup
+        const hash = window.location.hash || '';
+        const hasImport = hash.includes('import=') || window.location.search.includes('import=');
+        
+        if (hasImport) {
+            // Initialize basic database/state first so that the import flow works perfectly
+            try {
+                await Store.initDB();
+                Store.loadViewPreferences();
+                Store.loadCurrentView();
+                const savedShortcuts = await Store.getShortcuts();
+                if (savedShortcuts) {
+                    Store.shortcuts = { ...Store.shortcuts, ...savedShortcuts };
+                }
+                await UndoRedoManager.loadState();
+            } catch (err) {
+                console.error('Failed to pre-initialize database for import:', err);
+            }
+
+            // Call QRTransfer's result handler with the current URL hash/search
+            const importPayload = hash.includes('import=') ? hash : window.location.search;
+            QRTransfer._handleScanResult(importPayload);
+
+            // Clean up the URL parameters so that reloading the page doesn't prompt for import again
+            // Using replaceState to keep history clean and avoid annoying loops.
+            history.replaceState(null, document.title, window.location.pathname + window.location.search.replace(/[\?&]import=[^&]+/g, ''));
+            if (window.location.hash.includes('import=')) {
+                history.replaceState(null, document.title, window.location.pathname + window.location.search);
+            }
+            return;
+        }
+
         // Auto-load on startup
         try {
             const container = document.getElementById('viewContainer');
