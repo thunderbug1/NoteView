@@ -222,8 +222,8 @@ const QRTransfer = {
         const compressed = LZString.compressToEncodedURIComponent(json);
         const importPayload = 'Z:' + compressed;
 
-        const currentUrl = window.location.origin + window.location.pathname;
-        const qrPayload = currentUrl + '#import=' + importPayload;
+        const baseUrl = 'https://thunderbug1.github.io/NoteView/';
+        const qrPayload = baseUrl + '#import=' + importPayload;
 
         if (qrPayload.length > 2500) {
             showToast('Settings too large for a single QR code. Remove some AI profiles or presets.');
