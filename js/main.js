@@ -284,6 +284,9 @@ const App = {
             const { status, detail, pendingCommits, lastSyncTime } = e.detail;
             const hasRemote = e.detail.hasRemote;
 
+            // Reset classes
+            btn.classList.remove('sync-offline', 'sync-syncing', 'sync-error', 'sync-conflict');
+
             if (!hasRemote) {
                 btn.title = 'Sync: no remote configured';
                 btn.style.color = 'var(--text-muted)';
@@ -291,29 +294,44 @@ const App = {
                 return;
             }
 
-            const iconMap = {
-                idle: { color: 'var(--text-secondary)', anim: '' },
-                syncing: { color: 'var(--accent)', anim: 'sync-pulse 1.2s ease-in-out infinite' },
-                error: { color: 'var(--color-danger, #f44)', anim: '' },
-                conflict: { color: 'var(--color-warning, #f90)', anim: '' }
-            };
+            // Remove inline style overrides so CSS classes take full effect
+            btn.style.color = '';
+            btn.style.animation = '';
 
-            const style = iconMap[status] || iconMap.idle;
-            btn.innerHTML = this._syncIcons[status] || this._syncIcons.idle;
-            btn.style.color = style.color;
-            btn.style.animation = style.anim;
+            const isOffline = !navigator.onLine || detail === 'Offline';
 
-            let title = 'Sync: ';
-            if (status === 'idle' && pendingCommits > 0) {
-                title += `${pendingCommits} unpushed`;
-                btn.style.color = 'var(--accent)';
-                btn.innerHTML += '<span class="sync-dot" style="position:absolute;top:2px;right:2px;width:6px;height:6px;border-radius:50%;background:var(--accent)"></span>';
-            } else if (status === 'idle') {
-                title += lastSyncTime ? `synced (${formatRelativeDate(lastSyncTime)})` : 'ready';
-            } else {
-                title += detail || status;
+            if (isOffline) {
+                btn.classList.add('sync-offline');
+                btn.innerHTML = this._syncIcons.idle + '<span class="sync-badge-dot" style="background:var(--warning-color)"></span>';
+                btn.title = `Sync: Offline (${detail || 'Check network connection'})`;
+                return;
             }
-            btn.title = title;
+
+            if (status === 'syncing') {
+                btn.classList.add('sync-syncing');
+                btn.innerHTML = this._syncIcons.syncing;
+                btn.title = 'Syncing...';
+            } else if (status === 'error') {
+                btn.classList.add('sync-error');
+                btn.innerHTML = this._syncIcons.error + '<span class="sync-badge-dot" style="background:var(--danger)"></span>';
+                btn.title = `Sync Error: ${detail || 'Git synchronization failed'}`;
+            } else if (status === 'conflict') {
+                btn.classList.add('sync-conflict');
+                btn.innerHTML = this._syncIcons.conflict + '<span class="sync-badge-dot" style="background:var(--warning-color)"></span>';
+                btn.title = `Sync Conflict: ${detail || 'Merge conflict, manual resolution needed'}`;
+            } else {
+                // status === 'idle'
+                btn.innerHTML = this._syncIcons.idle;
+                let title = 'Sync: ';
+                if (pendingCommits > 0) {
+                    title += `${pendingCommits} unpushed commits`;
+                    // Green or accent dot for pending commits
+                    btn.innerHTML += '<span class="sync-badge-dot" style="background:var(--accent)"></span>';
+                } else {
+                    title += lastSyncTime ? `synced (${formatRelativeDate(lastSyncTime)})` : 'ready';
+                }
+                btn.title = title;
+            }
         });
     },
 
@@ -499,6 +517,8 @@ const App = {
             if (installBanner) installBanner.classList.remove('visible');
         });
     },
+
+
 
     setupSearch() {
         const searchInput = document.getElementById('searchInput');
@@ -730,6 +750,8 @@ const App = {
     setupEventListeners() {
         this.setupSidebarListeners();
         this.setupPWAListeners();
+
+
 
         // Deselect / defocus editor when clicking outside
         document.getElementById('main').addEventListener('mousedown', (e) => {
@@ -1769,6 +1791,8 @@ const ThemeManager = {
         }
     }
 };
+
+window.App = App;
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => App.init());

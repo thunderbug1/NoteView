@@ -1713,3 +1713,56 @@
     background: var(--accent);
     color: var(--bg-primary);
 }
+
+/* Premium Sync Button Status Styling */
+#toolbarSyncBtn {
+    position: relative;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm, 6px);
+}
+
+/* Offline state */
+#toolbarSyncBtn.sync-offline {
+    color: var(--warning-color, #fbbf24) !important;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* Syncing state */
+#toolbarSyncBtn.sync-syncing {
+    color: var(--accent) !important;
+    background: var(--accent-light);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+/* Error state (git issue, auth error, etc) */
+#toolbarSyncBtn.sync-error {
+    color: var(--danger, #ef4444) !important;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+#toolbarSyncBtn.sync-error:hover {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* Conflict state (merge conflict) */
+#toolbarSyncBtn.sync-conflict {
+    color: var(--warning-color, #f59e0b) !important;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+#toolbarSyncBtn.sync-conflict:hover {
+    background: rgba(245, 158, 11, 0.15);
+}
+
+/* Sync Dot badge */
+#toolbarSyncBtn .sync-badge-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
+

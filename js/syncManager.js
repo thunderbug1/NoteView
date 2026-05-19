@@ -255,12 +255,14 @@ const SyncManager = {
         this._networkListenersInstalled = true;
         window.addEventListener('online', () => {
             this._isOnline = true;
+            this._setStatus(this._status, this._statusDetail);
             if (this._config.autoSync && this._pendingCommits > 0 && GitRemote.config) {
                 this._scheduleIdleSync();
             }
         });
         window.addEventListener('offline', () => {
             this._isOnline = false;
+            this._setStatus(this._status, 'Offline');
         });
     },
 
