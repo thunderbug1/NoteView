@@ -339,30 +339,381 @@ const VaultModal = {
             }
         };
 
-        const createBrowserVault = async () => {
-            const name = window.prompt('Browser vault name:', 'Browser Vault');
-            if (!name) return;
-            try {
-                modal.close();
-                const container = document.getElementById('viewContainer');
-                if (container) container.innerHTML = '<div class="loading">Loading notes...</div>';
+        const openBrowserVaultWizard = () => {
+            const prevDirectoryHandle = Store.directoryHandle;
+            modal.close(); // Close the vault manager modal
 
-                await Store.createOPFSVault(name);
-                await App.completeInitialization();
-                App.setView('settings');
-                VaultModal.updateVaultSwitcherName();
-            } catch (err) {
-                App.showError(err.message || 'Failed to create browser vault');
+            const wizardModal = Modal.create({
+                title: 'Browser Vault Setup Wizard',
+                content: `
+                    <div class="vault-wizard">
+                        <!-- Progress Indicator -->
+                        <div class="wizard-steps">
+                            <div class="wizard-step-indicator active" data-step="1">1. Vault Name</div>
+                            <div class="wizard-step-indicator" data-step="2">2. Git Sync</div>
+                            <div class="wizard-step-indicator" data-step="3">3. Connection</div>
+                        </div>
+
+                        <!-- Step 1: Vault Name -->
+                        <div class="wizard-panel active" data-panel="1">
+                            <h3 class="wizard-title">Give your browser vault a name</h3>
+                            <p class="wizard-intro-text">Browser vaults are securely stored in your browser's private database (OPFS). They require no security prompts or disk permissions.</p>
+                            
+                            <div class="wizard-form-group">
+                                <label for="wizardVaultName">Vault Name</label>
+                                <input type="text" id="wizardVaultName" placeholder="My Vault" value="My Vault" autofocus>
+                                <span class="field-hint">Use a simple name, e.g. "Work Notes" or "Personal"</span>
+                            </div>
+
+                            <div class="wizard-footer">
+                                <button class="vault-manager-action-btn secondary close-wizard-btn">Cancel</button>
+                                <button class="vault-manager-action-btn primary next-step-btn" data-next="2">Next: Git Sync</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Git Sync Settings -->
+                        <div class="wizard-panel" data-panel="2">
+                            <h3 class="wizard-title">Git Cloud Synchronization <span class="wizard-optional">(Optional)</span></h3>
+                            <p class="wizard-intro-text">Connect to a remote Git repository (like GitHub or GitLab) to sync your notes across multiple devices and back them up in the cloud.</p>
+                            
+                            <div class="wizard-toggle-sync">
+                                <label class="switch-container">
+                                    <input type="checkbox" id="wizardEnableGit" checked>
+                                    <span class="switch-slider"></span>
+                                    <span class="switch-label">Enable Git Sync for this vault</span>
+                                </label>
+                            </div>
+
+                            <div id="wizardGitFields" class="wizard-git-fields">
+                                <div class="wizard-form-group">
+                                    <label for="wizardGitUrl">Git Remote URL (HTTPS)</label>
+                                    <input type="url" id="wizardGitUrl" placeholder="https://github.com/username/notes.git">
+                                    <span class="field-hint">HTTPS URL only (SSH is not supported in the browser).</span>
+                                </div>
+                                
+                                <div class="wizard-form-row">
+                                    <div class="wizard-form-group">
+                                        <label for="wizardGitUser">Username</label>
+                                        <input type="text" id="wizardGitUser" placeholder="github-username">
+                                    </div>
+                                    <div class="wizard-form-group">
+                                        <label for="wizardGitToken">Personal Access Token / Password</label>
+                                        <input type="password" id="wizardGitToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                                        <span class="field-hint">For GitHub, use a Personal Access Token (PAT) with <b>repo</b> scope.</span>
+                                    </div>
+                                </div>
+
+                                <div class="wizard-form-group">
+                                    <label for="wizardGitProxy">CORS Proxy URL</label>
+                                    <input type="url" id="wizardGitProxy" value="https://cors.isomorphic-git.org">
+                                    <span class="field-hint">Proxy to bypass browser CORS limits. Default: https://cors.isomorphic-git.org</span>
+                                </div>
+                            </div>
+
+                            <div class="wizard-footer">
+                                <button class="vault-manager-action-btn secondary prev-step-btn" data-prev="1">Back</button>
+                                <button class="vault-manager-action-btn primary" id="wizardStartVerificationBtn">Verify & Create Vault</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Verification & Setup -->
+                        <div class="wizard-panel" data-panel="3">
+                            <h3 class="wizard-title" id="wizardVerifyTitle">Verifying Git Connection</h3>
+                            
+                            <div class="wizard-status-container">
+                                <div class="wizard-spinner-large" id="wizardStatusSpinner"></div>
+                                <div class="wizard-status-success-icon" id="wizardStatusSuccessIcon" style="display:none">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                </div>
+                                <div class="wizard-status-error-icon" id="wizardStatusErrorIcon" style="display:none">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                </div>
+                                <p id="wizardStatusMessage" class="wizard-status-message">Testing remote git repository connection...</p>
+                            </div>
+
+                            <div class="wizard-error-box" id="wizardErrorBox" style="display:none">
+                                <h4 id="wizardErrorHeadline">Verification Failed</h4>
+                                <p id="wizardErrorMessage">Could not connect to the Git repository. Please check your credentials and repository URL.</p>
+                            </div>
+
+                            <div class="wizard-footer" id="wizardVerificationFooter">
+                                <button class="vault-manager-action-btn secondary prev-step-btn" id="wizardErrorBackBtn" data-prev="2" style="display:none">Edit Settings</button>
+                                <button class="vault-manager-action-btn primary" id="wizardSuccessDoneBtn" style="display:none">Launch Vault</button>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                width: '550px',
+                onClose: () => {
+                    if (!Store.directoryHandle) {
+                        App.showDirectoryPicker();
+                    }
+                }
+            });
+
+            // Handle panel switching
+            const indicators = wizardModal.querySelectorAll('.wizard-step-indicator');
+            const panels = wizardModal.querySelectorAll('.wizard-panel');
+
+            const showPanel = (panelNum) => {
+                panels.forEach(p => p.classList.remove('active'));
+                indicators.forEach(ind => ind.classList.remove('active'));
+
+                const activePanel = wizardModal.querySelector(`[data-panel="${panelNum}"]`);
+                if (activePanel) activePanel.classList.add('active');
+
+                // Activate indicators up to panelNum
+                indicators.forEach(ind => {
+                    const stepNum = parseInt(ind.dataset.step);
+                    if (stepNum <= panelNum) {
+                        ind.classList.add('active');
+                    }
+                });
+            };
+
+            // Switch Git fields visibility
+            const enableGitCheckbox = wizardModal.querySelector('#wizardEnableGit');
+            const gitFields = wizardModal.querySelector('#wizardGitFields');
+            if (enableGitCheckbox && gitFields) {
+                enableGitCheckbox.addEventListener('change', () => {
+                    if (enableGitCheckbox.checked) {
+                        gitFields.classList.remove('disabled');
+                    } else {
+                        gitFields.classList.add('disabled');
+                    }
+                });
+            }
+
+            // Wire next/prev buttons
+            wizardModal.querySelectorAll('.next-step-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const nextNum = parseInt(btn.dataset.next);
+                    if (nextNum === 2) {
+                        const nameInput = wizardModal.querySelector('#wizardVaultName');
+                        if (!nameInput.value.trim()) {
+                            alert('Please enter a vault name.');
+                            nameInput.focus();
+                            return;
+                        }
+                    }
+                    showPanel(nextNum);
+                });
+            });
+
+            wizardModal.querySelectorAll('.prev-step-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const prevNum = parseInt(btn.dataset.prev);
+                    showPanel(prevNum);
+                });
+            });
+
+            wizardModal.querySelectorAll('.close-wizard-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    Store.directoryHandle = prevDirectoryHandle;
+                    wizardModal.close();
+                    VaultModal.showManager();
+                });
+            });
+
+            // Start verification process
+            const verifyBtn = wizardModal.querySelector('#wizardStartVerificationBtn');
+            if (verifyBtn) {
+                verifyBtn.addEventListener('click', async () => {
+                    const name = wizardModal.querySelector('#wizardVaultName').value.trim();
+                    const enableGit = wizardModal.querySelector('#wizardEnableGit').checked;
+                    
+                    if (!name) {
+                        alert('Please enter a vault name.');
+                        showPanel(1);
+                        return;
+                    }
+
+                    if (!enableGit) {
+                        // Directly create browser vault (OPFS) without git connection
+                        try {
+                            wizardModal.close();
+                            const container = document.getElementById('viewContainer');
+                            if (container) container.innerHTML = '<div class="loading">Creating browser vault...</div>';
+
+                            await Store.createOPFSVault(name);
+                            await App.completeInitialization();
+                            VaultModal.updateVaultSwitcherName();
+                        } catch (err) {
+                            App.showError(err.message || 'Failed to create browser vault');
+                        }
+                        return;
+                    }
+
+                    // Git is enabled — verify first!
+                    const gitUrl = wizardModal.querySelector('#wizardGitUrl').value.trim();
+                    const gitUser = wizardModal.querySelector('#wizardGitUser').value.trim();
+                    const gitToken = wizardModal.querySelector('#wizardGitToken').value.trim();
+                    const gitProxy = wizardModal.querySelector('#wizardGitProxy').value.trim();
+
+                    if (!gitUrl) {
+                        alert('Please enter a Git repository URL.');
+                        wizardModal.querySelector('#wizardGitUrl').focus();
+                        return;
+                    }
+
+                    showPanel(3);
+
+                    const spinner = wizardModal.querySelector('#wizardStatusSpinner');
+                    const successIcon = wizardModal.querySelector('#wizardStatusSuccessIcon');
+                    const errorIcon = wizardModal.querySelector('#wizardStatusErrorIcon');
+                    const statusMsg = wizardModal.querySelector('#wizardStatusMessage');
+                    const errorBox = wizardModal.querySelector('#wizardErrorBox');
+                    const errorMsgEl = wizardModal.querySelector('#wizardErrorMessage');
+                    const errorBackBtn = wizardModal.querySelector('#wizardErrorBackBtn');
+                    const successDoneBtn = wizardModal.querySelector('#wizardSuccessDoneBtn');
+
+                    // Reset status view
+                    spinner.style.display = 'block';
+                    successIcon.style.display = 'none';
+                    errorIcon.style.display = 'none';
+                    errorBox.style.display = 'none';
+                    errorBackBtn.style.display = 'none';
+                    successDoneBtn.style.display = 'none';
+                    statusMsg.textContent = 'Initializing private directory...';
+
+                    let tempHandle = null;
+                    try {
+                        // 1. Create OPFS directory locally
+                        const opfsRoot = await navigator.storage.getDirectory();
+                        tempHandle = await opfsRoot.getDirectoryHandle(name, { create: true });
+
+                        // 2. Initialize Git locally inside this handle
+                        statusMsg.textContent = 'Initializing Git repository...';
+                        const initSuccess = await GitStore.init(tempHandle);
+                        if (!initSuccess) {
+                            throw new Error('Failed to initialize Git inside the browser directory.');
+                        }
+
+                        // 3. Configure Git credentials & remote URL
+                        statusMsg.textContent = 'Setting up credentials...';
+                        const auth = (gitUser || gitToken) ? { username: gitUser, password: gitToken } : null;
+                        
+                        // Set credentials in window.GitHttp directly so connection can check it
+                        window.GitHttp.clearCredentials();
+                        if (auth) {
+                            window.GitHttp.setCredentials(auth);
+                        }
+
+                        // Temporarily assign remote config to GitRemote
+                        GitRemote.config = { name: 'origin', url: gitUrl, auth };
+                        if (window.SyncManager) {
+                            SyncManager._config = SyncManager._config || {};
+                            SyncManager._config.corsProxy = gitProxy || undefined;
+                            SyncManager._config.branch = SyncManager._config.branch || 'main';
+                        }
+
+                        // Set directoryHandle temporarily so saveRemoteConfig and pull can run correctly
+                        Store.directoryHandle = tempHandle;
+
+                        // 4. Test connection via fetch
+                        statusMsg.textContent = 'Connecting to git remote repository...';
+                        await GitStore.git.fetch({
+                            fs: GitStore.fs,
+                            dir: GitStore.dir,
+                            http: window.GitHttp,
+                            remote: 'origin',
+                            url: gitUrl,
+                            corsProxy: gitProxy || undefined,
+                            onAuth: () => auth,
+                            singleBranch: true,
+                            depth: 1
+                        });
+
+                        // 5. Connection works! Try to pull notes (if existing)
+                        statusMsg.textContent = 'Connection successful! Fetching branch...';
+                        
+                        // Save remote config to file system so GitRemote pull can read it
+                        await Store.saveRemoteConfig(GitRemote.config);
+                        if (window.SyncManager) {
+                            // Ensure CORS proxy is persisted
+                            localStorage.setItem('sync_cors_proxy', gitProxy);
+                        }
+
+                        try {
+                            statusMsg.textContent = 'Downloading notes from remote repository...';
+                            await GitRemote.pull();
+                        } catch (pullErr) {
+                            // If branch main doesn't exist, it's just a fresh empty repository. Not an error!
+                            if (pullErr.message?.includes('not found') || pullErr.message?.includes('Could not resolve')) {
+                                Logger.log('Remote branch not found. Assuming fresh new repository.', pullErr);
+                            } else {
+                                // Real pull error (e.g. invalid permissions or checkout issue)
+                                throw pullErr;
+                            }
+                        }
+
+                        // 6. Complete and save vault!
+                        statusMsg.textContent = 'Vault setup complete!';
+                        spinner.style.display = 'none';
+                        successIcon.style.display = 'block';
+                        successDoneBtn.style.display = 'block';
+
+                        // Save vault to vaultList and make active
+                        await Store.saveVault(tempHandle, 'opfs');
+                        await Store.setLastActiveVault(name);
+
+                        // Wire done button to launch vault
+                        successDoneBtn.addEventListener('click', async () => {
+                            wizardModal.close();
+                            const container = document.getElementById('viewContainer');
+                            if (container) container.innerHTML = '<div class="loading">Launching notes...</div>';
+                            await App.completeInitialization();
+                            VaultModal.updateVaultSwitcherName();
+                        });
+
+                    } catch (err) {
+                        console.error('Verification wizard error:', err);
+                        
+                        // Clean up: delete the locally created directory so it's not a zombie directory
+                        try {
+                            const opfsRoot = await navigator.storage.getDirectory();
+                            await opfsRoot.removeEntry(name, { recursive: true });
+                        } catch (cleanUpErr) {
+                            console.warn('Cleanup failed:', cleanUpErr);
+                        }
+
+                        // Restore previous directory handle
+                        Store.directoryHandle = prevDirectoryHandle;
+
+                        // Restore previous config to avoid breaking existing vaults
+                        try {
+                            await GitRemote.init();
+                        } catch (e) {}
+
+                        spinner.style.display = 'none';
+                        errorIcon.style.display = 'block';
+                        errorBox.style.display = 'block';
+                        errorBackBtn.style.display = 'block';
+                        statusMsg.textContent = 'Verification failed.';
+                        
+                        // Humanize common errors
+                        let friendlyMsg = err.message || err.toString();
+                        if (friendlyMsg.includes('401') || friendlyMsg.toLowerCase().includes('unauthorized') || friendlyMsg.toLowerCase().includes('auth')) {
+                            friendlyMsg = 'Authentication failed. Please verify your username and Personal Access Token (PAT). Remember, GitHub and GitLab require a PAT, not your login password.';
+                        } else if (friendlyMsg.includes('404') || friendlyMsg.toLowerCase().includes('not found')) {
+                            friendlyMsg = 'Repository not found. Double check the HTTPS URL. Make sure it exists and that your token has read/write access.';
+                        } else if (friendlyMsg.toLowerCase().includes('cors') || friendlyMsg.toLowerCase().includes('fetch')) {
+                            friendlyMsg = 'Network or CORS error. In-browser Git sync requires a CORS Proxy to work. Make sure your CORS proxy URL is correct and active, or try isomorphic-git\'s default proxy.';
+                        }
+                        
+                        errorMsgEl.textContent = friendlyMsg;
+                    }
+                });
             }
         };
-
-        const createBtn = modal.querySelector('#createVaultBtn');
-        if (createBtn) createBtn.addEventListener('click', openVaultFromPicker);
 
         const openBtn = modal.querySelector('#openFolderAsVaultBtn');
         if (openBtn) openBtn.addEventListener('click', openVaultFromPicker);
 
+        const createBtn = modal.querySelector('#createVaultBtn');
+        if (createBtn) createBtn.addEventListener('click', openVaultFromPicker);
+
         const browserVaultBtn = modal.querySelector('#createBrowserVaultBtn');
-        if (browserVaultBtn) browserVaultBtn.addEventListener('click', createBrowserVault);
+        if (browserVaultBtn) browserVaultBtn.addEventListener('click', openBrowserVaultWizard);
     }
 };
