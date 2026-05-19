@@ -1197,6 +1197,40 @@ body.is-dragging-wikilink * {
     opacity: 0.6;
 }
 
+/* Clone Context Button */
+.clone-context-btn {
+    background: transparent;
+    border: none;
+    padding: 0.3rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-primary);
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
+}
+
+.document-view .block:hover .clone-context-btn,
+.document-view .block:focus-within .clone-context-btn {
+    opacity: 1;
+}
+
+.clone-context-btn:hover {
+    opacity: 1 !important;
+    color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    transform: scale(1.1);
+}
+
+.content-modal .clone-context-btn {
+    opacity: 0.6;
+}
+
 /* Creation Action Buttons */
 .block-creation-actions {
     display: flex;

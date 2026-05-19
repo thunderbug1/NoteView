@@ -318,9 +318,9 @@ const NewNoteModal = {
         }
     },
 
-    showNewNoteModal(method = 'type') {
+    showNewNoteModal(method = 'type', options = {}) {
         const modalBlockId = 'new-modal';
-        let modalTags = SelectionManager.getTagsForNewNote();
+        let modalTags = options.cloneTags ? [...options.cloneTags] : SelectionManager.getTagsForNewNote();
         let createdBlockId = null;
         let isCreating = false;
 
@@ -623,7 +623,7 @@ const NewNoteModal = {
                 }
                 modal.close();
 
-                self.showNewNoteModal(newMethod);
+                self.showNewNoteModal(newMethod, { cloneTags: modalTags });
             });
         }
 

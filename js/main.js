@@ -1501,6 +1501,15 @@ const App = {
             });
         });
 
+        // Clone Context button inside modal
+        modal.querySelectorAll('.clone-context-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                modal.close();
+                App.showNewNoteModal('type', { cloneTags: [...(block.tags || [])] });
+            });
+        });
+
         // History
         modal.querySelectorAll('.history-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1741,8 +1750,8 @@ const App = {
         });
     },
 
-    showNewNoteModal(method = 'type') {
-        NewNoteModal.showNewNoteModal(method);
+    showNewNoteModal(method = 'type', options = {}) {
+        NewNoteModal.showNewNoteModal(method, options);
     },
 
 };

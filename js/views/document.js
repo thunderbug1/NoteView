@@ -186,6 +186,13 @@ const DocumentView = {
         this._aiBtnHandler = this.handleAiButtonClick.bind(this);
         container.addEventListener('click', this._aiBtnHandler);
 
+        // Clone Context button click delegation
+        if (this._cloneContextHandler) {
+            container.removeEventListener('click', this._cloneContextHandler);
+        }
+        this._cloneContextHandler = this.handleCloneContextClick.bind(this);
+        container.addEventListener('click', this._cloneContextHandler);
+
         // Drag handle mousedown delegation
         if (this._dragStartHandler) {
             container.removeEventListener('mousedown', this._dragStartHandler);
@@ -587,6 +594,13 @@ const DocumentView = {
                 </button>
             `);
         }
+
+        // Clone Context button (create new note with same context/tags)
+        actions.push(`
+            <button class="clone-context-btn" data-id="${escapeHtml(block.id)}" title="Create new note with same context (tags)" aria-label="Clone Context">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path><path d="M12 15h6M15 12v6"></path></svg>
+            </button>
+        `);
 
         // 3-dot overflow menu (pin, copy, delete)
         actions.push(`
@@ -1038,6 +1052,20 @@ const DocumentView = {
             this.stopSpeechRecognition();
         } else {
             this.startSpeechRecognition(blockId, micBtn);
+        }
+    },
+
+    handleCloneContextClick(e) {
+        const btn = e.target.closest('.clone-context-btn');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const blockId = btn.dataset.id;
+        if (!blockId) return;
+
+        const block = Store.blocks.find(b => b.id === blockId);
+        if (block) {
+            App.showNewNoteModal('type', { cloneTags: [...(block.tags || [])] });
         }
     },
 
