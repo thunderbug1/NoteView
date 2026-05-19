@@ -919,6 +919,45 @@ const DocumentView = {
         });
     },
 
+    toggleHeadingOnCurrentLine(view, level) {
+        const state = view.state;
+        const pos = state.selection.main.head;
+        const line = state.doc.lineAt(pos);
+        const text = line.text;
+
+        const match = text.match(/^(#{1,6})\s+(.*)$/);
+        const oldPrefixMatch = text.match(/^(#{1,6})\s+/);
+        const oldPrefixLen = oldPrefixMatch ? oldPrefixMatch[0].length : 0;
+
+        let newText;
+        let newPrefixLen;
+
+        if (match) {
+            const currentLevel = match[1].length;
+            if (currentLevel === level) {
+                // Toggle off
+                newText = match[2];
+                newPrefixLen = 0;
+            } else {
+                // Change heading level
+                newText = "#".repeat(level) + " " + match[2];
+                newPrefixLen = level + 1;
+            }
+        } else {
+            // Add heading
+            newText = "#".repeat(level) + " " + text;
+            newPrefixLen = level + 1;
+        }
+
+        const delta = newPrefixLen - oldPrefixLen;
+        const newPos = Math.max(line.from + newPrefixLen, Math.min(line.from + newText.length, pos + delta));
+
+        view.dispatch({
+            changes: { from: line.from, to: line.to, insert: newText },
+            selection: { anchor: newPos }
+        });
+    },
+
     shortcutToCM6(shortcut) {
         return shortcut
             .replace('Ctrl+', 'Mod-')
@@ -1451,6 +1490,31 @@ const DocumentView = {
                 <button class="mobile-toolbar-btn" data-action="indent" title="Indent">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 8 7 12 3 16"></polyline><line x1="11" y1="4" x2="21" y2="4"></line><line x1="11" y1="9" x2="21" y2="9"></line><line x1="11" y1="14" x2="21" y2="14"></line><line x1="11" y1="19" x2="21" y2="19"></line></svg>
                 </button>
+                <button class="mobile-toolbar-btn" data-action="h1" title="Heading 1">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="4" y1="4" x2="4" y2="20"></line>
+                        <line x1="12" y1="4" x2="12" y2="20"></line>
+                        <line x1="4" y1="12" x2="12" y2="12"></line>
+                        <line x1="18" y1="8" x2="18" y2="20"></line>
+                        <polyline points="15 11 18 8"></polyline>
+                    </svg>
+                </button>
+                <button class="mobile-toolbar-btn" data-action="h2" title="Heading 2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="4" y1="4" x2="4" y2="20"></line>
+                        <line x1="12" y1="4" x2="12" y2="20"></line>
+                        <line x1="4" y1="12" x2="12" y2="12"></line>
+                        <path d="M15 10a2.5 2.5 0 0 1 5 0c0 4-5 6-5 10h5"></path>
+                    </svg>
+                </button>
+                <button class="mobile-toolbar-btn" data-action="h3" title="Heading 3">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="4" y1="4" x2="4" y2="20"></line>
+                        <line x1="12" y1="4" x2="12" y2="20"></line>
+                        <line x1="4" y1="12" x2="12" y2="12"></line>
+                        <path d="M15 10h5l-3 4h3a3 3 0 0 1 0 6h-5"></path>
+                    </svg>
+                </button>
                 <button class="mobile-toolbar-btn" data-action="toggleTask" title="Toggle task">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
                 </button>
@@ -1473,6 +1537,12 @@ const DocumentView = {
                         indentMore(view);
                     } else if (action === 'outdent') {
                         indentLess(view);
+                    } else if (action === 'h1') {
+                        this.toggleHeadingOnCurrentLine(view, 1);
+                    } else if (action === 'h2') {
+                        this.toggleHeadingOnCurrentLine(view, 2);
+                    } else if (action === 'h3') {
+                        this.toggleHeadingOnCurrentLine(view, 3);
                     } else if (action === 'toggleTask') {
                         this.toggleTaskOnCurrentLine(view);
                     } else if (action === 'newNote') {
