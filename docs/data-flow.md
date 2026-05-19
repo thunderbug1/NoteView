@@ -229,7 +229,7 @@ Each clause has a `field` and `direction`. Fields are defined per view in `SortM
 
 ### Comparator helpers
 
-- `compareDates(a, b)` — Parses ISO strings, NaN sorts last
+- `compareDates(a, b)` — Parses ISO strings and timestamps, missing/invalid dates sort as 0 (oldest)
 - `compareNumbers(a, b)` — NaN/Infinity sorts last
 - `compareStrings(a, b)` — Uses `localeCompare` with numeric sorting, empty strings sort last
 

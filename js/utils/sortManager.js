@@ -147,9 +147,12 @@ const SortManager = {
     },
 
     compareDates(a, b) {
-        const aTime = a ? new Date(a).getTime() : Number.NaN;
-        const bTime = b ? new Date(b).getTime() : Number.NaN;
-        return this.compareNumbers(aTime, bTime);
+        const parse = (val) => {
+            if (!val) return 0;
+            const t = new Date(val).getTime();
+            return Number.isFinite(t) ? t : 0;
+        };
+        return this.compareNumbers(parse(a), parse(b));
     },
 
     compareNumbers(a, b) {
