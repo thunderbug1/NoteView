@@ -213,12 +213,35 @@ const Store = {
 
     // --- IndexedDB-backed key/value methods ---
 
-    async saveDirectoryHandle(handle) {
-        return this._dbPut(this.STORE_NAME, 'lastDirectory', handle);
+    async saveDirectoryHandle(handle, type = null) {
+        let vaultType = type;
+        if (!vaultType && handle && handle.name) {
+            const list = await this.getVaultList();
+            const entry = list.find(v => v.name === handle.name);
+            if (entry) {
+                vaultType = entry.type;
+            }
+        }
+
+        const valueToStore = (vaultType === 'opfs' && handle && typeof handle.getFileHandle === 'function')
+            ? { name: handle.name, type: 'opfs', isPlaceholder: true }
+            : handle;
+
+        return this._dbPut(this.STORE_NAME, 'lastDirectory', valueToStore);
     },
 
     async getDirectoryHandle() {
-        return this._dbGet(this.STORE_NAME, 'lastDirectory');
+        const stored = await this._dbGet(this.STORE_NAME, 'lastDirectory');
+        if (stored && stored.isPlaceholder && stored.type === 'opfs') {
+            try {
+                const opfsRoot = await navigator.storage.getDirectory();
+                return await opfsRoot.getDirectoryHandle(stored.name, { create: false });
+            } catch (e) {
+                console.warn('Could not reconstruct OPFS directory handle for lastDirectory:', e);
+                return null;
+            }
+        }
+        return stored;
     },
 
     async saveRemoteConfig(config) {
@@ -385,7 +408,7 @@ const Store = {
     },
 
     async _activateVault(handle, options = {}) {
-        await this.saveDirectoryHandle(handle);
+        await this.saveDirectoryHandle(handle, options.vaultType);
         await this.saveVault(handle, options.vaultType);
         if (options.setLastActive !== false) {
             await this.setLastActiveVault(handle.name);
@@ -530,7 +553,7 @@ const Store = {
 
     // --- Vault management ---
 
-    async saveVault(handle, type = 'local') {
+    async saveVault(handle, type = null) {
         if (!this.db) {
             await this.initDB();
             if (!this.db) return;
@@ -538,24 +561,29 @@ const Store = {
 
         const name = handle.name;
 
+        // Update vault list and resolve type
+        const list = await this.getVaultList();
+        const existing = list.find(v => v.name === name);
+        const resolvedType = type || (existing ? existing.type : 'local');
+
         // Store the handle under vault::<name>
         await new Promise((resolve, reject) => {
             try {
                 const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
                 const store = tx.objectStore(this.STORE_NAME);
-                const req = store.put(handle, `vault::${name}`);
+                const valueToStore = (resolvedType === 'opfs' && handle && typeof handle.getFileHandle === 'function')
+                    ? { name, type: 'opfs', isPlaceholder: true }
+                    : handle;
+                const req = store.put(valueToStore, `vault::${name}`);
                 req.onsuccess = () => resolve();
                 req.onerror = () => reject(req.error);
             } catch (e) { reject(e); }
         });
 
-        // Update vault list
-        const list = await this.getVaultList();
-        const existing = list.find(v => v.name === name);
         if (!existing) {
-            list.push({ name, type, addedAt: new Date().toISOString() });
+            list.push({ name, type: resolvedType, addedAt: new Date().toISOString() });
         } else {
-            existing.type = type;
+            existing.type = resolvedType;
         }
         await new Promise((resolve, reject) => {
             try {
@@ -568,7 +596,7 @@ const Store = {
         });
 
         // Keep lastDirectory in sync for backward compat
-        await this.saveDirectoryHandle(handle);
+        await this.saveDirectoryHandle(handle, resolvedType);
     },
 
     async getVaultList() {
@@ -592,7 +620,7 @@ const Store = {
             await this.initDB();
             if (!this.db) return null;
         }
-        return new Promise((resolve) => {
+        const stored = await new Promise((resolve) => {
             try {
                 const tx = this.db.transaction([this.STORE_NAME], 'readonly');
                 const store = tx.objectStore(this.STORE_NAME);
@@ -601,6 +629,33 @@ const Store = {
                 req.onerror = () => resolve(null);
             } catch (e) { resolve(null); }
         });
+
+        if (stored && stored.isPlaceholder && stored.type === 'opfs') {
+            try {
+                const opfsRoot = await navigator.storage.getDirectory();
+                return await opfsRoot.getDirectoryHandle(stored.name, { create: false });
+            } catch (e) {
+                console.warn(`Could not reconstruct OPFS directory handle for vault::${name}:`, e);
+                return null;
+            }
+        }
+
+        // Fallback: if stored is not a valid handle object (e.g. empty or placeholder parsed incorrectly),
+        // check vaultList to see if it is OPFS, and if so, reconstruct it.
+        if (!stored || typeof stored.getDirectoryHandle !== 'function') {
+            const list = await this.getVaultList();
+            const entry = list.find(v => v.name === name);
+            if (entry && entry.type === 'opfs') {
+                try {
+                    const opfsRoot = await navigator.storage.getDirectory();
+                    return await opfsRoot.getDirectoryHandle(name, { create: false });
+                } catch (e) {
+                    console.warn(`Fallback OPFS reconstruction failed for vault::${name}:`, e);
+                }
+            }
+        }
+
+        return stored;
     },
 
     async deleteVault(name) {
