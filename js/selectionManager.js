@@ -40,12 +40,25 @@ const SelectionManager = {
     /**
      * Initialize the selection manager
      */
-    init() {
+    init(options = {}) {
         Logger.log('[SelectionManager] init:start', {
-            existingContext: Array.from(this.selections.context)
+            existingContext: Array.from(this.selections.context),
+            options
         });
-        this.loadSelectionState();
-        this.initHistory();
+        if (options.isSwitch) {
+            this.selections.context.clear();
+            this.selections.excluded.clear();
+            this.selections.contact = '';
+            this.saveSelectionState();
+            if (this._historyDebounceTimer) {
+                clearTimeout(this._historyDebounceTimer);
+                this._historyDebounceTimer = null;
+            }
+            this._pushHistory();
+        } else {
+            this.loadSelectionState();
+            this.initHistory();
+        }
         this.normalizeContextSelection();
         this.updateSelectionUI();
         this.initClearContextBtn();

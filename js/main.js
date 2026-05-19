@@ -207,7 +207,7 @@ const App = {
                 await GitRemote.init();
                 await SyncManager.init();
                 await AIAssistant.init();
-                SelectionManager.init();
+                SelectionManager.init({ isSwitch: true });
                 SelectionManager.updateTagCounts();
                 this.updateVaultSwitcherName();
                 this.render();
@@ -1580,6 +1580,7 @@ const App = {
     async changeVaultDirectory() {
         const success = await Store.changeDirectory();
         if (success) {
+            SelectionManager.init({ isSwitch: true });
             TimelineView.invalidateRawDataCache();
             SelectionManager.updateTagCounts();
             this.setView('document');
