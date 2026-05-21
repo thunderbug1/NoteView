@@ -1019,6 +1019,31 @@ const Store = {
 
             // Capture state before save for undo/redo
             const existingBlock = this.blocks.find(b => b.id === block.id);
+
+            // Skip saving if there are no actual changes in content or metadata
+            if (existingBlock && !UndoRedoManager.isExecuting) {
+                let hasChanges = false;
+                const allowedKeys = new Set(['content', 'tags', 'priority', 'assignee', 'due', 'start', 'status', 'creationDate', 'lastUpdated', 'pinned']);
+                for (const key of Object.keys(updates)) {
+                    if (allowedKeys.has(key) || key.endsWith('Date') || key.endsWith('At')) {
+                        const newValue = updates[key];
+                        const currentValue = existingBlock[key];
+                        if (Array.isArray(newValue)) {
+                            if (!Array.isArray(currentValue) || newValue.length !== currentValue.length || !newValue.every((v, i) => v === currentValue[i])) {
+                                hasChanges = true;
+                                break;
+                            }
+                        } else if (newValue !== currentValue) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                }
+                if (!hasChanges) {
+                    return;
+                }
+            }
+
             const isUpdate = !!existingBlock && !UndoRedoManager.isExecuting && !skipUndo;
 
             // Take a deep copy of the block BEFORE applying updates
