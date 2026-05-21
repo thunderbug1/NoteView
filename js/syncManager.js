@@ -374,6 +374,42 @@ const SyncManager = {
         const ref = this._config.branch || 'main';
         const remoteName = GitRemote.config.name;
 
+        const parseFM = (content) => {
+            if (typeof parseFrontMatter === 'function') {
+                return parseFrontMatter(content);
+            }
+            let currentContent = content.trimStart();
+            const data = {};
+            const regex = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
+            const match = currentContent.match(regex);
+            if (match) {
+                const metadataString = match[1];
+                currentContent = currentContent.substring(match[0].length).trimStart();
+                metadataString.split(/\r?\n/).forEach(line => {
+                    const lineMatch = line.match(/^([^:]+):\s*(.*)$/);
+                    if (!lineMatch) return;
+                    const key = lineMatch[1].trim();
+                    const valueStr = lineMatch[2].trim();
+                    if (!(key in data)) {
+                        try { data[key] = JSON.parse(valueStr); } catch { data[key] = valueStr; }
+                    }
+                });
+            }
+            return { content: currentContent, ...data };
+        };
+
+        const isEqual = (v1, v2) => {
+            if (v1 === v2) return true;
+            if (Array.isArray(v1) && Array.isArray(v2)) {
+                if (v1.length !== v2.length) return false;
+                return v1.every((el, idx) => el === v2[idx]);
+            }
+            if (v1 && typeof v1 === 'object' && v2 && typeof v2 === 'object') {
+                return JSON.stringify(v1) === JSON.stringify(v2);
+            }
+            return false;
+        };
+
         // Resolve local and remote HEAD
         const localOid = await git.resolveRef({ fs, dir, ref: 'HEAD' });
         let remoteOid;
@@ -478,7 +514,45 @@ const SyncManager = {
             } else {
                 category = 'both-changed';
                 resolution = null;
-                allAutoResolved = false;
+
+                // Check if only lastUpdated differs, and auto-resolve by taking the latest
+                if (localContent !== null && localContent !== undefined &&
+                    remoteContent !== null && remoteContent !== undefined) {
+                    
+                    const localParsed = parseFM(localContent);
+                    const remoteParsed = parseFM(remoteContent);
+                    
+                    const keys = new Set([
+                        ...Object.keys(localParsed),
+                        ...Object.keys(remoteParsed)
+                    ]);
+                    keys.delete('lastUpdated');
+                    
+                    let onlyLastUpdatedDiffers = true;
+                    for (const key of keys) {
+                        if (!isEqual(localParsed[key], remoteParsed[key])) {
+                            onlyLastUpdatedDiffers = false;
+                            break;
+                        }
+                    }
+                    
+                    if (onlyLastUpdatedDiffers) {
+                        const localTimeStr = localParsed.lastUpdated;
+                        const remoteTimeStr = remoteParsed.lastUpdated;
+                        const localTime = localTimeStr ? new Date(localTimeStr).getTime() : 0;
+                        const remoteTime = remoteTimeStr ? new Date(remoteTimeStr).getTime() : 0;
+                        
+                        if (localTime >= remoteTime) {
+                            resolution = 'local';
+                        } else {
+                            resolution = 'remote';
+                        }
+                    }
+                }
+
+                if (!resolution) {
+                    allAutoResolved = false;
+                }
             }
 
             // Load base content for files needing manual resolution
