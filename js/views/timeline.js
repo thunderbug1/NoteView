@@ -621,6 +621,13 @@ const TimelineView = {
                     <div class="tl-card-footer">
                         <span class="tl-note-name" title="Open note">${escapeHtml(noteName)}</span>
                         ${event.unpushed ? '<span class="tl-sync-pending" title="Not yet synced to remote">unpushed</span>' : ''}
+                        <button class="tl-undo-btn" title="Undo this change" data-block-id="${escapeHtml(event.blockId)}" data-filename="${escapeHtml(event.filename)}" data-oid="${escapeHtml(event.oid)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 7v6h6"/>
+                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+                            </svg>
+                            Undo
+                        </button>
                     </div>
                 </div>
             </div>
@@ -648,6 +655,13 @@ const TimelineView = {
                     <div class="tl-card-footer">
                         <span class="tl-note-name" title="Open note">${escapeHtml(event.blockId)}</span>
                         ${event.commitMessage ? `<span class="tl-commit-msg">${escapeHtml(event.commitMessage)}</span>` : ''}
+                        <button class="tl-undo-btn" title="Undo this change" data-block-id="${escapeHtml(event.blockId)}" data-filename="${escapeHtml(event.filename)}" data-oid="${escapeHtml(event.oid)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 7v6h6"/>
+                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+                            </svg>
+                            Undo
+                        </button>
                     </div>
                 </div>
             </div>
@@ -787,6 +801,30 @@ const TimelineView = {
                         card.dataset.oid,
                         card.dataset.parents
                     );
+                }
+            });
+        });
+
+        container.querySelectorAll('.tl-undo-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const blockId = btn.dataset.blockId;
+                const filename = btn.dataset.filename;
+                const oid = btn.dataset.oid;
+                const parentsRaw = btn.dataset.parents;
+                
+                if (confirm(`Are you sure you want to undo the changes made to ${blockId} in commit ${oid.substring(0, 7)}?`)) {
+                    btn.disabled = true;
+                    btn.innerHTML = `Undoing...`;
+                    try {
+                        await this.undoChange(blockId, filename, oid, parentsRaw);
+                        showToast(`Successfully undid changes to ${blockId}.`);
+                    } catch (err) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg> Undo`;
+                        console.error('Failed to undo changes:', err);
+                        alert(`Failed to undo changes: ${err.message}`);
+                    }
                 }
             });
         });
@@ -959,5 +997,58 @@ const TimelineView = {
         };
         
         await renderView('diff');
+    },
+
+    async undoChange(blockId, filename, oid, parentsRaw) {
+        const parents = parentsRaw ? parentsRaw.split(',').filter(p => p) : [];
+        const parentOid = parents.length > 0 ? parents[0] : null;
+
+        if (!parentOid) {
+            // No parent commit means this was the first commit (note creation).
+            // To undo creation, we delete the block.
+            await Store.deleteBlock(blockId);
+        } else {
+            // Get content from before this change (at parent commit)
+            const prevContentRaw = await GitStore.getFileAtCommit(filename, parentOid);
+            if (prevContentRaw === null || prevContentRaw === undefined) {
+                // If it wasn't present, delete the block
+                await Store.deleteBlock(blockId);
+            } else {
+                const parsed = parseFrontMatter(prevContentRaw);
+                const block = Store.blocks.find(b => b.id === blockId);
+                if (block) {
+                    // Update existing block
+                    await Store.saveBlock(block, {
+                        content: parsed.content,
+                        tags: parsed.tags || [],
+                        commit: true,
+                        commitMessage: `Revert changes to ${blockId} from commit ${oid.substring(0, 7)}`
+                    });
+                } else {
+                    // Recreate deleted block
+                    await Store.createBlock(parsed.content, {
+                        id: blockId,
+                        tags: parsed.tags || [],
+                        ...parsed,
+                        commitMessage: `Recreate note ${blockId} from commit ${oid.substring(0, 7)}`
+                    });
+                }
+            }
+        }
+
+        // Invalidate timeline caches
+        this.invalidateRawDataCache();
+        this.invalidateCache();
+        
+        // Re-load and re-render the application view
+        if (window.App && typeof App.render === 'function') {
+            App.showViewLoading();
+            try {
+                await Store.loadBlocks();
+                App.render();
+            } finally {
+                App.hideViewLoading();
+            }
+        }
     }
 };

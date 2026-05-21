@@ -505,3 +505,41 @@
 .tl-tag-group-ungrouped .tl-tag-group-header {
     border-left-color: var(--border);
 }
+
+/* Undo Button in Timeline */
+.tl-undo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border-light, var(--border));
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: auto;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tl-undo-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-light, rgba(59, 130, 246, 0.1));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tl-undo-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tl-undo-btn svg {
+    flex-shrink: 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tl-undo-btn:hover:not(:disabled) svg {
+    transform: rotate(-120deg);
+}
