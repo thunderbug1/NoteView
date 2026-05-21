@@ -1141,14 +1141,13 @@ const Store = {
     },
 
     async _loadBlocksInternal() {
-        this.blocks = [];
-        this._filteredBlocksCache.invalidate();
-
         let entries;
         try {
             entries = this.directoryHandle.values();
         } catch (err) {
             console.error('loadBlocks: failed to iterate directory:', err);
+            // Invalidate and extract contacts if we failed to iterate, keeping existing memory safe
+            this._filteredBlocksCache.invalidate();
             this.extractContacts();
             return;
         }
@@ -1163,6 +1162,7 @@ const Store = {
             }
         } catch (err) {
             console.error('loadBlocks: failed to gather directory entries:', err);
+            this._filteredBlocksCache.invalidate();
             this.extractContacts();
             return;
         }
@@ -1190,8 +1190,10 @@ const Store = {
         });
 
         const results = await Promise.all(readPromises);
+        
+        // Atomically update the memory store, cache, and contacts only after all async reads resolve
         this.blocks = results.filter(block => block !== null);
-
+        this._filteredBlocksCache.invalidate();
         this.extractContacts();
         Logger.log('Loaded ' + this.blocks.length + ' blocks');
     }
