@@ -1153,31 +1153,45 @@ const Store = {
             return;
         }
 
-        for await (const entry of entries) {
-            try {
+        const entriesArray = [];
+        try {
+            for await (const entry of entries) {
                 if (entry.name === '.git') continue;
-
                 if (entry.kind === 'file' && entry.name.endsWith('.md')) {
-                    const file = await entry.getFile();
-                    const content = await file.text();
-                    const parsed = parseFrontMatter(content);
-                    this.blocks.push({
-                        id: entry.name.endsWith('.md') ? entry.name.slice(0, -3) : entry.name,
-                        filename: entry.name,
-                        fileHandle: entry,
-                        ...parsed
-                    });
+                    entriesArray.push(entry);
                 }
+            }
+        } catch (err) {
+            console.error('loadBlocks: failed to gather directory entries:', err);
+            this.extractContacts();
+            return;
+        }
+
+        const readPromises = entriesArray.map(async (entry) => {
+            try {
+                const file = await entry.getFile();
+                const content = await file.text();
+                const parsed = parseFrontMatter(content);
+                return {
+                    id: entry.name.slice(0, -3),
+                    filename: entry.name,
+                    fileHandle: entry,
+                    ...parsed
+                };
             } catch (err) {
                 if (err.name === 'NotFoundError') {
                     console.warn('loadBlocks: skipping stale entry:', err.message);
-                    continue;
+                    return null;
                 }
                 // Skip corrupted/unreadable files instead of halting the entire load
                 console.error('loadBlocks: skipping unreadable file:', entry?.name, err);
-                continue;
+                return null;
             }
-        }
+        });
+
+        const results = await Promise.all(readPromises);
+        this.blocks = results.filter(block => block !== null);
+
         this.extractContacts();
         Logger.log('Loaded ' + this.blocks.length + ' blocks');
     }
