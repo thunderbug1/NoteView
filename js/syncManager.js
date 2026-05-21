@@ -102,7 +102,6 @@ const SyncManager = {
         this._syncing = true;
 
         this._setStatus('syncing', 'Syncing...');
-        if (window.App) App.showViewLoading();
         try {
             // Flush and commit any pending edits first
             if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
@@ -157,7 +156,6 @@ const SyncManager = {
             return false;
         } finally {
             this._syncing = false;
-            if (window.App) App.hideViewLoading();
         }
     },
 
