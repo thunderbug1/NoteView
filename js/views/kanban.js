@@ -6,6 +6,8 @@ const KanbanView = {
     collapsedGroups: new Map(),
     showUpcoming: false,
     UPCOMING_STORAGE_KEY: 'noteview-kanban-show-upcoming',
+    showArchived: false,
+    ARCHIVED_STORAGE_KEY: 'noteview-kanban-show-archived',
     doneLookbackDays: 30,
     DONE_LOOKBACK_STORAGE_KEY: 'noteview-kanban-done-lookback',
     MAX_VISIBLE_CARDS: 10,
@@ -20,6 +22,18 @@ const KanbanView = {
     saveShowUpcoming(val) {
         try {
             localStorage.setItem(this.UPCOMING_STORAGE_KEY, String(val));
+        } catch {}
+    },
+
+    loadShowArchived() {
+        try {
+            return localStorage.getItem(this.ARCHIVED_STORAGE_KEY) === 'true';
+        } catch { return false; }
+    },
+
+    saveShowArchived(val) {
+        try {
+            localStorage.setItem(this.ARCHIVED_STORAGE_KEY, String(val));
         } catch {}
     },
 
@@ -101,6 +115,7 @@ const KanbanView = {
 
         // Start-date filtering
         this.showUpcoming = this.loadShowUpcoming();
+        this.showArchived = this.loadShowArchived();
         this.doneLookbackDays = this.loadDoneLookback();
         const notStartedIds = new Set(
             tasks.filter(t => TaskParser.isNotStarted(t)).map(t => t.id)
@@ -122,17 +137,39 @@ const KanbanView = {
         this.attachEventListeners(container);
     },
 
-    renderToolbar(hiddenCount) {
-        if (hiddenCount === 0 && !this.showUpcoming) return '';
-        const activeClass = this.showUpcoming ? ' active' : '';
-        const label = this.showUpcoming
-            ? 'Hide upcoming'
-            : `Show upcoming (${hiddenCount})`;
-        return `<div class="kanban-toolbar">
-            <button class="kanban-toolbar-btn kanban-toggle-upcoming${activeClass}" data-action="toggle-upcoming">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
-                ${label}
-            </button>
+    renderToolbar(hiddenCount, hiddenArchivedCount = 0) {
+        const buttons = [];
+
+        if (hiddenCount > 0 || this.showUpcoming) {
+            const activeClass = this.showUpcoming ? ' active' : '';
+            const label = this.showUpcoming
+                ? 'Hide upcoming'
+                : `Show upcoming (${hiddenCount})`;
+            buttons.push(`
+                <button class="kanban-toolbar-btn kanban-toggle-upcoming${activeClass}" data-action="toggle-upcoming">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+                    ${label}
+                </button>
+            `);
+        }
+
+        if (hiddenArchivedCount > 0 || this.showArchived) {
+            const activeClass = this.showArchived ? ' active' : '';
+            const label = this.showArchived
+                ? 'Hide archived'
+                : `Show archived (${hiddenArchivedCount})`;
+            buttons.push(`
+                <button class="kanban-toolbar-btn kanban-toggle-archived${activeClass}" data-action="toggle-archived">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+                    ${label}
+                </button>
+            `);
+        }
+
+        if (buttons.length === 0) return '';
+
+        return `<div class="kanban-toolbar" style="display: flex; gap: 8px;">
+            ${buttons.join('')}
         </div>`;
     },
 
@@ -220,15 +257,24 @@ const KanbanView = {
 
         const sortedGroups = new Map([...groupTasks.entries()].sort((a, b) => a[0].localeCompare(b[0])));
 
+        let hiddenArchivedCount = 0;
         let html = '';
         for (const [key, groupTaskList] of sortedGroups) {
+            const fullTag = `${namespace}.${key}`;
+            const isArchived = SelectionManager._archivedTags ? SelectionManager._archivedTags.has(fullTag) : false;
+            if (isArchived) {
+                hiddenArchivedCount++;
+                if (!this.showArchived) {
+                    continue;
+                }
+            }
             html += this.renderSwimlane(key, groupTaskList, fullHierarchy, allTasksById, namespace, false);
         }
         if (ungroupedTasks.length > 0) {
             html += this.renderSwimlane(null, ungroupedTasks, fullHierarchy, allTasksById, namespace, true);
         }
 
-        container.innerHTML = `${this.renderToolbar(hiddenCount)}${html}`;
+        container.innerHTML = `${this.renderToolbar(hiddenCount, hiddenArchivedCount)}${html}`;
     },
 
     renderSwimlane(key, tasks, fullHierarchy, allTasksById, namespace, isUngrouped) {
@@ -664,6 +710,16 @@ const KanbanView = {
                 e.stopPropagation();
                 KanbanView.showUpcoming = !KanbanView.showUpcoming;
                 KanbanView.saveShowUpcoming(KanbanView.showUpcoming);
+                App.render();
+            });
+        });
+
+        // Show/hide archived toggle
+        container.querySelectorAll('.kanban-toggle-archived').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                KanbanView.showArchived = !KanbanView.showArchived;
+                KanbanView.saveShowArchived(KanbanView.showArchived);
                 App.render();
             });
         });
