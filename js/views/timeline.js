@@ -217,10 +217,18 @@ const TimelineView = {
         let changedFiles = null;
 
         if (!parentCommit) {
-            // First commit: must read all files
+            // First commit in our window: read all files to establish baseline state
             const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
             currAllTasks = this.extractAllTasks(filesContent);
             currFileSet = this.extractFileSet(filesContent);
+
+            // If this commit has parents (not the repo root), it's a window boundary.
+            // We don't know the parent's state, so we can only establish the baseline
+            // without emitting events — otherwise all existing files appear as "created"
+            // on this single day.
+            if (commit.parents && commit.parents.length > 0) {
+                return { tasks: currAllTasks, fileSet: currFileSet, events: [] };
+            }
         } else {
             // Diff-based: only read files that changed between parent and this commit
             changedFiles = await GitStore.getChangedFilesBetween(
@@ -359,7 +367,7 @@ const TimelineView = {
     },
 
     async _buildTimelineInternal() {
-        const commits = await GitStore.getFullHistory(100);
+        const commits = await GitStore.getFullHistory(500);
         if (commits.length === 0) return [];
 
         // Determine which commits are unpushed
@@ -1036,19 +1044,28 @@ const TimelineView = {
             }
         }
 
-        // Invalidate timeline caches
-        this.invalidateRawDataCache();
+        // Invalidate only the filtered events cache — keep the raw data cache
+        // warm so buildTimeline() uses the incremental path (processes just
+        // the new revert commit instead of walking all 100 commits).
         this.invalidateCache();
-        
-        // Re-load and re-render the application view
-        if (window.App && typeof App.render === 'function') {
-            App.showViewLoading();
-            try {
-                await Store.loadBlocks();
-                App.render();
-            } finally {
-                App.hideViewLoading();
-            }
+
+        // Store.blocks is already updated in memory by the undo operation
+        // (saveBlock/deleteBlock/createBlock), so no need for loadBlocks().
+
+        // Re-render just the timeline view, not the entire app.
+        const filteredBlocks = Store.getFilteredBlocks();
+        const groupBy = window.GroupManager ? GroupManager.activeGrouping : undefined;
+        await this.render(filteredBlocks, { groupBy });
+
+        // Update sidebar panels that would normally be refreshed by App.render().
+        if (window.SelectionManager) SelectionManager.updateTagCounts();
+        if (window.App) {
+            if (typeof App.updateFilterBar === 'function') App.updateFilterBar();
+            if (typeof App.updateUndoRedoUI === 'function') App.updateUndoRedoUI();
+        }
+        if (window.DeadlinePanel) DeadlinePanel.render(Store.blocks);
+        if (window.BacklinksPanel && typeof DocumentView !== 'undefined') {
+            BacklinksPanel.render(Store.blocks, DocumentView.getFocusedBlockId());
         }
     }
 };
