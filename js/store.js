@@ -49,7 +49,7 @@ const Store = {
     // IndexedDB for persistence
     db: null,
     DB_NAME: 'NoteViewDB',
-    DB_VERSION: 3,
+    DB_VERSION: 4,
     STORE_NAME: 'handles',
     VIEW_PREFERENCES_STORAGE_KEY: 'noteview-view-preferences',
     CURRENT_VIEW_STORAGE_KEY: 'noteview-current-view',
@@ -123,6 +123,10 @@ const Store = {
                 if (!db.objectStoreNames.contains('chatHistory')) {
                     db.createObjectStore('chatHistory');
                     Logger.log('Creating chatHistory object store');
+                }
+                if (!db.objectStoreNames.contains('timelineCache')) {
+                    db.createObjectStore('timelineCache');
+                    Logger.log('Creating timelineCache object store');
                 }
             };
 
@@ -277,6 +281,28 @@ const Store = {
 
     async loadChatHistory(vaultName) {
         return this._dbGet('chatHistory', `chatHistory::${vaultName}`);
+    },
+
+    async saveTimelineCache(vaultName, data) {
+        return this._dbPut('timelineCache', vaultName, data);
+    },
+
+    async loadTimelineCache(vaultName) {
+        return this._dbGet('timelineCache', vaultName);
+    },
+
+    async deleteTimelineCache(vaultName) {
+        if (!await this._ensureDB()) return;
+        return new Promise((resolve) => {
+            try {
+                if (!this.db.objectStoreNames.contains('timelineCache')) return resolve();
+                const transaction = this.db.transaction(['timelineCache'], 'readwrite');
+                const store = transaction.objectStore('timelineCache');
+                const request = store.delete(vaultName);
+                request.onsuccess = () => resolve();
+                request.onerror = () => { console.warn('Error deleting timeline cache:', request.error); resolve(); };
+            } catch (e) { console.warn('Exception deleting timeline cache:', e); resolve(); }
+        });
     },
 
     // Initialize file system access

@@ -33,13 +33,11 @@ const TimelineView = {
         return `${contextSelection}|${contactSelection}|${searchQuery}`;
     }),
 
-    // Raw git data cache — stores task snapshots per commit, survives filter changes.
+    // Raw git data cache — persists to IndexedDB for fast reload.
     // Validated by HEAD OID inside buildTimeline(). Incremental rebuild when only new
     // commits are added; full rebuild when HEAD OID doesn't match or on first load.
     _rawDataCache: {
         headOid: null,
-        commitCount: 0,
-        commitSnapshots: [],
         events: [],
     },
 
@@ -65,9 +63,9 @@ const TimelineView = {
      */
     invalidateRawDataCache() {
         this._rawDataCache.headOid = null;
-        this._rawDataCache.commitCount = 0;
-        this._rawDataCache.commitSnapshots = [];
         this._rawDataCache.events = [];
+        const vaultName = Store.directoryHandle?.name;
+        if (vaultName) Store.deleteTimelineCache(vaultName);
     },
 
     /**
@@ -352,6 +350,51 @@ const TimelineView = {
         return events;
     },
 
+    // --- IndexedDB persistence helpers ---
+
+    _serializeTasksMap(tasksMap) {
+        return [...tasksMap.entries()].map(([filename, { tasks, tags }]) => [
+            filename, { tasks: [...tasks.entries()], tags }
+        ]);
+    },
+
+    _deserializeTasksMap(arr) {
+        const map = new Map();
+        for (const [filename, { tasks, tags }] of arr) {
+            map.set(filename, { tasks: new Map(tasks), tags });
+        }
+        return map;
+    },
+
+    _serializeFileSet(fileSet) {
+        return [...fileSet.entries()];
+    },
+
+    _deserializeFileSet(arr) {
+        return new Map(arr);
+    },
+
+    async _persistToDB(events, frontierSnapshot, headOid) {
+        const vaultName = Store.directoryHandle?.name;
+        if (!vaultName) return;
+        const data = {
+            headOid,
+            events,
+            frontierSnapshot: {
+                tasks: this._serializeTasksMap(frontierSnapshot.tasks),
+                fileSet: this._serializeFileSet(frontierSnapshot.fileSet),
+            },
+            timestamp: Date.now(),
+        };
+        await Store.saveTimelineCache(vaultName, data);
+    },
+
+    async _restoreFromDB() {
+        const vaultName = Store.directoryHandle?.name;
+        if (!vaultName) return null;
+        return Store.loadTimelineCache(vaultName);
+    },
+
     /**
      * Build the full list of events from git history.
      * Uses diff-based file discovery and supports incremental rebuilds.
@@ -367,10 +410,94 @@ const TimelineView = {
     },
 
     async _buildTimelineInternal() {
-        const commits = await GitStore.getFullHistory(500);
+        // Quick HEAD check to potentially skip the full git log walk
+        const cached = await this._restoreFromDB();
+        if (cached) {
+            const currentHeadOid = await this._resolveHead();
+            if (currentHeadOid && cached.headOid === currentHeadOid) {
+                Logger.log('Timeline: cache hit (HEAD unchanged)');
+                this._rawDataCache.headOid = currentHeadOid;
+                this._rawDataCache.events = cached.events;
+
+                // Determine unpushed commits
+                const commits = await GitStore.getFullHistory();
+                if (commits.length > 0) {
+                    const unpushedOids = await this._getUnpushedOids(commits);
+                    for (const event of cached.events) {
+                        event.unpushed = unpushedOids.has(event.oid);
+                    }
+                }
+                return cached.events;
+            }
+        }
+
+        const commits = await GitStore.getFullHistory();
         if (commits.length === 0) return [];
 
-        // Determine which commits are unpushed
+        const currentHeadOid = commits[0].oid;
+        const unpushedOids = await this._getUnpushedOids(commits);
+
+        // Check if we can do an incremental rebuild from a cached frontier
+        // (cached head is an ancestor of current HEAD)
+        let allEvents = [];
+        let prevAllTasks;
+        let prevFileSet;
+        let startIdx = 0;
+
+        const chronological = [...commits].reverse();
+
+        if (cached && cached.frontierSnapshot) {
+            // Find where the cached head appears in chronological order
+            const cachedIdx = chronological.findIndex(c => c.oid === cached.headOid);
+            if (cachedIdx >= 0) {
+                Logger.log('Timeline: incremental rebuild from cached frontier');
+                // Cached events are newest-first; reverse to chronological for appending
+                allEvents = [...cached.events].reverse();
+                prevAllTasks = this._deserializeTasksMap(cached.frontierSnapshot.tasks);
+                prevFileSet = this._deserializeFileSet(cached.frontierSnapshot.fileSet);
+                startIdx = cachedIdx + 1;
+            }
+        }
+
+        if (startIdx === 0) {
+            // Full rebuild
+            Logger.log('Timeline: full rebuild');
+            prevAllTasks = new Map();
+            prevFileSet = new Map();
+        }
+
+        for (let i = startIdx; i < chronological.length; i++) {
+            const commit = chronological[i];
+            const parentCommit = i > 0 ? chronological[i - 1] : null;
+            const { tasks, fileSet, events } = await this._processCommit(
+                commit, prevAllTasks, prevFileSet, parentCommit
+            );
+            allEvents.push(...events);
+            prevAllTasks = tasks;
+            prevFileSet = fileSet;
+        }
+
+        // Newest first
+        allEvents.reverse();
+
+        // Update in-memory cache
+        this._rawDataCache.headOid = currentHeadOid;
+        this._rawDataCache.events = allEvents;
+
+        // Persist to IndexedDB with the frontier snapshot (last commit's state)
+        const frontierSnapshot = { tasks: prevAllTasks, fileSet: prevFileSet };
+        this._persistToDB(allEvents, frontierSnapshot, currentHeadOid).catch(e =>
+            console.warn('Timeline: failed to persist cache:', e)
+        );
+
+        // Tag unpushed events
+        for (const event of allEvents) {
+            event.unpushed = unpushedOids.has(event.oid);
+        }
+        return allEvents;
+    },
+
+    async _getUnpushedOids(commits) {
         const unpushedOids = new Set();
         try {
             const { git, fs, dir } = GitStore;
@@ -383,86 +510,20 @@ const TimelineView = {
                     if (c.oid === remoteHead) { foundRemote = true; break; }
                     unpushedOids.add(c.oid);
                 }
-                // If remote HEAD not in our commit list (diverged histories),
-                // don't mark everything as unpushed — treat as unknown
                 if (!foundRemote) unpushedOids.clear();
             }
         } catch (e) { /* ignore */ }
+        return unpushedOids;
+    },
 
-        // Process from oldest to newest for correct diffing
-        const chronological = [...commits].reverse();
-        const currentHeadOid = commits[0].oid;
-
-        // Check if we can do an incremental rebuild (new commits appended to existing history)
-        const rawCache = this._rawDataCache;
-        const canIncrement = rawCache.headOid !== null
-            && rawCache.commitCount > 0
-            && rawCache.commitSnapshots.length === rawCache.commitCount
-            && chronological.length > rawCache.commitCount
-            && chronological[rawCache.commitCount - 1].oid
-                === rawCache.commitSnapshots[rawCache.commitCount - 1].oid;
-
-        let allEvents = [];
-        let commitSnapshots;
-        let prevAllTasks;
-        let prevFileSet;
-
-        if (canIncrement) {
-            // Incremental: reuse existing snapshots, process only new commits
-            commitSnapshots = [...rawCache.commitSnapshots];
-            allEvents = [...rawCache.events];
-            prevAllTasks = commitSnapshots[commitSnapshots.length - 1].tasks;
-            prevFileSet = commitSnapshots[commitSnapshots.length - 1].fileSet || new Map();
-
-            for (let i = rawCache.commitCount; i < chronological.length; i++) {
-                const commit = chronological[i];
-                const { tasks, fileSet, events } = await this._processCommit(
-                    commit, prevAllTasks, prevFileSet, chronological[i - 1]
-                );
-                commitSnapshots.push({ oid: commit.oid, tasks, fileSet });
-                allEvents.push(...events);
-                prevAllTasks = tasks;
-                prevFileSet = fileSet;
-            }
-        } else {
-            // Full rebuild with diff-based optimization
-            commitSnapshots = [];
-            prevAllTasks = new Map();
-            prevFileSet = new Map();
-
-            for (let i = 0; i < chronological.length; i++) {
-                const commit = chronological[i];
-                const parentCommit = i > 0 ? chronological[i - 1] : null;
-                const { tasks, fileSet, events } = await this._processCommit(
-                    commit, prevAllTasks, prevFileSet, parentCommit
-                );
-                commitSnapshots.push({ oid: commit.oid, tasks, fileSet });
-                allEvents.push(...events);
-                prevAllTasks = tasks;
-                prevFileSet = fileSet;
-            }
+    async _resolveHead() {
+        try {
+            const { git, fs, dir } = GitStore;
+            const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
+            return await git.resolveRef({ fs, dir, ref: `refs/heads/${ref}` });
+        } catch (e) {
+            return null;
         }
-
-        // Update raw data cache (limit snapshots to prevent unbounded memory growth)
-        const MAX_SNAPSHOTS = 50;
-        this._rawDataCache.headOid = currentHeadOid;
-        this._rawDataCache.commitSnapshots = commitSnapshots.length > MAX_SNAPSHOTS
-            ? commitSnapshots.slice(-MAX_SNAPSHOTS)
-            : commitSnapshots;
-        // Keep commitCount in sync with actual snapshot length so incremental check works
-        this._rawDataCache.commitCount = this._rawDataCache.commitSnapshots.length;
-
-        // Return newest first
-        allEvents.reverse();
-
-        // Persist events for incremental rebuilds
-        this._rawDataCache.events = allEvents;
-
-        // Tag unpushed events
-        for (const event of allEvents) {
-            event.unpushed = unpushedOids.has(event.oid);
-        }
-        return allEvents;
     },
 
     /**
