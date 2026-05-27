@@ -704,11 +704,29 @@ const VaultModal = {
                         console.error('Verification wizard error:', err);
                         
                         // Clean up: delete the locally created directory so it's not a zombie directory
+                        let cleanupFailed = false;
+                        let cleanupMsg = '';
                         try {
                             const opfsRoot = await navigator.storage.getDirectory();
                             await opfsRoot.removeEntry(name, { recursive: true });
+                            Logger.log('Cleanup successful: removed partial vault', name);
                         } catch (cleanUpErr) {
                             console.warn('Cleanup failed:', cleanUpErr);
+                            cleanupFailed = true;
+                            cleanupMsg = cleanUpErr.message || 'Unknown error';
+                            
+                            // Try to clean up the vault list entry
+                            try {
+                                const vaultList = await Store.getVaultList();
+                                const zombieEntry = vaultList.find(v => v.name === name && v.type === 'opfs');
+                                if (zombieEntry) {
+                                    await Store.deleteVault(name);
+                                    Logger.log('Removed zombie vault entry from vault list', name);
+                                    cleanupFailed = false; // Mark as resolved since we cleaned the metadata
+                                }
+                            } catch (listCleanupErr) {
+                                console.warn('Failed to clean vault list:', listCleanupErr);
+                            }
                         }
 
                         // Restore previous directory handle
@@ -723,19 +741,74 @@ const VaultModal = {
                         errorIcon.style.display = 'block';
                         errorBox.style.display = 'block';
                         errorBackBtn.style.display = 'block';
-                        statusMsg.textContent = 'Verification failed.';
+                        successDoneBtn.style.display = 'none';
                         
-                        // Humanize common errors
+                        // Classify error type for better UX
+                        let errorType = 'generic';
                         let friendlyMsg = err.message || err.toString();
+                        let isTransient = false;
+                        let actionHint = '';
+                        
                         if (friendlyMsg.includes('401') || friendlyMsg.toLowerCase().includes('unauthorized') || friendlyMsg.toLowerCase().includes('auth')) {
+                            errorType = 'auth';
                             friendlyMsg = 'Authentication failed. Please verify your username and Personal Access Token (PAT). Remember, GitHub and GitLab require a PAT, not your login password.';
+                            actionHint = '<a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token" target="_blank" style="color:var(--accent);text-decoration:underline">How to create a PAT</a>';
+                        } else if (friendlyMsg.includes('403') || friendlyMsg.toLowerCase().includes('forbidden')) {
+                            errorType = 'forbidden';
+                            friendlyMsg = 'Access denied. Your token may not have the required permissions or the repository branch may be protected.';
+                            actionHint = 'Ensure your PAT has the "repo" scope and that push access is enabled.';
                         } else if (friendlyMsg.includes('404') || friendlyMsg.toLowerCase().includes('not found')) {
+                            errorType = 'notfound';
                             friendlyMsg = 'Repository not found. Double check the HTTPS URL. Make sure it exists and that your token has read/write access.';
-                        } else if (friendlyMsg.toLowerCase().includes('cors') || friendlyMsg.toLowerCase().includes('fetch')) {
+                        } else if (friendlyMsg.toLowerCase().includes('cors') || friendlyMsg.toLowerCase().includes('fetch') || friendlyMsg.toLowerCase().includes('networkerror')) {
+                            errorType = 'cors';
                             friendlyMsg = 'Network or CORS error. In-browser Git sync requires a CORS Proxy to work. Make sure your CORS proxy URL is correct and active, or try isomorphic-git\'s default proxy.';
+                            actionHint = '<a href="https://isomorphic-git.org/docs/en/corsProxy" target="_blank" style="color:var(--accent);text-decoration:underline">Learn about CORS proxies</a>';
+                        } else if (friendlyMsg.toLowerCase().includes('timeout') || friendlyMsg.toLowerCase().includes('timed out') || friendlyMsg.toLowerCase().includes('network')) {
+                            errorType = 'network';
+                            isTransient = true;
+                            friendlyMsg = 'Network timeout or connection error. This might be a temporary issue.';
+                            actionHint = 'Check your internet connection and try again.';
+                        } else if (friendlyMsg.toLowerCase().includes('failed to init git') || friendlyMsg.toLowerCase().includes('initialize')) {
+                            errorType = 'init';
+                            friendlyMsg = 'Failed to initialize Git repository. This may be due to storage limits or browser restrictions.';
                         }
                         
-                        errorMsgEl.textContent = friendlyMsg;
+                        statusMsg.textContent = isTransient ? 'Connection timeout' : 'Verification failed.';
+                        
+                        // Build detailed error message
+                        let detailedMsg = `<p>${escapeHtml(friendlyMsg)}</p>`;
+                        if (actionHint) {
+                            detailedMsg += `<p style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-secondary)">${actionHint}</p>`;
+                        }
+                        if (cleanupFailed) {
+                            detailedMsg += `<div style="margin-top:0.75rem;padding:0.75rem;background:rgba(245,158,11,0.15);border-left:3px solid var(--color-warning,#f59e0b);border-radius:4px">
+                                <p style="margin:0;font-size:0.85rem;color:var(--text-primary)">
+                                    <strong>⚠️ Partial cleanup failed</strong><br>
+                                    Could not remove the partially created vault. Go to <strong>Manage Vaults</strong> and remove "${escapeHtml(name)}" manually.
+                                </p>
+                                <p style="margin:0.25rem 0 0 0;font-size:0.75rem;color:var(--text-muted)">Error: ${escapeHtml(cleanupMsg)}</p>
+                            </div>`;
+                        }
+                        
+                        errorMsgEl.innerHTML = detailedMsg;
+                        
+                        // Add retry button for transient errors
+                        const retryBtnId = 'wizardRetryBtn';
+                        let existingRetryBtn = document.getElementById(retryBtnId);
+                        if (existingRetryBtn) existingRetryBtn.remove();
+                        
+                        if (isTransient) {
+                            const retryBtn = document.createElement('button');
+                            retryBtn.id = retryBtnId;
+                            retryBtn.className = 'vault-manager-action-btn primary';
+                            retryBtn.textContent = 'Retry';
+                            retryBtn.style.marginLeft = '0.5rem';
+                            retryBtn.addEventListener('click', () => {
+                                verifyBtn.click();
+                            });
+                            errorBackBtn.insertAdjacentElement('afterend', retryBtn);
+                        }
                     }
                 });
             }

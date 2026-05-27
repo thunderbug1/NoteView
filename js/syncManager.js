@@ -17,6 +17,8 @@ const SyncManager = {
     _syncing: false,
     _networkListenersInstalled: false,
     _idleSyncTimer: null,
+    _consecutiveErrors: 0,     // Track consecutive sync failures
+    _lastErrorTime: null,
 
     _config: {
         autoSync: false,
@@ -125,6 +127,8 @@ const SyncManager = {
             await GitRemote.push();
             this._lastSyncTime = new Date().toISOString();
             this._lastError = null;
+            this._consecutiveErrors = 0;
+            this._lastErrorTime = null;
 
             // Reconcile pending count from authoritative git state
             await this._refreshPendingCount();
@@ -134,6 +138,9 @@ const SyncManager = {
             await this._postSyncRender();
             return true;
         } catch (err) {
+            this._consecutiveErrors++;
+            this._lastErrorTime = new Date().toISOString();
+            
             if (this._isOverwriteError(err)) {
                 this._lastError = err.message;
                 this._setStatus('conflict', 'Local changes conflict with remote');
@@ -147,13 +154,41 @@ const SyncManager = {
             } else {
                 this._lastError = err.message;
                 this._setStatus('error', err.message);
-                const msg = this._isCorsError(err)
-                    ? 'Sync failed: CORS blocked — configure a CORS proxy in Settings → Sync'
-                    : 'Sync failed: ' + err.message;
-                showToast(msg, {
-                    actionLabel: 'Retry',
-                    action: () => this.sync()
-                });
+                
+                let msg = 'Sync failed: ' + err.message;
+                let actionLabel = 'Retry';
+                let action = () => this.sync();
+                
+                // Check for consecutive errors and escalate message
+                if (this._consecutiveErrors >= 3) {
+                    msg += ` (${this._consecutiveErrors} consecutive failures)`;
+                    actionLabel = 'Retry (Wait)';
+                    action = () => {
+                        // Add delay before retry for consecutive failures
+                        setTimeout(() => this.sync(), 2000 * Math.min(this._consecutiveErrors, 5));
+                    };
+                }
+                
+                if (this._isCorsError(err)) {
+                    msg = 'Sync failed: CORS blocked — configure a CORS proxy in Settings';
+                    actionLabel = 'View Settings';
+                    action = () => App.setView('settings');
+                } else if (this._isAuthError(err)) {
+                    msg = 'Sync failed: Authentication error — check your credentials in Settings';
+                    actionLabel = 'View Settings';
+                    action = () => App.setView('settings');
+                } else if (this._isNetworkError(err)) {
+                    msg = 'Sync failed: Network error — check your connection and retry';
+                    if (this._consecutiveErrors >= 2) {
+                        msg += ' (retrying with delay...)';
+                    }
+                } else if (this._isProtectedBranchError(err)) {
+                    msg = 'Sync failed: Branch is protected. You may need to push to a different branch or use force push.';
+                    actionLabel = 'Force Push';
+                    action = () => this._forcePush();
+                }
+                
+                showToast(msg, { actionLabel, action });
             }
             // Reconcile even on failure — partial sync may have changed count
             await this._refreshPendingCount().catch(() => {});
@@ -185,9 +220,18 @@ const SyncManager = {
             try {
                 await GitRemote.push();
                 await this._refreshPendingCount();
+                this._consecutiveErrors = 0;
             } catch (err) {
                 this._lastError = err.message;
+                this._consecutiveErrors++;
                 console.warn('[SyncManager] background push failed:', err);
+                // Show subtle notification for background sync failures
+                if (this._consecutiveErrors >= 2) {
+                    showToast(`Background sync failed (${this._consecutiveErrors}x). Will retry automatically.`, {
+                        actionLabel: 'View Status',
+                        action: () => document.getElementById('toolbarSyncBtn')?.click()
+                    });
+                }
             } finally {
                 this._syncing = false;
             }
@@ -318,7 +362,51 @@ const SyncManager = {
     _isCorsError(err) {
         const msg = (err.message || '').toLowerCase();
         return msg.includes('failed to fetch') || msg.includes('networkerror') ||
-               msg.includes('load failed');
+               msg.includes('load failed') || msg.includes('cors');
+    },
+
+    _isAuthError(err) {
+        const msg = (err.message || '').toLowerCase();
+        return msg.includes('401') || msg.includes('403') || msg.includes('unauthorized') ||
+               msg.includes('forbidden') || msg.includes('authentication') || msg.includes('credentials');
+    },
+
+    _isNetworkError(err) {
+        const msg = (err.message || '').toLowerCase();
+        return msg.includes('timeout') || msg.includes('timed out') || msg.includes('network') ||
+               msg.includes('connection') || msg.includes('econnrefused') || msg.includes('enotfound');
+    },
+
+    _isProtectedBranchError(err) {
+        const msg = (err.message || '').toLowerCase();
+        return msg.includes('protected') || msg.includes('permission denied') ||
+               (msg.includes('push') && msg.includes('rejected'));
+    },
+
+    async _forcePush() {
+        try {
+            const { git, fs, dir } = GitStore;
+            const ref = this._config.branch || 'main';
+            const remoteName = GitRemote.config.name;
+            
+            await git.push({
+                fs, dir,
+                http: window.GitHttp,
+                remote: remoteName, ref, force: true,
+                corsProxy: GitRemote._getCorsProxy(),
+                onAuth: () => GitRemote.config.auth
+            });
+            
+            this._pendingCommits = 0;
+            this._lastError = null;
+            this._consecutiveErrors = 0;
+            this._setStatus('idle', 'Force push succeeded');
+            showToast('Force push successful.');
+        } catch (err) {
+            this._lastError = err.message;
+            this._setStatus('error', err.message);
+            alert('Force push failed: ' + err.message);
+        }
     },
 
     async _handleMergeConflict() {

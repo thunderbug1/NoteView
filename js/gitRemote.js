@@ -21,34 +21,84 @@ const GitRemote = {
         }
         const { git, fs, dir } = GitStore;
 
-        // Persist config BEFORE adding remote so we don't end up in partial state
-        this.config = { name, url, auth };
-        window.GitHttp.setCredentials(auth);
+        // Validate parameters
+        if (!name || !url) {
+            console.error('GitRemote.setRemote: name and url are required');
+            return false;
+        }
+
+        // Validate URL format
+        if (!url.startsWith('https://')) {
+            console.error('GitRemote.setRemote: URL must use HTTPS');
+            return false;
+        }
+
+        // Backup current config for rollback
+        const previousConfig = this.config ? { ...this.config } : null;
+
         try {
+            // 1. Test connection first (if auth provided)
+            if (auth && auth.password) {
+                try {
+                    await git.fetch({
+                        fs, dir,
+                        http: window.GitHttp,
+                        remote: name,
+                        url: url,
+                        corsProxy: this._getCorsProxy(),
+                        onAuth: () => auth,
+                        singleBranch: true,
+                        depth: 1
+                    });
+                } catch (fetchErr) {
+                    const msg = (fetchErr.message || '').toLowerCase();
+                    if (msg.includes('401') || msg.includes('unauthorized')) {
+                        throw new Error('Authentication failed. Please verify your username and Personal Access Token (PAT).');
+                    } else if (msg.includes('404') || msg.includes('not found')) {
+                        throw new Error('Repository not found. Double check the HTTPS URL.');
+                    } else if (msg.includes('cors') || msg.includes('fetch') || msg.includes('networkerror')) {
+                        throw new Error('Network or CORS error. Check your CORS proxy configuration.');
+                    }
+                    // If it's a "branch not found" error, that's OK for new repos
+                    if (!msg.includes('not found') || !msg.includes('branch')) {
+                        throw fetchErr;
+                    }
+                }
+            }
+
+            // 2. Persist config BEFORE adding remote so we don't end up in partial state
+            this.config = { name, url, auth };
+            window.GitHttp.setCredentials(auth);
             await Store.saveRemoteConfig(this.config);
-        } catch (err) {
-            console.error('Failed to persist remote config:', err);
-            this.config = null;
-            return false;
-        }
 
-        try {
-            await git.addRemote({
-                fs,
-                dir,
-                remote: name,
-                url: url,
-                force: true
-            });
-        } catch (err) {
-            console.error('Failed to add remote:', err);
-            // Roll back persisted config
-            this.config = null;
-            try { await Store.saveRemoteConfig(null); } catch (e) { /* ignore */ }
-            return false;
-        }
+            // 3. Add remote (atomic operation)
+            try {
+                await git.addRemote({
+                    fs,
+                    dir,
+                    remote: name,
+                    url: url,
+                    force: true
+                });
+            } catch (addErr) {
+                // Roll back persisted config if addRemote fails
+                console.error('Failed to add remote after config persisted, rolling back:', addErr);
+                try {
+                    await Store.saveRemoteConfig(previousConfig);
+                    this.config = previousConfig;
+                } catch (rollbackErr) {
+                    console.error('Rollback failed, manual intervention may be needed:', rollbackErr);
+                }
+                return false;
+            }
 
-        return true;
+            return true;
+        } catch (err) {
+            console.error('Failed to set remote:', err);
+            this.config = previousConfig;
+            window.GitHttp.setCredentials(previousConfig?.auth || null);
+            throw err;
+        }
     },
 
     async push(force = false) {

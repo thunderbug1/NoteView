@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Error Handling Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { margin-top: 0; }
+        h2 { color: #333; }
+        button {
+            padding: 10px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        button.primary {
+            background: #2563eb;
+            color: white;
+        }
+        button.secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        button:hover { opacity: 0.9; }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .result.pass { background: #dcfce7; color: #166534; }
+        .result.fail { background: #fee2e2; color: #991b1b; }
+        .result.info { background: #dbeafe; color: #1e40af; }
+        .mock-error-ui {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px 0;
+            background: white;
+        }
+        .mock-error-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .mock-error-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fee2e2;
+            border-radius: 50%;
+        }
+        .mock-error-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+        }
+        .mock-error-box h4 { margin: 0 0 8px 0; color: #991b1b; }
+        .mock-error-box p { margin: 0; color: #7f1d1d; }
+    </style>
+</head>
+<body>
+    <h1>Git Error Handling UI Test</h1>
+    <p>This page demonstrates the improved error handling UI for git connection issues.</p>
+
+    <!-- Error Message Display Test -->
+    <div class="test-section">
+        <h2>1. Error Message Display</h2>
+        <p>Click each button to see how different errors are displayed:</p>
+        
+        <button class="secondary" onclick="showError('auth')">Authentication Error (401)</button>
+        <button class="secondary" onclick="showError('forbidden')">Access Denied (403)</button>
+        <button class="secondary" onclick="showError('notfound')">Repository Not Found (404)</button>
+        <button class="secondary" onclick="showError('cors')">CORS Error</button>
+        <button class="secondary" onclick="showError('network')">Network Timeout</button>
+        
+        <div id="error-display" class="mock-error-ui" style="display:none;">
+            <div class="mock-error-header">
+                <div class="mock-error-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </div>
+                <h3>Verification failed</h3>
+            </div>
+            <div class="mock-error-box">
+                <h4 id="error-headline">Error</h4>
+                <p id="error-message">Error message</p>
+            </div>
+            <div>
+                <button class="secondary">Edit Settings</button>
+                <button class="primary" id="retry-btn" style="display:none">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Consecutive Errors Test -->
+    <div class="test-section">
+        <h2>2. Consecutive Error Tracking</h2>
+        <p>Simulate multiple sync failures to see escalation:</p>
+        
+        <button class="secondary" onclick="incrementError()">Simulate Sync Failure</button>
+        <button class="secondary" onclick="resetError()">Reset Counter</button>
+        
+        <div id="consecutive-result" class="result info">
+            Consecutive errors: 0
+        </div>
+    </div>
+
+    <!-- Action Buttons Test -->
+    <div class="test-section">
+        <h2>3. Error Action Buttons</h2>
+        <p>Different error types show different action buttons:</p>
+        
+        <div class="mock-error-ui">
+            <h4>CORS Error</h4>
+            <p>Sync failed: CORS blocked — configure a CORS proxy in Settings</p>
+            <button class="primary">View Settings</button>
+        </div>
+        
+        <div class="mock-error-ui">
+            <h4>Auth Error</h4>
+            <p>Sync failed: Authentication error — check your credentials in Settings</p>
+            <button class="primary">View Settings</button>
+        </div>
+        
+        <div class="mock-error-ui">
+            <h4>Network Error (2+ failures)</h4>
+            <p>Sync failed: Network error — check your connection and retry (2 consecutive failures)</p>
+            <button class="primary">Retry (Wait)</button>
+        </div>
+        
+        <div class="mock-error-ui">
+            <h4>Protected Branch</h4>
+            <p>Sync failed: Branch is protected. You may need to push to a different branch or use force push.</p>
+            <button class="primary">Force Push</button>
+        </div>
+    </div>
+
+    <!-- Cleanup Failure Test -->
+    <div class="test-section">
+        <h2>4. Cleanup Failure Handling</h2>
+        <button class="secondary" onclick="showCleanupFailure()">Show Cleanup Failure</button>
+        
+        <div id="cleanup-ui" class="mock-error-ui" style="display:none;">
+            <div class="mock-error-header">
+                <div class="mock-error-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </div>
+                <h3>Verification failed</h3>
+            </div>
+            <div class="mock-error-box">
+                <h4>Authentication failed</h4>
+                <p>Please verify your username and Personal Access Token (PAT).</p>
+            </div>
+            <div style="background: rgba(245,158,11,0.15); border-left: 3px solid #f59e0b; border-radius: 4px; padding: 12px; margin-top: 15px;">
+                <p style="margin: 0; font-size: 14px; color: #111827;">
+                    <strong>⚠️ Partial cleanup failed</strong><br>
+                    Could not remove the partially created vault. Go to <strong>Manage Vaults</strong> and remove "TestVault" manually.
+                </p>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">Error: Could not find entry in OPFS</p>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="secondary">Edit Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const errorMessages = {
+            auth: {
+                headline: 'Authentication Failed',
+                message: 'Authentication failed. Please verify your username and Personal Access Token (PAT). Remember, GitHub and GitLab require a PAT, not your login password.',
+                actionHint: '<a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token" target="_blank" style="color:#2563eb;text-decoration:underline">How to create a PAT</a>',
+                retry: false
+            },
+            forbidden: {
+                headline: 'Access Denied',
+                message: 'Access denied. Your token may not have the required permissions or the repository branch may be protected.',
+                actionHint: 'Ensure your PAT has the "repo" scope and that push access is enabled.',
+                retry: false
+            },
+            notfound: {
+                headline: 'Repository Not Found',
+                message: 'Repository not found. Double check the HTTPS URL. Make sure it exists and that your token has read/write access.',
+                retry: false
+            },
+            cors: {
+                headline: 'CORS Error',
+                message: 'Network or CORS error. In-browser Git sync requires a CORS Proxy to work. Make sure your CORS proxy URL is correct and active, or try isomorphic-git\'s default proxy.',
+                actionHint: '<a href="https://isomorphic-git.org/docs/en/corsProxy" target="_blank" style="color:#2563eb;text-decoration:underline">Learn about CORS proxies</a>',
+                retry: false
+            },
+            network: {
+                headline: 'Network Timeout',
+                message: 'Network timeout or connection error. This might be a temporary issue.',
+                actionHint: 'Check your internet connection and try again.',
+                retry: true
+            }
+        };
+
+        function showError(type) {
+            const error = errorMessages[type];
+            const display = document.getElementById('error-display');
+            const headline = document.getElementById('error-headline');
+            const message = document.getElementById('error-message');
+            const retryBtn = document.getElementById('retry-btn');
+            
+            display.style.display = 'block';
+            headline.textContent = error.headline;
+            message.innerHTML = error.message;
+            if (error.actionHint) {
+                message.innerHTML += '<br><span style="font-size:13px;color:#6b7280">' + error.actionHint + '</span>';
+            }
+            retryBtn.style.display = error.retry ? 'inline-block' : 'none';
+        }
+
+        let consecutiveErrors = 0;
+        
+        function incrementError() {
+            consecutiveErrors++;
+            updateConsecutiveDisplay();
+        }
+        
+        function resetError() {
+            consecutiveErrors = 0;
+            updateConsecutiveDisplay();
+        }
+        
+        function updateConsecutiveDisplay() {
+            const result = document.getElementById('consecutive-result');
+            result.innerHTML = `Consecutive errors: ${consecutiveErrors}<br>`;
+            
+            if (consecutiveErrors >= 3) {
+                result.innerHTML += '<strong>⚠️ Escalated error message shown</strong><br>';
+                result.innerHTML += 'Action: Retry with delay (up to 10 seconds)';
+            } else if (consecutiveErrors >= 2) {
+                result.innerHTML += 'Action: Retry with minimal delay (2 seconds)';
+            } else {
+                result.innerHTML += 'Action: Immediate retry';
+            }
+        }
+
+        function showCleanupFailure() {
+            document.getElementById('cleanup-ui').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
