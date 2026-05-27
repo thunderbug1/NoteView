@@ -134,6 +134,17 @@ const AppSettings = {
         await this.save(settings);
     },
 
+    async getDefaultCorsProxy() {
+        const settings = await this.load();
+        return settings.defaultCorsProxy || '';
+    },
+
+    async setDefaultCorsProxy(url) {
+        const settings = await this.load();
+        settings.defaultCorsProxy = url.trim();
+        await this.save(settings);
+    },
+
     async _ensureGitignore(dir) {
         try {
             const handle = await dir.getFileHandle('.gitignore', { create: true });

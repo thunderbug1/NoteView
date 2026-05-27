@@ -375,8 +375,9 @@ const VaultModal = {
         }
     },
 
-    _openBrowserVaultWizard(prefillData = null) {
+    async _openBrowserVaultWizard(prefillData = null) {
         const prevDirectoryHandle = VaultModal._prevHandle || Store.directoryHandle;
+        const defaultProxy = window.AppSettings ? await AppSettings.getDefaultCorsProxy() : '';
 
         const wizardModal = Modal.create({
                 title: 'Browser Vault Setup Wizard',
@@ -441,7 +442,7 @@ const VaultModal = {
 
                                 <div class="wizard-form-group">
                                     <label for="wizardGitProxy">CORS Proxy URL</label>
-                                    <input type="url" id="wizardGitProxy" value="https://cors.isomorphic-git.org">
+                                    <input type="url" id="wizardGitProxy" value="${escapeHtml(defaultProxy)}" placeholder="https://cors.isomorphic-git.org">
                                     <span class="field-hint">Proxy to bypass browser CORS limits. Default: https://cors.isomorphic-git.org</span>
                                 </div>
                             </div>
@@ -643,8 +644,12 @@ const VaultModal = {
                             SyncManager._config.branch = SyncManager._config.branch || 'main';
                         }
 
+                        // Save the full remote config including sync settings
+                        const remoteConfig = { name: 'origin', url: gitUrl, auth, sync: SyncManager._config };
+                        
                         // Set directoryHandle temporarily so saveRemoteConfig and pull can run correctly
                         Store.directoryHandle = tempHandle;
+                        await Store.saveRemoteConfig(remoteConfig);
 
                         // 4. Test connection via fetch
                         statusMsg.textContent = 'Connecting to git remote repository...';
@@ -662,13 +667,6 @@ const VaultModal = {
 
                         // 5. Connection works! Try to pull notes (if existing)
                         statusMsg.textContent = 'Connection successful! Fetching branch...';
-                        
-                        // Save remote config to file system so GitRemote pull can read it
-                        await Store.saveRemoteConfig(GitRemote.config);
-                        if (window.SyncManager) {
-                            // Ensure CORS proxy is persisted
-                            localStorage.setItem('sync_cors_proxy', gitProxy);
-                        }
 
                         try {
                             statusMsg.textContent = 'Downloading notes from remote repository...';

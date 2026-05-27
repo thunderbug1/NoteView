@@ -69,6 +69,10 @@ const SyncManager = {
         if (remoteConfig && remoteConfig.sync) {
             Object.assign(this._config, remoteConfig.sync);
         }
+        // Use default CORS proxy from app settings if not set in remote config
+        if (!this._config.corsProxy && window.AppSettings) {
+            this._config.corsProxy = await AppSettings.getDefaultCorsProxy();
+        }
     },
 
     async saveConfig(updates) {

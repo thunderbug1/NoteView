@@ -29,40 +29,16 @@ const SettingsView = {
                     <button class="edit-profile-btn" data-profile-id="${escapeHtml(p.id)}">Edit</button>
                     <button class="clone-profile-btn" data-profile-id="${escapeHtml(p.id)}">Clone</button>
                     <button class="delete-profile-btn" data-profile-id="${escapeHtml(p.id)}">Delete</button>
-                </div>
-            </div>
-        `).join('');
-    },
-
-    _cleanupShortcutRecording() {
-        if (this._activeShortcutHandler) {
-            window.removeEventListener('keydown', this._activeShortcutHandler, true);
-            this._activeShortcutHandler = null;
-        }
-        if (this._activeShortcutBtn) {
-            this._activeShortcutBtn.classList.remove('recording');
-            this._activeShortcutBtn.textContent = 'Record';
-            this._activeShortcutBtn = null;
-        }
-    },
-
-    async render(blocks) {
-        this._cleanupShortcutRecording();
-        const container = document.getElementById('viewContainer');
-        if (!container) return;
-
-        const directoryName = Store.directoryHandle ? Store.directoryHandle.name : 'No directory selected';
-
-        container.innerHTML = `
-            <div class="settings-view">
-                <div class="settings-header">
-                    <button id="settingsBackBtn" class="settings-back-btn" title="Back to Notes">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="19" y1="12" x2="5" y2="12"></line>
-                            <polyline points="12 19 5 12 12 5"></polyline>
-                        </svg>
-                    </button>
-                    <h2>Settings</h2>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Default CORS Proxy</label>
+                            <p class="settings-item-hint">Default proxy for new vaults and git operations.</p>
+                        </div>
+                        <button id="configDefaultCorsBtn" class="settings-btn secondary">
+                            Configure...
+                        </button>
+                    </div>
                 </div>
 
                 <div class="settings-section">
@@ -314,6 +290,11 @@ const SettingsView = {
         const configRemoteBtn = document.getElementById('configRemoteBtn');
         if (configRemoteBtn) {
             configRemoteBtn.addEventListener('click', () => this._openRemoteConfigModal());
+        }
+
+        const configDefaultCorsBtn = document.getElementById('configDefaultCorsBtn');
+        if (configDefaultCorsBtn) {
+            configDefaultCorsBtn.addEventListener('click', () => this._openDefaultCorsModal());
         }
 
         // Auto-sync toggle
@@ -1161,6 +1142,58 @@ const SettingsView = {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save & Connect';
                 alert('Failed to configure remote: ' + err.message);
+            }
+        });
+    },
+
+    async _openDefaultCorsModal() {
+        const defaultProxy = await AppSettings.getDefaultCorsProxy();
+
+        const modal = Modal.create({
+            title: 'Default CORS Proxy',
+            content: `
+                <div class="ai-profile-form">
+                    <div class="ai-form-row">
+                        <label>Default CORS Proxy URL <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(optional)</span></label>
+                        <input type="url" id="defaultCorsInput" value="${escapeHtml(defaultProxy)}" placeholder="https://cors.isomorphic-git.org">
+                        <div style="display:flex;gap:0.35rem;margin-top:0.35rem;flex-wrap:wrap">
+                            <button type="button" class="settings-btn secondary default-cors-preset" data-url="https://cors.isomorphic-git.org" style="font-size:0.8rem">isomorphic-git.org</button>
+                            <button type="button" class="settings-btn secondary default-cors-preset" data-url="https://cors-proxy.thinxlabs.workers.dev/corsproxy" style="font-size:0.8rem">thinxlabs</button>
+                            <button type="button" class="settings-btn secondary default-cors-preset" data-url="" style="font-size:0.8rem">None</button>
+                        </div>
+                        <p class="settings-item-hint" style="margin-top:0.35rem">This proxy will be used as the default for new vaults and git operations. Leave empty to not use a proxy by default.</p>
+                    </div>
+                    <div class="ai-form-actions">
+                        <button class="ai-form-cancel" id="defaultCorsCancelBtn">Cancel</button>
+                        <button class="ai-form-save" id="defaultCorsSaveBtn">Save</button>
+                    </div>
+                </div>
+            `,
+            width: '500px'
+        });
+
+        modal.querySelectorAll('.default-cors-preset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                modal.querySelector('#defaultCorsInput').value = btn.dataset.url;
+            });
+        });
+
+        modal.querySelector('#defaultCorsCancelBtn').addEventListener('click', () => modal.close());
+
+        modal.querySelector('#defaultCorsSaveBtn').addEventListener('click', async () => {
+            const corsProxy = modal.querySelector('#defaultCorsInput').value.trim();
+            const saveBtn = modal.querySelector('#defaultCorsSaveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            try {
+                await AppSettings.setDefaultCorsProxy(corsProxy);
+                saveBtn.textContent = 'Saved';
+                setTimeout(() => modal.close(), 500);
+            } catch (err) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save';
+                alert('Failed to save default CORS proxy: ' + err.message);
             }
         });
     },
