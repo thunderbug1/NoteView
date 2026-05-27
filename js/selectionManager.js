@@ -182,7 +182,7 @@ const SelectionManager = {
         });
         if (tag === 'Status.untagged') {
             for (const t of Array.from(this.selections.context)) {
-                if (this.isComputedContextTag(t)) this.selections.context.delete(t);
+                this.selections.context.delete(t);
             }
         } else {
             this.selections.context.delete('Status.untagged');
