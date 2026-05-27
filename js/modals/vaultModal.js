@@ -4,6 +4,8 @@
 
 const VaultModal = {
     _closeDropdownHandler: null,
+    _prevHandle: null,
+    _managerModal: null,
 
     updateVaultSwitcherName() {
         const nameEl = document.getElementById('vaultSwitcherName');
@@ -188,6 +190,7 @@ const VaultModal = {
         const modal = Modal.create({
             title: 'Manage Vaults',
             onClose: () => {
+                VaultModal._managerModal = null;
                 if (!Store.directoryHandle) {
                     App.showDirectoryPicker();
                 }
@@ -208,11 +211,21 @@ const VaultModal = {
                             </div>
                             <button class="vault-manager-action-btn secondary" id="createBrowserVaultBtn">Create</button>
                         </div>
+                        <div class="vault-manager-action">
+                            <div class="vault-manager-action-text">
+                                <h4>Scan QR Code</h4>
+                                <p>Scan a vault config from another device</p>
+                            </div>
+                            <button class="vault-manager-action-btn secondary" id="scanQrVaultBtn">Scan</button>
+                        </div>
                     </div>
                 </div>
             `,
             width: '600px'
         });
+
+        VaultModal._managerModal = modal;
+        VaultModal._prevHandle = Store.directoryHandle;
 
         const refreshList = async () => {
             const list = await Store.getVaultList();
@@ -340,10 +353,32 @@ const VaultModal = {
         };
 
         const openBrowserVaultWizard = () => {
-            const prevDirectoryHandle = Store.directoryHandle;
-            modal.close(); // Close the vault manager modal
+            modal.close();
+            VaultModal._openBrowserVaultWizard();
+        };
 
-            const wizardModal = Modal.create({
+        const browserVaultBtn = modal.querySelector('#createBrowserVaultBtn');
+        if (browserVaultBtn) browserVaultBtn.addEventListener('click', openBrowserVaultWizard);
+
+        const openBtn = modal.querySelector('#openFolderAsVaultBtn');
+        if (openBtn) openBtn.addEventListener('click', openVaultFromPicker);
+
+        const createBtn = modal.querySelector('#createVaultBtn');
+        if (createBtn) createBtn.addEventListener('click', openVaultFromPicker);
+
+        const scanQrBtn = modal.querySelector('#scanQrVaultBtn');
+        if (scanQrBtn) {
+            scanQrBtn.addEventListener('click', () => {
+                modal.close();
+                VaultModal.openQrScanner();
+            });
+        }
+    },
+
+    _openBrowserVaultWizard(prefillData = null) {
+        const prevDirectoryHandle = VaultModal._prevHandle || Store.directoryHandle;
+
+        const wizardModal = Modal.create({
                 title: 'Browser Vault Setup Wizard',
                 content: `
                     <div class="vault-wizard">
@@ -367,6 +402,7 @@ const VaultModal = {
 
                             <div class="wizard-footer">
                                 <button class="vault-manager-action-btn secondary close-wizard-btn">Cancel</button>
+                                <button class="vault-manager-action-btn secondary" id="wizardScanQrBtn" style="margin-right:auto">Scan QR Code</button>
                                 <button class="vault-manager-action-btn primary next-step-btn" data-next="2">Next: Git Sync</button>
                             </div>
                         </div>
@@ -705,15 +741,160 @@ const VaultModal = {
                     }
                 });
             }
+
+        // Wire Scan QR button inside wizard step 1
+        const wizardScanBtn = wizardModal.querySelector('#wizardScanQrBtn');
+        if (wizardScanBtn) {
+            wizardScanBtn.addEventListener('click', () => {
+                VaultModal.openQrScanner(wizardModal);
+            });
+        }
+
+        // Apply prefill data from QR scan
+        if (prefillData) {
+            const nameInput = wizardModal.querySelector('#wizardVaultName');
+            const gitUrlInput = wizardModal.querySelector('#wizardGitUrl');
+            const gitUserInput = wizardModal.querySelector('#wizardGitUser');
+            const gitTokenInput = wizardModal.querySelector('#wizardGitToken');
+            const gitProxyInput = wizardModal.querySelector('#wizardGitProxy');
+            const enableGitCheckbox = wizardModal.querySelector('#wizardEnableGit');
+            const gitFieldsEl = wizardModal.querySelector('#wizardGitFields');
+
+            if (prefillData.name) nameInput.value = prefillData.name;
+            if (prefillData.gitUrl) gitUrlInput.value = prefillData.gitUrl;
+            if (prefillData.gitUser) gitUserInput.value = prefillData.gitUser;
+            if (prefillData.gitToken) gitTokenInput.value = prefillData.gitToken;
+            if (prefillData.gitProxy) gitProxyInput.value = prefillData.gitProxy;
+            if (prefillData.enableGit === false) {
+                enableGitCheckbox.checked = false;
+                gitFieldsEl.classList.add('disabled');
+            } else if (prefillData.gitUrl) {
+                enableGitCheckbox.checked = true;
+                gitFieldsEl.classList.remove('disabled');
+            }
+        }
+    },
+
+    _normalizeQrData(raw) {
+        // Try QRTransfer v1 format first
+        if (window.QRTransfer) {
+            const v1Data = QRTransfer._validateData(raw);
+            if (v1Data && v1Data.g) {
+                return {
+                    name: v1Data.n || null,
+                    gitUrl: v1Data.g.u || null,
+                    gitUser: v1Data.g.un || null,
+                    gitToken: v1Data.g.pw || null,
+                    gitProxy: v1Data.g.c || null,
+                    enableGit: !!v1Data.g.u
+                };
+            }
+        }
+
+        // Try simplified vault-config format
+        let parsed;
+        try { parsed = JSON.parse(raw); } catch { return null; }
+        if (!parsed || parsed.type !== 'vault-config') return null;
+
+        return {
+            name: parsed.name || null,
+            gitUrl: parsed.gitUrl || null,
+            gitUser: parsed.gitUser || null,
+            gitToken: parsed.gitToken || null,
+            gitProxy: parsed.gitProxy || null,
+            enableGit: !!parsed.gitUrl
+        };
+    },
+
+    openQrScanner(targetWizard = null) {
+        VaultModal._prevHandle = VaultModal._prevHandle || Store.directoryHandle;
+
+        const scannerModal = Modal.create({
+            title: 'Scan Vault QR Code',
+            content: `
+                <div class="qr-scanner-container" id="qrScannerContainer">
+                    <video id="qrScannerVideo" autoplay playsinline muted></video>
+                    <div class="qr-scanner-overlay"></div>
+                </div>
+                <div class="qr-scanner-status" id="qrScannerStatus">Starting camera...</div>
+                <button class="qr-paste-toggle" id="qrPasteToggle">Or paste vault config JSON</button>
+                <div class="qr-paste-area" id="qrPasteArea">
+                    <textarea id="qrPasteInput" rows="5" placeholder='{"type":"vault-config","name":"My Notes","gitUrl":"https://github.com/user/notes.git","gitUser":"user","gitToken":"ghp_xxx"}'></textarea>
+                    <button class="settings-btn secondary" id="qrPasteApply">Apply</button>
+                </div>
+                <canvas id="qrScannerCanvas" style="display:none"></canvas>
+            `,
+            onClose: () => {
+                if (window.QRTransfer) QRTransfer._stopScanner();
+            }
+        });
+
+        const video = scannerModal.querySelector('#qrScannerVideo');
+        const canvas = scannerModal.querySelector('#qrScannerCanvas');
+        const statusEl = scannerModal.querySelector('#qrScannerStatus');
+        const container = scannerModal.querySelector('#qrScannerContainer');
+
+        const handleResult = (raw) => {
+            if (window.QRTransfer) QRTransfer._stopScanner();
+            scannerModal.close();
+            const normalized = VaultModal._normalizeQrData(raw);
+            if (!normalized) {
+                App.showError('QR code does not contain a valid vault configuration.');
+                return;
+            }
+            if (targetWizard) {
+                // Populate existing wizard fields
+                const nameInput = targetWizard.querySelector('#wizardVaultName');
+                const gitUrlInput = targetWizard.querySelector('#wizardGitUrl');
+                const gitUserInput = targetWizard.querySelector('#wizardGitUser');
+                const gitTokenInput = targetWizard.querySelector('#wizardGitToken');
+                const gitProxyInput = targetWizard.querySelector('#wizardGitProxy');
+                const enableGitCheckbox = targetWizard.querySelector('#wizardEnableGit');
+                const gitFieldsEl = targetWizard.querySelector('#wizardGitFields');
+
+                if (normalized.name) nameInput.value = normalized.name;
+                if (normalized.gitUrl) gitUrlInput.value = normalized.gitUrl;
+                if (normalized.gitUser) gitUserInput.value = normalized.gitUser;
+                if (normalized.gitToken) gitTokenInput.value = normalized.gitToken;
+                if (normalized.gitProxy) gitProxyInput.value = normalized.gitProxy;
+                if (normalized.enableGit === false) {
+                    enableGitCheckbox.checked = false;
+                    gitFieldsEl.classList.add('disabled');
+                } else if (normalized.gitUrl) {
+                    enableGitCheckbox.checked = true;
+                    gitFieldsEl.classList.remove('disabled');
+                }
+            } else {
+                VaultModal._openBrowserVaultWizard(normalized);
+            }
         };
 
-        const openBtn = modal.querySelector('#openFolderAsVaultBtn');
-        if (openBtn) openBtn.addEventListener('click', openVaultFromPicker);
+        if (window.QRTransfer) {
+            QRTransfer._startScanner(video, canvas, statusEl, container, handleResult);
+        } else {
+            container.style.display = 'none';
+            statusEl.textContent = 'QR scanner not available. Use the paste option below.';
+        }
 
-        const createBtn = modal.querySelector('#createVaultBtn');
-        if (createBtn) createBtn.addEventListener('click', openVaultFromPicker);
+        // Paste fallback
+        const pasteToggle = scannerModal.querySelector('#qrPasteToggle');
+        const pasteArea = scannerModal.querySelector('#qrPasteArea');
+        const pasteInput = scannerModal.querySelector('#qrPasteInput');
+        const pasteApply = scannerModal.querySelector('#qrPasteApply');
 
-        const browserVaultBtn = modal.querySelector('#createBrowserVaultBtn');
-        if (browserVaultBtn) browserVaultBtn.addEventListener('click', openBrowserVaultWizard);
+        pasteToggle.addEventListener('click', () => {
+            pasteArea.classList.toggle('visible');
+            if (window.QRTransfer) QRTransfer._stopScanner();
+            if (pasteArea.classList.contains('visible')) {
+                statusEl.textContent = 'Paste vault config JSON below.';
+                container.style.display = 'none';
+            }
+        });
+
+        pasteApply.addEventListener('click', () => {
+            const raw = pasteInput.value.trim();
+            if (!raw) return;
+            handleResult(raw);
+        });
     }
 };
