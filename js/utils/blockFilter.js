@@ -45,27 +45,60 @@ window.BlockFilter = {
             if (!TimeFilter.checkTimeFilter(dateVal, timeTag)) return false;
         }
 
-        // Context filter (multi-select AND)
+        // Context filter (multi-select AND) - use tag index for fast path
         if (contextSelection && contextSelection.size > 0) {
-            const blockTags = block.tags || [];
+            const regularTags = [];
+            const pathGroups = [];
+            let hasUntagged = false;
 
             for (const item of contextSelection) {
                 if (SelectionManager.isComputedContextTag(item)) continue;
-
                 if (item.startsWith('path:')) {
-                    const group = item.slice(5);
+                    pathGroups.push(item.slice(5));
+                } else if (item === 'Status.untagged') {
+                    hasUntagged = true;
+                } else {
+                    regularTags.push(item);
+                }
+            }
+
+            // Use tag index for regular tags (AND logic) if index is available
+            if (regularTags.length > 0 && window.TagIndex?.tagToBlocks?.size > 0) {
+                const blockIdSet = window.TagIndex.getBlocksWithTags(regularTags);
+                if (!blockIdSet.has(block.id)) return false;
+            } else if (regularTags.length > 0) {
+                // Fallback to linear scan if index not available
+                const blockTags = block.tags || [];
+                for (const tag of regularTags) {
+                    if (!blockTags.includes(tag)) return false;
+                }
+            }
+
+            // Use tag index for path groups (AND logic) if index is available
+            if (pathGroups.length > 0 && window.TagIndex?.groupToBlocks?.size > 0) {
+                for (const group of pathGroups) {
+                    const groupBlocks = window.TagIndex.getBlocksWithTagGroup(group);
+                    if (!groupBlocks.has(block.id)) return false;
+                }
+            } else if (pathGroups.length > 0) {
+                // Fallback to linear scan if index not available
+                const blockTags = block.tags || [];
+                for (const group of pathGroups) {
                     const hasMatch = blockTags.some(tag => {
                         const { segments } = Common.parseHierarchicalTag(tag);
                         return segments.length > 0 && segments[0] === group;
                     });
                     if (!hasMatch) return false;
-                } else {
-                    if (!blockTags.includes(item)) return false;
                 }
             }
 
-            // Block-level computed: untagged
-            if (contextSelection.has('Status.untagged')) {
+            // Use tag index for untagged check if available
+            if (hasUntagged && window.TagIndex?.untaggedBlocks?.size >= 0) {
+                if (!window.TagIndex.isBlockUntagged(block.id)) {
+                    return false;
+                }
+            } else if (hasUntagged) {
+                // Fallback
                 if (block.tags && block.tags.length > 0) return false;
             }
 
@@ -80,25 +113,67 @@ window.BlockFilter = {
             }
         }
 
-        // Excluded tags
+        // Excluded tags - use tag index for fast path
         if (excludedSelection && excludedSelection.size > 0) {
-            const blockTags = block.tags || [];
+            const regularTags = [];
+            const pathGroups = [];
+            let hasUntagged = false;
 
             for (const item of excludedSelection) {
                 if (SelectionManager.isComputedContextTag(item)) {
                     if (item.startsWith('Todo.')) continue;
                     if (item === 'Status.untagged') {
-                        if (!block.tags || block.tags.length === 0) return false;
+                        hasUntagged = true;
                     }
                 } else if (item.startsWith('path:')) {
-                    const group = item.slice(5);
+                    pathGroups.push(item.slice(5));
+                } else {
+                    regularTags.push(item);
+                }
+            }
+
+            // Use tag index for regular tags (block is excluded if it has ANY of these) if available
+            if (regularTags.length > 0 && window.TagIndex?.blocksByTag?.size > 0) {
+                const blockTags = window.TagIndex.getBlockTags(block.id);
+                for (const tag of regularTags) {
+                    if (blockTags.has(tag)) return false;
+                }
+            } else if (regularTags.length > 0) {
+                // Fallback to linear scan
+                const blockTags = block.tags || [];
+                for (const tag of regularTags) {
+                    if (blockTags.includes(tag)) return false;
+                }
+            }
+
+            // Use tag index for path groups (block is excluded if it has ANY tag in these groups) if available
+            if (pathGroups.length > 0 && window.TagIndex?.blocksByTag?.size > 0) {
+                const blockTags = window.TagIndex.getBlockTags(block.id);
+                for (const tag of blockTags) {
+                    const parsed = window.TagIndex.getParsedTag(block.id, tag);
+                    if (parsed && parsed.segments.length > 0 && pathGroups.includes(parsed.segments[0])) {
+                        return false;
+                    }
+                }
+            } else if (pathGroups.length > 0) {
+                // Fallback to linear scan
+                const blockTags = block.tags || [];
+                for (const group of pathGroups) {
                     if (blockTags.some(tag => {
                         const { segments } = Common.parseHierarchicalTag(tag);
                         return segments.length > 0 && segments[0] === group;
                     })) return false;
-                } else {
-                    if (blockTags.includes(item)) return false;
                 }
+            }
+
+            // Use tag index for untagged exclusion if available
+            if (hasUntagged && window.TagIndex?.untaggedBlocks?.size >= 0) {
+                if (window.TagIndex.isBlockUntagged(block.id)) {
+                    return false;
+                }
+            } else if (hasUntagged) {
+                // Fallback
+                if (!block.tags || block.tags.length === 0) return false;
             }
 
             // Line-level exclusion of todo tags

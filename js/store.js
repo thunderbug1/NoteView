@@ -872,6 +872,7 @@ const Store = {
         // Remove from memory only after file and git operations succeed
         this.blocks.splice(index, 1);
         this._deleteSentinels?.delete(id);
+        TagIndex.removeBlock(id);
         this.extractContacts();
         this._filteredBlocksCache.invalidate();
         TimelineView.invalidateCache();
@@ -1008,7 +1009,125 @@ const Store = {
         const opts = BlockFilter._currentOpts();
         const pinnedBlocks = this.blocks.filter(block => block.pinned && !block._isTemp);
         const unpinnedBlocks = this.blocks.filter(block => !block.pinned && !block._isTemp);
-        const filteredUnpinned = unpinnedBlocks.filter(block => BlockFilter._blockPassesFast(block, opts));
+
+        // Use tag index to pre-filter by context tags when possible
+        let candidateBlocks = unpinnedBlocks;
+
+        if (opts.contextSelection && opts.contextSelection.size > 0 && window.TagIndex?.tagToBlocks?.size > 0) {
+            const regularTags = [];
+            const pathGroups = [];
+            let hasUntagged = false;
+
+            for (const item of opts.contextSelection) {
+                if (window.SelectionManager.isComputedContextTag(item)) {
+                    if (item === 'Status.untagged') hasUntagged = true;
+                    continue;
+                }
+                if (item.startsWith('path:')) {
+                    pathGroups.push(item.slice(5));
+                } else {
+                    regularTags.push(item);
+                }
+            }
+
+            // If we have regular tags or path groups, use index to pre-filter
+            if (regularTags.length > 0 || pathGroups.length > 0 || hasUntagged) {
+                let candidateBlockIds = null;
+
+                // Start with all blocks
+                if (regularTags.length > 0) {
+                    candidateBlockIds = window.TagIndex.getBlocksWithTags(regularTags);
+                }
+
+                // Intersect with path group blocks
+                if (pathGroups.length > 0) {
+                    for (const group of pathGroups) {
+                        const groupBlocks = window.TagIndex.getBlocksWithTagGroup(group);
+                        if (candidateBlockIds === null) {
+                            candidateBlockIds = groupBlocks;
+                        } else {
+                            candidateBlockIds = new Set([...candidateBlockIds].filter(x => groupBlocks.has(x)));
+                        }
+                        if (candidateBlockIds.size === 0) break;
+                    }
+                }
+
+                // Intersect with untagged blocks if needed
+                if (hasUntagged) {
+                    const untagged = window.TagIndex.untaggedBlocks;
+                    if (candidateBlockIds === null) {
+                        candidateBlockIds = untagged;
+                    } else {
+                        candidateBlockIds = new Set([...candidateBlockIds].filter(x => untagged.has(x)));
+                    }
+                }
+
+                // Pre-filter blocks to only those in the candidate set
+                if (candidateBlockIds) {
+                    candidateBlocks = candidateBlocks.filter(block => candidateBlockIds.has(block.id));
+                }
+            }
+        }
+
+        // Use tag index to pre-filter by excluded tags when possible
+        if (opts.excludedSelection && opts.excludedSelection.size > 0 && window.TagIndex?.tagToBlocks?.size > 0) {
+            const regularTags = [];
+            const pathGroups = [];
+            let hasUntagged = false;
+
+            for (const item of opts.excludedSelection) {
+                if (window.SelectionManager.isComputedContextTag(item)) {
+                    if (item === 'Status.untagged') hasUntagged = true;
+                    continue;
+                }
+                if (item.startsWith('path:')) {
+                    pathGroups.push(item.slice(5));
+                } else {
+                    regularTags.push(item);
+                }
+            }
+
+            // If we have regular tags or path groups to exclude, use index to pre-filter
+            if (regularTags.length > 0 || pathGroups.length > 0 || hasUntagged) {
+                let excludedBlockIds = null;
+
+                // Collect blocks with any excluded regular tag
+                if (regularTags.length > 0) {
+                    excludedBlockIds = window.TagIndex.getBlocksWithoutTags(regularTags);
+                }
+
+                // Collect blocks with any tag in excluded path groups
+                if (pathGroups.length > 0) {
+                    for (const group of pathGroups) {
+                        const groupBlocks = window.TagIndex.getBlocksWithTagGroup(group);
+                        if (excludedBlockIds === null) {
+                            excludedBlockIds = groupBlocks;
+                        } else {
+                            // Union: block is excluded if it's in ANY of these sets
+                            groupBlocks.forEach(id => excludedBlockIds.add(id));
+                        }
+                    }
+                }
+
+                // Add untagged blocks to excluded set if needed
+                if (hasUntagged) {
+                    const untagged = window.TagIndex.untaggedBlocks;
+                    if (excludedBlockIds === null) {
+                        excludedBlockIds = untagged;
+                    } else {
+                        untagged.forEach(id => excludedBlockIds.add(id));
+                    }
+                }
+
+                // Pre-filter blocks to exclude those in the excluded set
+                if (excludedBlockIds) {
+                    candidateBlocks = candidateBlocks.filter(block => !excludedBlockIds.has(block.id));
+                }
+            }
+        }
+
+        // Filter the candidates with the full filter logic
+        const filteredUnpinned = candidateBlocks.filter(block => BlockFilter._blockPassesFast(block, opts));
 
         const result = [...pinnedBlocks, ...filteredUnpinned];
         this._filteredBlocksCache.set(result);
@@ -1120,6 +1239,13 @@ const Store = {
 
             block.filename = fileName;
 
+            // Update tag index if tags changed
+            const oldTags = existingBlock?.tags || [];
+            const newTags = block.tags || [];
+            if (JSON.stringify(oldTags) !== JSON.stringify(newTags)) {
+                TagIndex.updateBlockTags(block.id, oldTags, newTags);
+            }
+
             // Update contacts
             this.extractContacts();
 
@@ -1197,8 +1323,9 @@ const Store = {
             entries = this.directoryHandle.values();
         } catch (err) {
             console.error('loadBlocks: failed to iterate directory:', err);
-            // Invalidate and extract contacts if we failed to iterate, keeping existing memory safe
+            // Invalidate cache, clear index, and extract contacts if we failed to iterate
             this._filteredBlocksCache.invalidate();
+            TagIndex.clear();
             this.extractContacts();
             return;
         }
@@ -1214,6 +1341,7 @@ const Store = {
         } catch (err) {
             console.error('loadBlocks: failed to gather directory entries:', err);
             this._filteredBlocksCache.invalidate();
+            TagIndex.clear();
             this.extractContacts();
             return;
         }
@@ -1242,9 +1370,10 @@ const Store = {
 
         const results = await Promise.all(readPromises);
         
-        // Atomically update the memory store, cache, and contacts only after all async reads resolve
+        // Atomically update the memory store, cache, index, and contacts only after all async reads resolve
         this.blocks = results.filter(block => block !== null);
         this._filteredBlocksCache.invalidate();
+        TagIndex.init(this.blocks);
         this.extractContacts();
         Logger.log('Loaded ' + this.blocks.length + ' blocks');
     }

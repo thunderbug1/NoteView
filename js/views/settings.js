@@ -194,6 +194,24 @@ const SettingsView = {
                     </div>
                 </div>
 
+                <div class="settings-section">
+                    <h3>Debug</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Rebuild Tag Index</label>
+                            <p class="settings-item-hint">Manually rebuild tag index from blocks (use if tag filtering seems buggy)</p>
+                        </div>
+                        <button id="rebuildTagIndexBtn" class="settings-btn secondary">Rebuild</button>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Show Tag Index Stats</label>
+                            <p class="settings-item-hint">Log index statistics to browser console</p>
+                        </div>
+                        <button id="showTagIndexStatsBtn" class="settings-btn secondary">Show Stats</button>
+                    </div>
+                </div>
+
                 <div class="settings-section" id="templatesSection">
                     <h3>Note Templates</h3>
                     <div class="settings-item">
@@ -284,6 +302,27 @@ const SettingsView = {
         const scanQRBtn = document.getElementById('scanQRBtn');
         if (scanQRBtn) {
             scanQRBtn.addEventListener('click', () => QRTransfer.showImportModal());
+        }
+
+        const rebuildTagIndexBtn = document.getElementById('rebuildTagIndexBtn');
+        if (rebuildTagIndexBtn) {
+            rebuildTagIndexBtn.addEventListener('click', () => {
+                try {
+                    window.TagIndex.rebuild();
+                    Common.showToast('Tag index rebuilt successfully');
+                } catch (e) {
+                    console.error('Failed to rebuild tag index:', e);
+                    Common.showToast('Failed to rebuild tag index: ' + (e.message || 'Unknown error'));
+                }
+            });
+        }
+
+        const showTagIndexStatsBtn = document.getElementById('showTagIndexStatsBtn');
+        if (showTagIndexStatsBtn) {
+            showTagIndexStatsBtn.addEventListener('click', () => {
+                const stats = window.TagIndex.logStats();
+                Common.showToast(`Tag index stats: ${stats.totalBlocks} blocks, ${stats.totalTags} tags`);
+            });
         }
 
         // Git sync: remote configuration

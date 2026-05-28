@@ -246,7 +246,9 @@ const UndoRedoManager = {
 
             // Remove from memory only after successful file deletion
             const index = Store.blocks.findIndex(b => b.id === command.blockId);
+            const block = Store.blocks[index];
             Store.blocks.splice(index, 1);
+            TagIndex.removeBlock(command.blockId);
             try {
                 await GitStore.commitBlock(fileName, `Undo: remove ${fileName}`);
             } catch (e) {
@@ -276,6 +278,9 @@ const UndoRedoManager = {
         if (!Store.blocks.find(b => b.id === block.id)) {
             Store.blocks.push(block);
         }
+
+        // Update tag index
+        TagIndex.addBlock(block);
 
         // Update contacts and cache
         Store.extractContacts();
