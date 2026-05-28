@@ -688,7 +688,7 @@ const TimelineView = {
                     </div>
                     ${transitionHtml}
                     <div class="tl-card-footer">
-                        <span class="tl-note-name" title="Open note">${escapeHtml(noteName)}</span>
+                        <button class="tl-open-note-btn" title="View changes" data-block-id="${escapeHtml(event.blockId)}" data-filename="${escapeHtml(event.filename)}" data-oid="${escapeHtml(event.oid)}" data-parents="${escapeHtml((event.parents || []).join(','))}">View Changes</button>
                         ${event.unpushed ? '<span class="tl-sync-pending" title="Not yet synced to remote">unpushed</span>' : ''}
                         <button class="tl-undo-btn" title="Undo this change" data-block-id="${escapeHtml(event.blockId)}" data-filename="${escapeHtml(event.filename)}" data-oid="${escapeHtml(event.oid)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -722,7 +722,7 @@ const TimelineView = {
                         <span class="tl-time">${this.formatTime(event.timestamp)}</span>
                     </div>
                     <div class="tl-card-footer">
-                        <span class="tl-note-name" title="Open note">${escapeHtml(event.blockId)}</span>
+                        <button class="tl-open-note-btn" title="View changes" data-block-id="${escapeHtml(event.blockId)}" data-filename="${escapeHtml(event.filename)}" data-oid="${escapeHtml(event.oid)}" data-parents="${escapeHtml((event.parents || []).join(','))}">View Changes</button>
                         ${event.commitMessage ? `<span class="tl-commit-msg">${escapeHtml(event.commitMessage)}</span>` : ''}
                         <button class="tl-undo-btn" title="Undo this change" data-block-id="${escapeHtml(event.blockId)}" data-filename="${escapeHtml(event.filename)}" data-oid="${escapeHtml(event.oid)}" data-parents="${escapeHtml((event.parents || []).join(','))}">
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -769,6 +769,17 @@ const TimelineView = {
         group.classList.add('tl-date-collapsed');
     },
 
+    collapseAll() {
+        const groups = document.querySelectorAll('.tl-date-group');
+        groups.forEach(group => {
+            const collapseBtn = group.querySelector('.tl-collapse-btn');
+            if (collapseBtn && !collapseBtn.classList.contains('collapsed')) {
+                const dateStr = collapseBtn.dataset.date;
+                if (dateStr) this.collapseDay(dateStr);
+            }
+        });
+    },
+
     expandDay(dateStr) {
         this.collapsedDays.delete(dateStr);
         const group = document.querySelector(`.tl-date-group .tl-collapse-btn[data-date="${CSS.escape(dateStr)}"]`)?.closest('.tl-date-group');
@@ -786,6 +797,17 @@ const TimelineView = {
         }
 
         group.classList.remove('tl-date-collapsed');
+    },
+
+    expandAll() {
+        const groups = document.querySelectorAll('.tl-date-group');
+        groups.forEach(group => {
+            const collapseBtn = group.querySelector('.tl-collapse-btn');
+            if (collapseBtn && collapseBtn.classList.contains('collapsed')) {
+                const dateStr = collapseBtn.dataset.date;
+                if (dateStr) this.expandDay(dateStr);
+            }
+        });
     },
 
     async render(blocks, options = {}) {
@@ -844,11 +866,21 @@ const TimelineView = {
 
         html += '</div>';
 
-        // Add refresh button
-        html += `<button class="tl-refresh-btn" id="tlRefreshBtn" title="Refresh timeline">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            Refresh
-        </button>`;
+        // Add control buttons
+        html += `<div class="tl-controls">
+            <button class="tl-control-btn" id="tlCollapseAllBtn" title="Collapse all days">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                Collapse All
+            </button>
+            <button class="tl-control-btn" id="tlExpandAllBtn" title="Expand all days">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                Expand All
+            </button>
+            <button class="tl-refresh-btn" id="tlRefreshBtn" title="Refresh timeline">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Refresh
+            </button>
+        </div>`;
 
         container.innerHTML = html;
 
@@ -859,9 +891,21 @@ const TimelineView = {
         this._collapseHandler = this.handleCollapseClick.bind(this);
         container.addEventListener('click', this._collapseHandler);
 
-        // Attach event listeners
-        container.querySelectorAll('.tl-note-name').forEach(el => {
-            el.addEventListener('click', () => {
+        // Cleanup old event listeners
+        if (this._openNoteHandlers) {
+            this._openNoteHandlers.forEach(handler => handler());
+            this._openNoteHandlers = [];
+        }
+        if (this._undoHandlers) {
+            this._undoHandlers.forEach(handler => handler());
+            this._undoHandlers = [];
+        }
+        this._openNoteHandlers = [];
+        this._undoHandlers = [];
+
+        // Attach event listeners for open note buttons
+        container.querySelectorAll('.tl-open-note-btn').forEach(el => {
+            const handler = () => {
                 const card = el.closest('.tl-event');
                 if (card) {
                     this.openDiffModal(
@@ -871,17 +915,20 @@ const TimelineView = {
                         card.dataset.parents
                     );
                 }
-            });
+            };
+            el.addEventListener('click', handler);
+            this._openNoteHandlers.push(() => el.removeEventListener('click', handler));
         });
 
+        // Attach event listeners for undo buttons
         container.querySelectorAll('.tl-undo-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
+            const handler = async (e) => {
                 e.stopPropagation();
                 const blockId = btn.dataset.blockId;
                 const filename = btn.dataset.filename;
                 const oid = btn.dataset.oid;
                 const parentsRaw = btn.dataset.parents;
-                
+
                 if (confirm(`Are you sure you want to undo the changes made to ${blockId} in commit ${oid.substring(0, 7)}?`)) {
                     btn.disabled = true;
                     btn.innerHTML = `Undoing...`;
@@ -895,13 +942,23 @@ const TimelineView = {
                         alert(`Failed to undo changes: ${err.message}`);
                     }
                 }
-            });
+            };
+            btn.addEventListener('click', handler);
+            this._undoHandlers.push(() => btn.removeEventListener('click', handler));
         });
 
         document.getElementById('tlRefreshBtn')?.addEventListener('click', () => {
             this.invalidateRawDataCache();
             this.invalidateCache();
             this.render(blocks, options);
+        });
+
+        document.getElementById('tlCollapseAllBtn')?.addEventListener('click', () => {
+            this.collapseAll();
+        });
+
+        document.getElementById('tlExpandAllBtn')?.addEventListener('click', () => {
+            this.expandAll();
         });
     },
 
