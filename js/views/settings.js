@@ -243,7 +243,7 @@ const SettingsView = {
                     </div>
                 </div>
             </div>
-        `;
+        `)
 
         this.attachEventListeners();
         this._checkForUpdates();
