@@ -315,6 +315,47 @@
     border-left: 2px solid var(--accent);
 }
 
+.tl-load-more-container {
+    display: flex;
+    justify-content: center;
+    padding: 2rem 0;
+    margin-top: 1rem;
+}
+
+.tl-load-more-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 2rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--neu-flat);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tl-load-more-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.tl-load-more-btn:active:not(:disabled) {
+    box-shadow: var(--neu-pressed);
+    transform: translateY(0);
+}
+
+.tl-load-more-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+    background: var(--bg-tertiary);
+}
+
 .tl-sync-pending {
     font-size: 0.65rem;
     color: var(--accent);

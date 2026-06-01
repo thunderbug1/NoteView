@@ -1179,14 +1179,23 @@ const SelectionManager = {
      */
     updateTagCounts({ skipRender = false } = {}) {
         const tagCounts = {};
-        let hasOpenTodos = false;
-        let hasInProgressTodos = false;
-        let hasDoneTodos = false;
-        let hasBlockedTodos = false;
-        let hasCanceledTodos = false;
-        let hasUnblockedTodos = false;
-        let hasUntagged = false;
-        let hasUnassigned = false;
+        
+        // Use tag index for fast counts
+        if (window.TagIndex?.tagToBlocks?.size > 0) {
+            window.TagIndex.getAllTags().forEach(tag => {
+                tagCounts[tag] = window.TagIndex.getTagCount(tag);
+            });
+        }
+
+        // Fast path for Todo.* computed tags using the index
+        const hasOpenTodos = window.TagIndex?.getTodoCount('Todo.anyOpen') > 0;
+        const hasDoneTodos = window.TagIndex?.getTodoCount('Todo.done') > 0;
+        const hasBlockedTodos = window.TagIndex?.getTodoCount('Todo.blocked') > 0;
+        const hasInProgressTodos = window.TagIndex?.getTodoCount('Todo.inProgress') > 0;
+        const hasCanceledTodos = window.TagIndex?.getTodoCount('Todo.canceled') > 0;
+        const hasUnblockedTodos = window.TagIndex?.getTodoCount('Todo.unblocked') > 0;
+        const hasUntagged = window.TagIndex?.untaggedBlocks?.size > 0;
+        const hasUnassigned = window.TagIndex?.getTodoCount('Todo.unassigned') > 0;
 
         // Pre-compute which time tags have matching blocks
         const timeTagHasBlocks = {};
@@ -1195,31 +1204,16 @@ const SelectionManager = {
         const currentProp = Store.timeProperty || 'lastUpdated';
 
         Store.blocks.forEach(block => {
-            (block.tags || []).forEach(tag => {
-                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-            });
-            if (block.content && block.content.match(/\[[ \/]\]/)) hasOpenTodos = true;
-
-            const tasks = TaskParser.parseTasksFromBlock(block);
-            const hasBlocked = tasks.some(t => TaskParser.isBlockedTask(t));
-            const hasUnblocked = tasks.some(t => TaskParser.isUnblockedTask(t));
-            const hasUnassignedTasks = TaskParser.hasUnassignedTasks(tasks);
-            const hasDone = tasks.some(t => TaskParser.isDoneTask(t));
-            const hasInProgress = tasks.some(t => TaskParser.isInProgressTask(t));
-            const hasCanceled = tasks.some(t => TaskParser.isCanceledTask(t));
-
-            if (hasBlocked) hasBlockedTodos = true;
-            if (hasUnblocked) hasUnblockedTodos = true;
-            if (hasUnassignedTasks) hasUnassigned = true;
-            if (hasDone) hasDoneTodos = true;
-            if (hasInProgress) hasInProgressTodos = true;
-            if (hasCanceled) hasCanceledTodos = true;
-
-            if (!block.tags || block.tags.length === 0) hasUntagged = true;
+            if (!window.TagIndex?.tagToBlocks?.size) {
+                (block.tags || []).forEach(tag => {
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                });
+            }
 
             // Check time tags against block date
             let dateVal = block[currentProp];
             if (!dateVal && (currentProp === 'due' || currentProp === 'start' || currentProp === 'completed')) {
+                const tasks = TaskParser.parseTasksFromBlock(block);
                 const dates = tasks
                     .map(t => { const v = TaskParser.getBadgeValue(t, currentProp).trim(); return v ? new Date(v).getTime() : Number.NaN; })
                     .filter(d => !Number.isNaN(d));
@@ -1251,6 +1245,8 @@ const SelectionManager = {
 
             if (tag && tag.startsWith('Time.')) {
                 hasBlocks = timeTagHasBlocks[tag] || false;
+            } else if (tag === 'Todo.all') {
+                hasBlocks = window.TagIndex?.getTodoCount('Todo.all') > 0;
             } else if (tag === 'Todo.open') hasBlocks = hasOpenTodos;
             else if (tag === 'Todo.inProgress') hasBlocks = hasInProgressTodos;
             else if (tag === 'Todo.done') hasBlocks = hasDoneTodos;
@@ -1259,7 +1255,12 @@ const SelectionManager = {
             else if (tag === 'Todo.unblocked') hasBlocks = hasUnblockedTodos;
             else if (tag === 'Todo.unassigned') hasBlocks = hasUnassigned;
             else if (tag === 'Status.untagged') hasBlocks = hasUntagged;
-            else hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
+            else if (tag?.startsWith('path:')) {
+                const groupName = tag.slice(5);
+                hasBlocks = window.TagIndex?.getBlocksWithTagGroup(groupName)?.size > 0;
+            } else {
+                hasBlocks = tag === '' || (tagCounts[tag] || 0) > 0;
+            }
 
             // In kanban view, state-based Todo.* tags map directly to columns — no filter effect
             const kanbanColumnTags = new Set(['Todo.open', 'Todo.inProgress', 'Todo.done', 'Todo.blocked', 'Todo.canceled']);

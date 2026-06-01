@@ -14,6 +14,9 @@ const TagIndex = {
   // Map<blockId, Map<tag, {segments, leaf, full}>> - parsed tag segments
   parsedTags: new Map(),
 
+  // Map<todoType, Set<blockId>> - for fast Todo.* computed tag filtering
+  todoToBlocks: new Map(),
+
   // For validation: reference to blocks array
   _blocksRef: null,
   
@@ -36,6 +39,7 @@ const TagIndex = {
     this.untaggedBlocks.clear();
     this.blocksByTag.clear();
     this.parsedTags.clear();
+    this.todoToBlocks.clear();
     this._blocksRef = null;
   },
   
@@ -83,7 +87,7 @@ const TagIndex = {
         }
 
         // Check group index for hierarchical tags
-        const tagParsed = window.parseHierarchicalTag(tag);
+        const tagParsed = window.Common.parseHierarchicalTag(tag);
         if (tagParsed.segments.length > 0) {
           const group = tagParsed.segments[0];
           const groupSet = this.groupToBlocks.get(group);
@@ -151,6 +155,25 @@ const TagIndex = {
     // Track tags for this block
     this.blocksByTag.set(id, new Set(tags));
     
+    // Track task status for Todo.* computed tags
+    if (window.TaskParser) {
+        if (block.content && block.content.match(/\[[ \/]\]/)) {
+            this._addToTodoIndex('Todo.anyOpen', id);
+        }
+        
+        const tasks = window.TaskParser.parseTasksFromBlock(block);
+        if (tasks.length > 0) {
+            this._addToTodoIndex('Todo.all', id);
+            if (tasks.some(t => window.TaskParser.isOpenTask(t))) this._addToTodoIndex('Todo.open', id);
+            if (tasks.some(t => window.TaskParser.isDoneTask(t))) this._addToTodoIndex('Todo.done', id);
+            if (tasks.some(t => window.TaskParser.isBlockedTask(t))) this._addToTodoIndex('Todo.blocked', id);
+            if (tasks.some(t => window.TaskParser.isInProgressTask(t))) this._addToTodoIndex('Todo.inProgress', id);
+            if (tasks.some(t => window.TaskParser.isCanceledTask(t))) this._addToTodoIndex('Todo.canceled', id);
+            if (tasks.some(t => window.TaskParser.isUnblockedTask(t))) this._addToTodoIndex('Todo.unblocked', id);
+            if (window.TaskParser.hasUnassignedTasks(tasks)) this._addToTodoIndex('Todo.unassigned', id);
+        }
+    }
+
     if (tags.length === 0) {
       this.untaggedBlocks.add(id);
       return;
@@ -164,7 +187,7 @@ const TagIndex = {
       this.tagToBlocks.get(tag).add(id);
       
       // Parse hierarchical tag and add to group index
-      const parsed = window.parseHierarchicalTag(tag);
+      const parsed = window.Common.parseHierarchicalTag(tag);
       if (parsed.segments.length > 0) {
         const group = parsed.segments[0];
         if (!this.groupToBlocks.has(group)) {
@@ -249,7 +272,38 @@ const TagIndex = {
       this.untaggedBlocks.delete(blockId);
     }
   },
-  
+
+  /**
+   * Update a block's content in indexes (call after save if content changed)
+   */
+  updateBlockContent(blockId, content) {
+    // For now, simpler to just re-add the block's todo info
+    // First remove from all todo sets
+    for (const set of this.todoToBlocks.values()) {
+        set.delete(blockId);
+    }
+    
+    // Then re-evaluate
+    if (window.TaskParser) {
+        if (content && content.match(/\[[ \/]\]/)) {
+            this._addToTodoIndex('Todo.anyOpen', blockId);
+        }
+        
+        // Create a temporary block-like object for TaskParser
+        const tasks = window.TaskParser.parseTasksFromContent(content, blockId);
+        if (tasks.length > 0) {
+            this._addToTodoIndex('Todo.all', blockId);
+            if (tasks.some(t => window.TaskParser.isOpenTask(t))) this._addToTodoIndex('Todo.open', blockId);
+            if (tasks.some(t => window.TaskParser.isDoneTask(t))) this._addToTodoIndex('Todo.done', blockId);
+            if (tasks.some(t => window.TaskParser.isBlockedTask(t))) this._addToTodoIndex('Todo.blocked', blockId);
+            if (tasks.some(t => window.TaskParser.isInProgressTask(t))) this._addToTodoIndex('Todo.inProgress', blockId);
+            if (tasks.some(t => window.TaskParser.isCanceledTask(t))) this._addToTodoIndex('Todo.canceled', blockId);
+            if (tasks.some(t => window.TaskParser.isUnblockedTask(t))) this._addToTodoIndex('Todo.unblocked', blockId);
+            if (window.TaskParser.hasUnassignedTasks(tasks)) this._addToTodoIndex('Todo.unassigned', blockId);
+        }
+    }
+  },
+
   /**
    * Add a single tag to a block (helper for incremental updates)
    */
@@ -270,7 +324,7 @@ const TagIndex = {
     this.tagToBlocks.get(tag).add(blockId);
     
     // Add to group index
-    const parsed = window.parseHierarchicalTag(tag);
+    const parsed = window.Common.parseHierarchicalTag(tag);
     if (parsed.segments.length > 0) {
       const group = parsed.segments[0];
       if (!this.groupToBlocks.has(group)) {
@@ -375,6 +429,30 @@ const TagIndex = {
    */
   getBlocksWithTagGroup(group) {
     return this.groupToBlocks.get(group) || new Set();
+  },
+  
+  /**
+   * Get all blocks matching a Todo.* computed status
+   */
+  getBlocksWithTodo(todoType) {
+    return this.todoToBlocks.get(todoType) || new Set();
+  },
+
+  /**
+   * Get count of blocks for a specific Todo.* status
+   */
+  getTodoCount(todoType) {
+    return this.todoToBlocks.get(todoType)?.size || 0;
+  },
+
+  /**
+   * Internal helper to add a block to the todo index
+   */
+  _addToTodoIndex(type, blockId) {
+    if (!this.todoToBlocks.has(type)) {
+      this.todoToBlocks.set(type, new Set());
+    }
+    this.todoToBlocks.get(type).add(blockId);
   },
   
   /**

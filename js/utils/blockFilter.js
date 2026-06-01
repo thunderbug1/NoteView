@@ -49,10 +49,14 @@ window.BlockFilter = {
         if (contextSelection && contextSelection.size > 0) {
             const regularTags = [];
             const pathGroups = [];
+            const todoTags = [];
             let hasUntagged = false;
 
             for (const item of contextSelection) {
-                if (SelectionManager.isComputedContextTag(item)) continue;
+                if (SelectionManager.isComputedContextTag(item)) {
+                    if (item.startsWith('Todo.')) todoTags.push(item);
+                    continue;
+                }
                 if (item.startsWith('path:')) {
                     pathGroups.push(item.slice(5));
                 } else if (item === 'Status.untagged') {
@@ -71,6 +75,13 @@ window.BlockFilter = {
                 const blockTags = block.tags || [];
                 for (const tag of regularTags) {
                     if (!blockTags.includes(tag)) return false;
+                }
+            }
+
+            // Use tag index for todo status (AND logic) if available
+            if (todoTags.length > 0 && window.TagIndex?.todoToBlocks?.size > 0) {
+                for (const todoTag of todoTags) {
+                    if (!window.TagIndex.getBlocksWithTodo(todoTag).has(block.id)) return false;
                 }
             }
 
@@ -117,15 +128,18 @@ window.BlockFilter = {
         if (excludedSelection && excludedSelection.size > 0) {
             const regularTags = [];
             const pathGroups = [];
+            const todoTags = [];
             let hasUntagged = false;
 
             for (const item of excludedSelection) {
                 if (SelectionManager.isComputedContextTag(item)) {
-                    if (item.startsWith('Todo.')) continue;
+                    if (item.startsWith('Todo.')) todoTags.push(item);
                     if (item === 'Status.untagged') {
                         hasUntagged = true;
                     }
-                } else if (item.startsWith('path:')) {
+                    continue;
+                }
+                if (item.startsWith('path:')) {
                     pathGroups.push(item.slice(5));
                 } else {
                     regularTags.push(item);
@@ -143,6 +157,13 @@ window.BlockFilter = {
                 const blockTags = block.tags || [];
                 for (const tag of regularTags) {
                     if (blockTags.includes(tag)) return false;
+                }
+            }
+
+            // Use tag index for todo exclusion (exclude if block matches any todo tag)
+            if (todoTags.length > 0 && window.TagIndex?.todoToBlocks?.size > 0) {
+                for (const todoTag of todoTags) {
+                    if (window.TagIndex.getBlocksWithTodo(todoTag).has(block.id)) return false;
                 }
             }
 
@@ -263,12 +284,21 @@ window.BlockFilter = {
             // Computed context tags (Todo.*) — line-level hiding semantics
             const activeTaskComputed = TaskParser.getActiveTaskFilter();
             if (activeTaskComputed.size > 0) {
-                const lines = (block.content || '').split('\n');
-                const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
-                const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskComputed, excludeFilters);
-                const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
-                if (!hasVisibleContent) {
-                    for (const filter of activeTaskComputed) {
+                for (const filter of activeTaskComputed) {
+                    // Fast check using index if possible
+                    if (window.TagIndex?.todoToBlocks?.size > 0) {
+                        if (!window.TagIndex.getBlocksWithTodo(filter).has(block.id)) {
+                            reasons.push({ type: 'context', label: filter });
+                        }
+                        continue;
+                    }
+
+                    // Fallback to line-level check
+                    const lines = (block.content || '').split('\n');
+                    const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
+                    const hidden = TaskParser.getHiddenTaskLineIndices(lines, new Set([filter]), excludeFilters);
+                    const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
+                    if (!hasVisibleContent) {
                         reasons.push({ type: 'context', label: filter });
                     }
                 }
@@ -310,12 +340,21 @@ window.BlockFilter = {
             // Excluded Todo.* tags — check at line level
             const excludedTaskFilters = TaskParser.getActiveExcludedTaskFilter();
             if (excludedTaskFilters.size > 0) {
-                const lines = (block.content || '').split('\n');
-                const activeTaskFilters = TaskParser.getActiveTaskFilter();
-                const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskFilters, excludedTaskFilters);
-                const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
-                if (!hasVisibleContent) {
-                    for (const filter of excludedTaskFilters) {
+                for (const filter of excludedTaskFilters) {
+                    // Fast check using index if possible
+                    if (window.TagIndex?.todoToBlocks?.size > 0) {
+                        if (window.TagIndex.getBlocksWithTodo(filter).has(block.id)) {
+                            reasons.push({ type: 'excluded', label: filter });
+                        }
+                        continue;
+                    }
+
+                    // Fallback to line-level check
+                    const lines = (block.content || '').split('\n');
+                    const activeTaskFilters = TaskParser.getActiveTaskFilter();
+                    const hidden = TaskParser.getHiddenTaskLineIndices(lines, activeTaskFilters, new Set([filter]));
+                    const hasVisibleContent = lines.some((_, i) => !hidden.has(i));
+                    if (!hasVisibleContent) {
                         reasons.push({ type: 'excluded', label: filter });
                     }
                 }

@@ -6,6 +6,12 @@
 
 const TimelineView = {
     collapsedDays: new Map(),
+    BATCH_SIZE: 50,
+    _allCommits: [],
+    _hasMore: false,
+    _startIdx: 0,
+    _prevAllTasks: new Map(),
+    _prevFileSet: new Map(),
 
     stateLabels: {
         ' ': 'Todo',
@@ -64,6 +70,11 @@ const TimelineView = {
     invalidateRawDataCache() {
         this._rawDataCache.headOid = null;
         this._rawDataCache.events = [];
+        this._allCommits = [];
+        this._hasMore = false;
+        this._startIdx = 0;
+        this._prevAllTasks = new Map();
+        this._prevFileSet = new Map();
         const vaultName = Store.directoryHandle?.name;
         if (vaultName) Store.deleteTimelineCache(vaultName);
     },
@@ -412,89 +423,130 @@ const TimelineView = {
     async _buildTimelineInternal() {
         // Quick HEAD check to potentially skip the full git log walk
         const cached = await this._restoreFromDB();
-        if (cached) {
-            const currentHeadOid = await this._resolveHead();
-            if (currentHeadOid && cached.headOid === currentHeadOid) {
-                Logger.log('Timeline: cache hit (HEAD unchanged)');
-                this._rawDataCache.headOid = currentHeadOid;
-                this._rawDataCache.events = cached.events;
+        const currentHeadOid = await this._resolveHead();
 
-                // Determine unpushed commits
-                const commits = await GitStore.getFullHistory();
-                if (commits.length > 0) {
-                    const unpushedOids = await this._getUnpushedOids(commits);
-                    for (const event of cached.events) {
-                        event.unpushed = unpushedOids.has(event.oid);
-                    }
+        if (cached && currentHeadOid && cached.headOid === currentHeadOid) {
+            Logger.log('Timeline: cache hit (HEAD unchanged)');
+            this._rawDataCache.headOid = currentHeadOid;
+            this._rawDataCache.events = cached.events;
+            this._hasMore = false; // Cached full history
+
+            // Determine unpushed commits
+            const commits = await GitStore.getFullHistory(500);
+            if (commits.length > 0) {
+                const unpushedOids = await this._getUnpushedOids(commits);
+                for (const event of cached.events) {
+                    event.unpushed = unpushedOids.has(event.oid);
                 }
-                return cached.events;
             }
+            return cached.events;
         }
 
-        const commits = await GitStore.getFullHistory();
-        if (commits.length === 0) return [];
+        // Full or incremental rebuild starting from scratch
+        this._allCommits = await GitStore.getFullHistory();
+        if (this._allCommits.length === 0) return [];
 
-        const currentHeadOid = commits[0].oid;
-        const unpushedOids = await this._getUnpushedOids(commits);
+        this._rawDataCache.headOid = currentHeadOid;
+        this._rawDataCache.events = [];
+        this._hasMore = this._allCommits.length > this.BATCH_SIZE;
+        this._startIdx = 0;
+        
+        // Commits come in newest-first. We need chronological for diffing.
+        const chronological = [...this._allCommits].reverse();
+        
+        // We always process at least one batch to establish the baseline and show recent events
+        let endIdx = Math.min(this.BATCH_SIZE, chronological.length);
+        
+        this._prevAllTasks = new Map();
+        this._prevFileSet = new Map();
+        const allEvents = [];
 
-        // Check if we can do an incremental rebuild from a cached frontier
-        // (cached head is an ancestor of current HEAD)
-        let allEvents = [];
-        let prevAllTasks;
-        let prevFileSet;
-        let startIdx = 0;
-
-        const chronological = [...commits].reverse();
-
-        if (cached && cached.frontierSnapshot) {
-            // Find where the cached head appears in chronological order
-            const cachedIdx = chronological.findIndex(c => c.oid === cached.headOid);
-            if (cachedIdx >= 0) {
-                Logger.log('Timeline: incremental rebuild from cached frontier');
-                // Cached events are newest-first; reverse to chronological for appending
-                allEvents = [...cached.events].reverse();
-                prevAllTasks = this._deserializeTasksMap(cached.frontierSnapshot.tasks);
-                prevFileSet = this._deserializeFileSet(cached.frontierSnapshot.fileSet);
-                startIdx = cachedIdx + 1;
-            }
-        }
-
-        if (startIdx === 0) {
-            // Full rebuild
-            Logger.log('Timeline: full rebuild');
-            prevAllTasks = new Map();
-            prevFileSet = new Map();
-        }
-
-        for (let i = startIdx; i < chronological.length; i++) {
+        Logger.log('Timeline: starting incremental build, first batch');
+        for (let i = 0; i < endIdx; i++) {
             const commit = chronological[i];
             const parentCommit = i > 0 ? chronological[i - 1] : null;
             const { tasks, fileSet, events } = await this._processCommit(
-                commit, prevAllTasks, prevFileSet, parentCommit
+                commit, this._prevAllTasks, this._prevFileSet, parentCommit
             );
             allEvents.push(...events);
-            prevAllTasks = tasks;
-            prevFileSet = fileSet;
+            this._prevAllTasks = tasks;
+            this._prevFileSet = fileSet;
         }
 
-        // Newest first
-        allEvents.reverse();
+        this._startIdx = endIdx;
+        
+        // Newest first for UI
+        const eventsReversed = [...allEvents].reverse();
+        this._rawDataCache.events = eventsReversed;
 
-        // Update in-memory cache
-        this._rawDataCache.headOid = currentHeadOid;
-        this._rawDataCache.events = allEvents;
-
-        // Persist to IndexedDB with the frontier snapshot (last commit's state)
-        const frontierSnapshot = { tasks: prevAllTasks, fileSet: prevFileSet };
-        this._persistToDB(allEvents, frontierSnapshot, currentHeadOid).catch(e =>
-            console.warn('Timeline: failed to persist cache:', e)
-        );
+        // If we finished everything in one batch, persist to DB
+        if (!this._hasMore) {
+            const frontierSnapshot = { tasks: this._prevAllTasks, fileSet: this._prevFileSet };
+            this._persistToDB(eventsReversed, frontierSnapshot, currentHeadOid).catch(e =>
+                console.warn('Timeline: failed to persist cache:', e)
+            );
+        }
 
         // Tag unpushed events
-        for (const event of allEvents) {
+        const unpushedOids = await this._getUnpushedOids(this._allCommits.slice(0, 500));
+        for (const event of eventsReversed) {
             event.unpushed = unpushedOids.has(event.oid);
         }
-        return allEvents;
+
+        return eventsReversed;
+    },
+
+    /**
+     * Load the next batch of commits and append to the timeline.
+     */
+    async loadMore() {
+        if (!this._hasMore || this._allCommits.length === 0) return;
+        
+        const chronological = [...this._allCommits].reverse();
+        let endIdx = Math.min(this._startIdx + this.BATCH_SIZE, chronological.length);
+        const newEvents = [];
+
+        Logger.log(`Timeline: loading more (${this._startIdx} to ${endIdx})`);
+        
+        for (let i = this._startIdx; i < endIdx; i++) {
+            const commit = chronological[i];
+            const parentCommit = i > 0 ? chronological[i - 1] : null;
+            const { tasks, fileSet, events } = await this._processCommit(
+                commit, this._prevAllTasks, this._prevFileSet, parentCommit
+            );
+            newEvents.push(...events);
+            this._prevAllTasks = tasks;
+            this._prevFileSet = fileSet;
+        }
+
+        this._startIdx = endIdx;
+        this._hasMore = this._startIdx < chronological.length;
+
+        // Prepend new events (they are older) to the end of our newest-first list
+        const olderEvents = newEvents.reverse();
+        this._rawDataCache.events.push(...olderEvents);
+        
+        // Update unpushed status for new events
+        const unpushedOids = await this._getUnpushedOids(this._allCommits.slice(0, 500));
+        for (const event of olderEvents) {
+            event.unpushed = unpushedOids.has(event.oid);
+        }
+
+        // Invalidate filtered cache
+        this.invalidateCache();
+
+        // If finished, persist
+        if (!this._hasMore) {
+            const frontierSnapshot = { tasks: this._prevAllTasks, fileSet: this._prevFileSet };
+            this._persistToDB(this._rawDataCache.events, frontierSnapshot, this._rawDataCache.headOid).catch(e =>
+                console.warn('Timeline: failed to persist cache:', e)
+            );
+        }
+
+        // Re-render
+        const filteredBlocks = Store.getFilteredBlocks();
+        const groupBy = window.GroupManager ? GroupManager.activeGrouping : undefined;
+        await this.render(filteredBlocks, { groupBy });
     },
 
     async _getUnpushedOids(commits) {
@@ -866,6 +918,18 @@ const TimelineView = {
 
         html += '</div>';
 
+        // Add "Load More" button if there are more commits to process
+        if (this._hasMore) {
+            html += `
+                <div class="tl-load-more-container">
+                    <button class="tl-load-more-btn" id="tlLoadMoreBtn">
+                        <span class="tl-btn-text">Load Older History</span>
+                        <div class="tl-spinner-small" style="display:none"></div>
+                    </button>
+                </div>
+            `;
+        }
+
         // Add control buttons
         html += `<div class="tl-controls">
             <button class="tl-control-btn" id="tlCollapseAllBtn" title="Collapse all days">
@@ -959,6 +1023,24 @@ const TimelineView = {
 
         document.getElementById('tlExpandAllBtn')?.addEventListener('click', () => {
             this.expandAll();
+        });
+
+        document.getElementById('tlLoadMoreBtn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('tlLoadMoreBtn');
+            const text = btn.querySelector('.tl-btn-text');
+            const spinner = btn.querySelector('.tl-spinner-small');
+            
+            btn.disabled = true;
+            if (text) text.textContent = 'Loading...';
+            if (spinner) spinner.style.display = 'block';
+            
+            try {
+                await this.loadMore();
+            } catch (err) {
+                console.error('Failed to load more history:', err);
+                if (text) text.textContent = 'Failed to load history';
+                btn.disabled = false;
+            }
         });
     },
 

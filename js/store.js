@@ -1016,11 +1016,13 @@ const Store = {
         if (opts.contextSelection && opts.contextSelection.size > 0 && window.TagIndex?.tagToBlocks?.size > 0) {
             const regularTags = [];
             const pathGroups = [];
+            const todoTags = [];
             let hasUntagged = false;
 
             for (const item of opts.contextSelection) {
                 if (window.SelectionManager.isComputedContextTag(item)) {
                     if (item === 'Status.untagged') hasUntagged = true;
+                    else if (item.startsWith('Todo.')) todoTags.push(item);
                     continue;
                 }
                 if (item.startsWith('path:')) {
@@ -1030,17 +1032,30 @@ const Store = {
                 }
             }
 
-            // If we have regular tags or path groups, use index to pre-filter
-            if (regularTags.length > 0 || pathGroups.length > 0 || hasUntagged) {
+            // If we have regular tags, path groups, or todo status, use index to pre-filter
+            if (regularTags.length > 0 || pathGroups.length > 0 || todoTags.length > 0 || hasUntagged) {
                 let candidateBlockIds = null;
 
-                // Start with all blocks
+                // Regular tags (AND logic)
                 if (regularTags.length > 0) {
                     candidateBlockIds = window.TagIndex.getBlocksWithTags(regularTags);
                 }
 
+                // Intersect with todo status blocks (AND logic)
+                if (todoTags.length > 0) {
+                    for (const todoTag of todoTags) {
+                        const todoBlocks = window.TagIndex.getBlocksWithTodo(todoTag);
+                        if (candidateBlockIds === null) {
+                            candidateBlockIds = todoBlocks;
+                        } else {
+                            candidateBlockIds = new Set([...candidateBlockIds].filter(x => todoBlocks.has(x)));
+                        }
+                        if (candidateBlockIds.size === 0) break;
+                    }
+                }
+
                 // Intersect with path group blocks
-                if (pathGroups.length > 0) {
+                if (candidateBlockIds !== new Set() && pathGroups.length > 0) {
                     for (const group of pathGroups) {
                         const groupBlocks = window.TagIndex.getBlocksWithTagGroup(group);
                         if (candidateBlockIds === null) {
@@ -1053,7 +1068,7 @@ const Store = {
                 }
 
                 // Intersect with untagged blocks if needed
-                if (hasUntagged) {
+                if (candidateBlockIds !== new Set() && hasUntagged) {
                     const untagged = window.TagIndex.untaggedBlocks;
                     if (candidateBlockIds === null) {
                         candidateBlockIds = untagged;
@@ -1073,11 +1088,13 @@ const Store = {
         if (opts.excludedSelection && opts.excludedSelection.size > 0 && window.TagIndex?.tagToBlocks?.size > 0) {
             const regularTags = [];
             const pathGroups = [];
+            const todoTags = [];
             let hasUntagged = false;
 
             for (const item of opts.excludedSelection) {
                 if (window.SelectionManager.isComputedContextTag(item)) {
                     if (item === 'Status.untagged') hasUntagged = true;
+                    else if (item.startsWith('Todo.')) todoTags.push(item);
                     continue;
                 }
                 if (item.startsWith('path:')) {
@@ -1087,8 +1104,8 @@ const Store = {
                 }
             }
 
-            // If we have regular tags or path groups to exclude, use index to pre-filter
-            if (regularTags.length > 0 || pathGroups.length > 0 || hasUntagged) {
+            // If we have regular tags, path groups, or todo status to exclude, use index to pre-filter
+            if (regularTags.length > 0 || pathGroups.length > 0 || todoTags.length > 0 || hasUntagged) {
                 let excludedBlockIds = null;
 
                 // Collect blocks with any excluded regular tag
@@ -1096,15 +1113,26 @@ const Store = {
                     excludedBlockIds = window.TagIndex.getBlocksWithoutTags(regularTags);
                 }
 
+                // Collect blocks with any excluded todo status
+                if (todoTags.length > 0) {
+                    for (const todoTag of todoTags) {
+                        const todoBlocks = window.TagIndex.getBlocksWithTodo(todoTag);
+                        if (excludedBlockIds === null) {
+                            excludedBlockIds = new Set(todoBlocks);
+                        } else {
+                            todoBlocks.forEach(id => excludedBlockIds.add(id));
+                        }
+                    }
+                }
+
                 // Collect blocks with any tag in excluded path groups
                 if (pathGroups.length > 0) {
                     for (const group of pathGroups) {
-                        const groupBlocks = window.TagIndex.getBlocksWithTagGroup(group);
+                        const groupSet = window.TagIndex.getBlocksWithTagGroup(group);
                         if (excludedBlockIds === null) {
-                            excludedBlockIds = groupBlocks;
+                            excludedBlockIds = new Set(groupSet);
                         } else {
-                            // Union: block is excluded if it's in ANY of these sets
-                            groupBlocks.forEach(id => excludedBlockIds.add(id));
+                            groupSet.forEach(id => excludedBlockIds.add(id));
                         }
                     }
                 }
@@ -1113,7 +1141,7 @@ const Store = {
                 if (hasUntagged) {
                     const untagged = window.TagIndex.untaggedBlocks;
                     if (excludedBlockIds === null) {
-                        excludedBlockIds = untagged;
+                        excludedBlockIds = new Set(untagged);
                     } else {
                         untagged.forEach(id => excludedBlockIds.add(id));
                     }
@@ -1245,6 +1273,9 @@ const Store = {
             if (JSON.stringify(oldTags) !== JSON.stringify(newTags)) {
                 TagIndex.updateBlockTags(block.id, oldTags, newTags);
             }
+
+            // Always update content index (for Todo.* status)
+            TagIndex.updateBlockContent(block.id, block.content || '');
 
             // Update contacts
             this.extractContacts();
