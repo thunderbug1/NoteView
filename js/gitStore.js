@@ -151,12 +151,13 @@ const GitStore = {
         }
     },
     
-    async getFullHistory(maxCount) {
+    async getFullHistory(maxCount, ref) {
         if (!this.git || !this.fs) return [];
 
         try {
             const logOpts = { fs: this.fs, dir: this.dir };
             if (maxCount) logOpts.depth = maxCount;
+            if (ref) logOpts.ref = ref;
             const commits = await this.git.log(logOpts);
             
             return commits.map(c => ({

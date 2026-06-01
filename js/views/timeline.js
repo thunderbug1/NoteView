@@ -442,27 +442,35 @@ const TimelineView = {
             return cached.events;
         }
 
-        // Full or incremental rebuild starting from scratch
-        this._allCommits = await GitStore.getFullHistory();
-        if (this._allCommits.length === 0) return [];
+        // Fresh build: Get only the most recent batch of commits
+        // We fetch BATCH_SIZE + 1 so the last one can serve as the baseline
+        const recentCommits = await GitStore.getFullHistory(this.BATCH_SIZE + 1);
+        if (recentCommits.length === 0) return [];
 
         this._rawDataCache.headOid = currentHeadOid;
         this._rawDataCache.events = [];
-        this._hasMore = this._allCommits.length > this.BATCH_SIZE;
-        this._startIdx = 0;
+        this._hasMore = recentCommits.length > this.BATCH_SIZE;
         
-        // Commits come in newest-first. We need chronological for diffing.
-        const chronological = [...this._allCommits].reverse();
-        
-        // We always process at least one batch to establish the baseline and show recent events
-        let endIdx = Math.min(this.BATCH_SIZE, chronological.length);
+        // chronological = [C_oldest_in_batch, ..., C_newest_in_batch]
+        const chronological = [...recentCommits].reverse();
         
         this._prevAllTasks = new Map();
         this._prevFileSet = new Map();
         const allEvents = [];
 
-        Logger.log('Timeline: starting incremental build, first batch');
-        for (let i = 0; i < endIdx; i++) {
+        let startIdx = 0;
+        if (this._hasMore) {
+            // Use the oldest commit in our batch as the baseline (C_oldest_in_batch)
+            // Establishing baseline state without emitting events for this commit.
+            const baselineCommit = chronological[0];
+            const { tasks, fileSet } = await this._processCommit(baselineCommit, new Map(), new Map(), null);
+            this._prevAllTasks = tasks;
+            this._prevFileSet = fileSet;
+            startIdx = 1; // Start processing events from the next commit
+        }
+
+        Logger.log('Timeline: building first batch (newest first)');
+        for (let i = startIdx; i < chronological.length; i++) {
             const commit = chronological[i];
             const parentCommit = i > 0 ? chronological[i - 1] : null;
             const { tasks, fileSet, events } = await this._processCommit(
@@ -473,22 +481,12 @@ const TimelineView = {
             this._prevFileSet = fileSet;
         }
 
-        this._startIdx = endIdx;
-        
-        // Newest first for UI
+        // UI is newest-first
         const eventsReversed = [...allEvents].reverse();
         this._rawDataCache.events = eventsReversed;
 
-        // If we finished everything in one batch, persist to DB
-        if (!this._hasMore) {
-            const frontierSnapshot = { tasks: this._prevAllTasks, fileSet: this._prevFileSet };
-            this._persistToDB(eventsReversed, frontierSnapshot, currentHeadOid).catch(e =>
-                console.warn('Timeline: failed to persist cache:', e)
-            );
-        }
-
         // Tag unpushed events
-        const unpushedOids = await this._getUnpushedOids(this._allCommits.slice(0, 500));
+        const unpushedOids = await this._getUnpushedOids(recentCommits.slice(0, 500));
         for (const event of eventsReversed) {
             event.unpushed = unpushedOids.has(event.oid);
         }
@@ -500,34 +498,66 @@ const TimelineView = {
      * Load the next batch of commits and append to the timeline.
      */
     async loadMore() {
-        if (!this._hasMore || this._allCommits.length === 0) return;
+        if (!this._hasMore || this._rawDataCache.events.length === 0) return;
         
-        const chronological = [...this._allCommits].reverse();
-        let endIdx = Math.min(this._startIdx + this.BATCH_SIZE, chronological.length);
+        // Find the oldest commit we have processed so far
+        const oldestEvent = this._rawDataCache.events[this._rawDataCache.events.length - 1];
+        const oldestOid = oldestEvent.oid;
+        
+        // Find the parent of that oldest commit to start our next batch
+        const oldestCommitRaw = (await GitStore.getFullHistory(1, oldestOid))[0];
+        if (!oldestCommitRaw || !oldestCommitRaw.parents || oldestCommitRaw.parents.length === 0) {
+            this._hasMore = false;
+            await this.render(Store.getFilteredBlocks());
+            return;
+        }
+
+        const parentOid = oldestCommitRaw.parents[0];
+        
+        // Fetch next batch starting from that parent
+        const nextBatch = await GitStore.getFullHistory(this.BATCH_SIZE + 1, parentOid);
+        if (nextBatch.length === 0) {
+            this._hasMore = false;
+            await this.render(Store.getFilteredBlocks());
+            return;
+        }
+
+        this._hasMore = nextBatch.length > this.BATCH_SIZE;
+        const chronological = [...nextBatch].reverse();
+        
+        let batchPrevTasks = new Map();
+        let batchPrevFileSet = new Map();
         const newEvents = [];
 
-        Logger.log(`Timeline: loading more (${this._startIdx} to ${endIdx})`);
-        
-        for (let i = this._startIdx; i < endIdx; i++) {
+        let startIdx = 0;
+        if (this._hasMore) {
+            // Establish baseline at the end of this new batch
+            const baselineCommit = chronological[0];
+            const { tasks, fileSet } = await this._processCommit(baselineCommit, new Map(), new Map(), null);
+            batchPrevTasks = tasks;
+            batchPrevFileSet = fileSet;
+            startIdx = 1;
+        }
+
+        Logger.log('Timeline: loading older batch');
+        for (let i = startIdx; i < chronological.length; i++) {
             const commit = chronological[i];
             const parentCommit = i > 0 ? chronological[i - 1] : null;
             const { tasks, fileSet, events } = await this._processCommit(
-                commit, this._prevAllTasks, this._prevFileSet, parentCommit
+                commit, batchPrevTasks, batchPrevFileSet, parentCommit
             );
             newEvents.push(...events);
-            this._prevAllTasks = tasks;
-            this._prevFileSet = fileSet;
+            batchPrevTasks = tasks;
+            batchPrevFileSet = fileSet;
         }
 
-        this._startIdx = endIdx;
-        this._hasMore = this._startIdx < chronological.length;
-
-        // Prepend new events (they are older) to the end of our newest-first list
+        // Prepend new events (older) to the end of our newest-first list
         const olderEvents = newEvents.reverse();
         this._rawDataCache.events.push(...olderEvents);
         
-        // Update unpushed status for new events
-        const unpushedOids = await this._getUnpushedOids(this._allCommits.slice(0, 500));
+        // Update unpushed status
+        const headCommits = await GitStore.getFullHistory(500);
+        const unpushedOids = await this._getUnpushedOids(headCommits);
         for (const event of olderEvents) {
             event.unpushed = unpushedOids.has(event.oid);
         }
