@@ -1109,8 +1109,15 @@ const SelectionManager = {
                     const groupPath = groupEl.dataset.groupPath;
                     const pathKey = 'path:' + groupPath;
 
-                    if (isComputedSection) {
-                        // Computed groups: toggle all tags individually
+                    if (isComputedSection && groupPath === 'Todo') {
+                        // Todo computed group: toggle as a path entry (OR filter, same as user tag groups)
+                        if (this.selections.context.has(pathKey)) {
+                            this.selections.context.delete(pathKey);
+                        } else {
+                            this.selections.context.add(pathKey);
+                        }
+                    } else if (isComputedSection) {
+                        // Other computed groups: toggle all tags individually
                         const allTags = Array.from(groupEl.querySelectorAll(':scope > .tag-group-children > .tag-radio-option'))
                             .map(opt => opt.dataset.tag);
                         const allSelected = allTags.every(t => this.selections.context.has(t));

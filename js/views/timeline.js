@@ -634,7 +634,21 @@ const TimelineView = {
             
             // Context tag filter
             if (contextSelection.size > 0) {
-                const requiredTags = Array.from(contextSelection).filter(t => !SelectionManager.isComputedContextTag(t));
+                const requiredTags = [];
+                let hasTodoGroup = false;
+
+                for (const t of contextSelection) {
+                    if (t.startsWith('path:')) {
+                        const group = t.slice(5);
+                        if (group === 'Todo') {
+                            hasTodoGroup = true;
+                            continue;
+                        }
+                    }
+                    if (!SelectionManager.isComputedContextTag(t)) {
+                        requiredTags.push(t);
+                    }
+                }
 
                 if (requiredTags.length > 0) {
                     const hasAllTags = requiredTags.every(tag => event.tags?.includes(tag));
@@ -645,7 +659,12 @@ const TimelineView = {
                     if (event.tags && event.tags.length > 0) return false;
                 }
 
-                // Todo filters only apply to task events
+                // path:Todo shows all task events (any state)
+                if (hasTodoGroup) {
+                    if (event.category !== 'task') return false;
+                }
+
+                // Individual Todo.* filters only apply to task events
                 const activeTodoFilter = contextSelection.has('Todo.open')
                     || contextSelection.has('Todo.inProgress')
                     || contextSelection.has('Todo.done')

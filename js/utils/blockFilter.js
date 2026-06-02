@@ -50,17 +50,22 @@ window.BlockFilter = {
             const regularTags = [];
             const pathGroups = [];
             const todoTags = [];
+            let hasTodoGroup = false;
             let hasUntagged = false;
 
             for (const item of contextSelection) {
                 if (SelectionManager.isComputedContextTag(item)) {
                     if (item.startsWith('Todo.')) todoTags.push(item);
+                    else if (item === 'Status.untagged') hasUntagged = true;
                     continue;
                 }
                 if (item.startsWith('path:')) {
-                    pathGroups.push(item.slice(5));
-                } else if (item === 'Status.untagged') {
-                    hasUntagged = true;
+                    const group = item.slice(5);
+                    if (group === 'Todo') {
+                        hasTodoGroup = true;
+                    } else {
+                        pathGroups.push(group);
+                    }
                 } else {
                     regularTags.push(item);
                 }
@@ -78,8 +83,14 @@ window.BlockFilter = {
                 }
             }
 
-            // Use tag index for todo status (AND logic) if available
-            if (todoTags.length > 0 && window.TagIndex?.todoToBlocks?.size > 0) {
+            // Use tag index for todo status
+            if (hasTodoGroup) {
+                // path:Todo means OR logic for all Todo.* states
+                if (window.TagIndex?.todoToBlocks?.size > 0) {
+                    if (!window.TagIndex.getBlocksWithTodo('Todo.all').has(block.id)) return false;
+                }
+            } else if (todoTags.length > 0 && window.TagIndex?.todoToBlocks?.size > 0) {
+                // Individual Todo.* tags: use AND logic
                 for (const todoTag of todoTags) {
                     if (!window.TagIndex.getBlocksWithTodo(todoTag).has(block.id)) return false;
                 }
@@ -261,12 +272,15 @@ window.BlockFilter = {
         // Context tags (AND logic)
         if (contextSelection && contextSelection.size > 0) {
             const blockTags = block.tags || [];
+            let hasTodoGroup = false;
 
             for (const item of contextSelection) {
-                if (SelectionManager.isComputedContextTag(item)) continue;
-
                 if (item.startsWith('path:')) {
                     const group = item.slice(5);
+                    if (group === 'Todo') {
+                        hasTodoGroup = true;
+                        continue;
+                    }
                     const hasMatch = blockTags.some(tag => {
                         const { segments } = Common.parseHierarchicalTag(tag);
                         return segments.length > 0 && segments[0] === group;
@@ -274,9 +288,18 @@ window.BlockFilter = {
                     if (!hasMatch) {
                         reasons.push({ type: 'context', label: group });
                     }
-                } else {
+                } else if (!SelectionManager.isComputedContextTag(item)) {
                     if (!blockTags.includes(item)) {
                         reasons.push({ type: 'context', label: item });
+                    }
+                }
+            }
+
+            // Handle path:Todo (OR logic for all Todo.* states)
+            if (hasTodoGroup) {
+                if (window.TagIndex?.todoToBlocks?.size > 0) {
+                    if (!window.TagIndex.getBlocksWithTodo('Todo.all').has(block.id)) {
+                        reasons.push({ type: 'context', label: 'Todo' });
                     }
                 }
             }

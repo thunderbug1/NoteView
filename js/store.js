@@ -1017,6 +1017,7 @@ const Store = {
             const regularTags = [];
             const pathGroups = [];
             const todoTags = [];
+            let hasTodoGroup = false;
             let hasUntagged = false;
 
             for (const item of opts.contextSelection) {
@@ -1026,14 +1027,19 @@ const Store = {
                     continue;
                 }
                 if (item.startsWith('path:')) {
-                    pathGroups.push(item.slice(5));
+                    const group = item.slice(5);
+                    if (group === 'Todo') {
+                        hasTodoGroup = true;
+                    } else {
+                        pathGroups.push(group);
+                    }
                 } else {
                     regularTags.push(item);
                 }
             }
 
             // If we have regular tags, path groups, or todo status, use index to pre-filter
-            if (regularTags.length > 0 || pathGroups.length > 0 || todoTags.length > 0 || hasUntagged) {
+            if (regularTags.length > 0 || pathGroups.length > 0 || todoTags.length > 0 || hasTodoGroup || hasUntagged) {
                 let candidateBlockIds = null;
 
                 // Regular tags (AND logic)
@@ -1041,8 +1047,17 @@ const Store = {
                     candidateBlockIds = window.TagIndex.getBlocksWithTags(regularTags);
                 }
 
-                // Intersect with todo status blocks (AND logic)
-                if (todoTags.length > 0) {
+                // Intersect with todo status blocks
+                if (hasTodoGroup) {
+                    // path:Todo means OR logic for all Todo.* states
+                    const allTodoBlocks = window.TagIndex.getBlocksWithTodo('Todo.all');
+                    if (candidateBlockIds === null) {
+                        candidateBlockIds = allTodoBlocks;
+                    } else {
+                        candidateBlockIds = new Set([...candidateBlockIds].filter(x => allTodoBlocks.has(x)));
+                    }
+                } else if (todoTags.length > 0) {
+                    // Individual Todo.* tags: use AND logic
                     for (const todoTag of todoTags) {
                         const todoBlocks = window.TagIndex.getBlocksWithTodo(todoTag);
                         if (candidateBlockIds === null) {
