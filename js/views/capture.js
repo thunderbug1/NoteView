@@ -56,6 +56,20 @@ const CaptureView = {
         this._isStopping = false;
     },
 
+    _addTouchFeedback(element) {
+        element.addEventListener('touchstart', () => {
+            element.classList.add('active');
+        }, { passive: true });
+
+        element.addEventListener('touchend', () => {
+            element.classList.remove('active');
+        }, { passive: true });
+
+        element.addEventListener('touchcancel', () => {
+            element.classList.remove('active');
+        }, { passive: true });
+    },
+
     async _saveNote(content, extraMeta = {}) {
         if (!content || !content.trim()) return;
         try {
@@ -89,20 +103,27 @@ const CaptureView = {
     },
 
     _wireHeader(container) {
-        container.querySelector('[data-action="back"]')?.addEventListener('click', () => {
+        const backBtn = container.querySelector('[data-action="back"]');
+        const tagBtn = container.querySelector('[data-action="edit-tags"]');
+        if (backBtn) this._addTouchFeedback(backBtn);
+        if (tagBtn) this._addTouchFeedback(tagBtn);
+        
+        backBtn?.addEventListener('click', () => {
             const content = this._getPageContent(container);
             if (content && content.trim()) {
                 if (!confirm('Discard this note?')) return;
             }
             this._goToGrid();
         });
-        container.querySelector('[data-action="edit-tags"]')?.addEventListener('click', () => {
+        tagBtn?.addEventListener('click', () => {
             this._openTagModal(container);
         });
     },
 
     _wireSave(container, getContent) {
-        container.querySelector('[data-action="save"]')?.addEventListener('click', () => {
+        const saveBtn = container.querySelector('[data-action="save"]');
+        if (saveBtn) this._addTouchFeedback(saveBtn);
+        saveBtn?.addEventListener('click', () => {
             const content = getContent();
             if (!content || !content.trim()) { Common.showToast('Write something first'); return; }
             this._saveNote(content);
@@ -187,6 +208,7 @@ const CaptureView = {
             </div>`;
 
         container.querySelectorAll('.capture-card').forEach(card => {
+            this._addTouchFeedback(card);
             card.addEventListener('click', () => this._navigateTo(card.dataset.method));
         });
         const browseBtn = container.querySelector('.capture-browse-btn');
@@ -219,7 +241,7 @@ const CaptureView = {
             if (!cmContainer) return;
 
             const { EditorView } = window.CodeMirror;
-            const editor = DocumentView.createEditor(cmContainer, 'capture-write', initialContent, [
+            const editor = DocumentView.createEditor(cmContainer, 'capture-write', '', [
                 EditorView.updateListener.of(update => {
                     if (update.docChanged) {
                         this._setSaveEnabled(container, update.state.doc.length > 0);
@@ -228,7 +250,12 @@ const CaptureView = {
             ]);
             this._editor = editor;
             if (editor) {
-                if (initialContent.trim()) this._setSaveEnabled(container, true);
+                if (initialContent?.useSnippet && initialContent.content) {
+                    const { snippet } = window.CodeMirror;
+                    snippet(initialContent.content)(editor, null, 0, editor.state.doc.length);
+                } else if (initialContent && initialContent.trim && initialContent.trim()) {
+                    this._setSaveEnabled(container, true);
+                }
                 requestAnimationFrame(() => requestAnimationFrame(() => editor.focus()));
             }
         });
@@ -274,6 +301,10 @@ const CaptureView = {
         const formatBtn = container.querySelector('[data-action="ai-format"]');
         const interpretBtn = container.querySelector('[data-action="ai-interpret"]');
         let isRecording = true;
+
+        if (micBtn) this._addTouchFeedback(micBtn);
+        if (formatBtn) this._addTouchFeedback(formatBtn);
+        if (interpretBtn) this._addTouchFeedback(interpretBtn);
 
         const showAiBtns = () => {
             if (aiBtns && editArea.value.trim()) aiBtns.style.display = '';
@@ -485,7 +516,8 @@ const CaptureView = {
         this._wireHeader(container);
 
         const assigneeBtn = container.querySelector('[data-role="assignee"]');
-        assigneeBtn.addEventListener('click', () => {
+        if (assigneeBtn) this._addTouchFeedback(assigneeBtn);
+        assigneeBtn?.addEventListener('click', () => {
             AssigneeModal.show((contact) => {
                 if (contact) {
                     selectedAssignee = contact;
@@ -498,6 +530,7 @@ const CaptureView = {
         });
 
         container.querySelectorAll('.capture-priority-btn').forEach(btn => {
+            this._addTouchFeedback(btn);
             btn.addEventListener('click', () => {
                 container.querySelectorAll('.capture-priority-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
@@ -544,7 +577,9 @@ const CaptureView = {
                         </div>
                     </div>`;
                 container.querySelector('[data-action="back"]')?.addEventListener('click', () => this._goToGrid());
-                container.querySelector('[data-action="go-settings"]')?.addEventListener('click', () => App.setView('settings'));
+                const settingsBtn = container.querySelector('[data-action="go-settings"]');
+                if (settingsBtn) this._addTouchFeedback(settingsBtn);
+                settingsBtn?.addEventListener('click', () => App.setView('settings'));
                 return;
             }
 
@@ -566,9 +601,10 @@ const CaptureView = {
             container.querySelector('[data-action="edit-tags"]')?.addEventListener('click', () => this._openTagModal(container));
 
             container.querySelectorAll('.capture-template-card').forEach(card => {
+                this._addTouchFeedback(card);
                 card.addEventListener('click', () => {
                     const template = templates.find(t => t.id === card.dataset.templateId);
-                    this._templateContent = template?.content || '';
+                    this._templateContent = { content: template?.content || '', useSnippet: true };
                     this._cleanup();
                     this.currentPage = 'write';
                     this.render(this._blocks);

@@ -63,6 +63,7 @@
     transition: all 0.15s ease;
     color: var(--text-primary);
     min-height: 80px;
+    touch-action: manipulation;
 }
 
 .capture-card:hover {
@@ -70,7 +71,8 @@
     border-color: var(--accent);
 }
 
-.capture-card:active {
+.capture-card:active,
+.capture-card.active {
     transform: scale(0.97);
 }
 
@@ -143,6 +145,7 @@
     color: var(--text-primary);
     cursor: pointer;
     flex-shrink: 0;
+    touch-action: manipulation;
 }
 
 .capture-header-tag {
@@ -159,13 +162,15 @@
     cursor: pointer;
     min-height: 36px;
     transition: all 0.15s;
+    touch-action: manipulation;
 }
 
 .capture-header-tag svg {
     color: var(--accent);
 }
 
-.capture-header-tag:active {
+.capture-header-tag:active,
+.capture-header-tag.active {
     background: var(--bg-tertiary);
 }
 
@@ -200,6 +205,7 @@
     cursor: pointer;
     min-height: 48px;
     transition: opacity 0.15s;
+    touch-action: manipulation;
 }
 
 .capture-save-btn:disabled {
@@ -255,6 +261,7 @@
     position: relative;
     transition: all 0.2s;
     flex-shrink: 0;
+    touch-action: manipulation;
 }
 
 .capture-mic-btn.recording {
@@ -388,6 +395,7 @@
     cursor: pointer;
     transition: all 0.15s;
     min-height: 44px;
+    touch-action: manipulation;
 }
 
 .capture-priority-btn.active {
@@ -405,6 +413,7 @@
     color: var(--text-primary);
     font-size: 0.9rem;
     min-height: 44px;
+    touch-action: manipulation;
 }
 
 /* ─── Template Picker ────────────────────────── */
@@ -431,6 +440,7 @@
     text-align: left;
     transition: all 0.15s;
     min-height: 72px;
+    touch-action: manipulation;
 }
 
 .capture-template-card:hover {
@@ -438,7 +448,8 @@
     background: var(--bg-tertiary);
 }
 
-.capture-template-card:active {
+.capture-template-card:active,
+.capture-template-card.active {
     transform: scale(0.98);
 }
 
@@ -481,4 +492,19 @@
     color: var(--accent);
     font-size: 0.85rem;
     cursor: pointer;
+    touch-action: manipulation;
+}
+
+.capture-card.active,
+.capture-template-card.active,
+.capture-header-back.active,
+.capture-header-tag.active,
+.capture-save-btn.active,
+.capture-mic-btn.active,
+.capture-priority-btn.active,
+.capture-task-date.active,
+.capture-template-empty-btn.active {
+    transform: scale(0.97);
+    opacity: 0.9;
+    transition: transform 0.05s ease, opacity 0.05s ease;
 }
