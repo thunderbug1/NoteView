@@ -172,6 +172,29 @@ const GitStore = {
             return [];
         }
     },
+
+    async getCommit(oid) {
+        if (!this.git || !this.fs || !oid) return null;
+
+        try {
+            const commit = await this.git.readCommit({
+                fs: this.fs,
+                dir: this.dir,
+                oid
+            });
+            
+            return {
+                oid: commit.oid,
+                message: commit.commit.message,
+                timestamp: commit.commit.author.timestamp * 1000,
+                author: commit.commit.author.name,
+                parents: commit.commit.parent
+            };
+        } catch (err) {
+            console.warn(`Failed to get commit ${oid}:`, err);
+            return null;
+        }
+    },
     
     /**
      * Get only the .md files that changed between two commits.
