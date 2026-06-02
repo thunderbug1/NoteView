@@ -49,7 +49,7 @@ const Store = {
     // IndexedDB for persistence
     db: null,
     DB_NAME: 'NoteViewDB',
-    DB_VERSION: 4,
+    DB_VERSION: 5,
     STORE_NAME: 'handles',
     VIEW_PREFERENCES_STORAGE_KEY: 'noteview-view-preferences',
     CURRENT_VIEW_STORAGE_KEY: 'noteview-current-view',
