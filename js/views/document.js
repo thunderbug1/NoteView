@@ -3157,7 +3157,8 @@ const DocumentView = {
 
             if (update.docChanged) {
                 const content = update.state.doc.toString();
-                handleContentChange(content);
+                const isAutocomplete = update.transactions.some(tr => tr.isUserEvent('input.complete'));
+                handleContentChange(content, isAutocomplete);
             }
         });
     },
@@ -3871,7 +3872,7 @@ const DocumentView = {
         }
     },
 
-    handleContentChange(blockId, content) {
+    handleContentChange(blockId, content, skipUndo = false) {
         // Skip recording during undo/redo execution
         if (UndoRedoManager.isExecuting) return;
 
@@ -3891,7 +3892,7 @@ const DocumentView = {
             }
         } else {
             // Debounced save for existing blocks
-            this.scheduleSave(blockId, content);
+            this.scheduleSave(blockId, content, { skipUndo });
         }
     },
 
@@ -4040,7 +4041,7 @@ const DocumentView = {
         await Promise.allSettled(promises);
     },
 
-    scheduleSave(blockId, content) {
+    scheduleSave(blockId, content, options = {}) {
         const indicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
         if (indicator) {
             indicator.textContent = 'saving...';
@@ -4058,7 +4059,7 @@ const DocumentView = {
         const timeout = setTimeout(async () => {
             this.saveTimeouts.delete(blockId);
             try {
-                await App.saveBlockContent(blockId, content);
+                await App.saveBlockContent(blockId, content, options);
             } catch (err) {
                 const failedIndicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
                 if (failedIndicator) {
