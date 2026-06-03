@@ -6,8 +6,10 @@
 
 const TimelineView = {
     collapsedDays: new Map(),
+    _allCollapsed: false,
     BATCH_SIZE: 50,
     _allCommits: [],
+    _loadMoreHandler: null,
     _hasMore: false,
     _startIdx: 0,
     _prevAllTasks: new Map(),
@@ -562,8 +564,9 @@ const TimelineView = {
             event.unpushed = unpushedOids.has(event.oid);
         }
 
-        // Invalidate filtered cache
-        this.invalidateCache();
+        // Update filtered cache with the now-extended raw events so render()
+        // doesn't trigger a fresh buildTimeline() that discards the older batch.
+        this._cache.set(this._rawDataCache.events);
 
         // If finished, persist
         if (!this._hasMore) {
@@ -879,10 +882,12 @@ const TimelineView = {
                 if (dateStr) this.collapseDay(dateStr);
             }
         });
+        this._allCollapsed = true;
     },
 
     expandDay(dateStr) {
         this.collapsedDays.delete(dateStr);
+        this._allCollapsed = false;
         const group = document.querySelector(`.tl-date-group .tl-collapse-btn[data-date="${CSS.escape(dateStr)}"]`)?.closest('.tl-date-group');
         if (!group) return;
 
@@ -909,6 +914,7 @@ const TimelineView = {
                 if (dateStr) this.expandDay(dateStr);
             }
         });
+        this._allCollapsed = false;
     },
 
     async render(blocks, options = {}) {
@@ -945,7 +951,7 @@ const TimelineView = {
         let html = '<div class="tl-container"><div class="tl-line"></div>';
 
         for (const [dateStr, events] of grouped) {
-            const isCollapsed = this.collapsedDays.has(dateStr);
+            const isCollapsed = this._allCollapsed || this.collapsedDays.has(dateStr);
             html += `<div class="tl-date-group ${isCollapsed ? 'tl-date-collapsed' : ''}">`;
             html += `<div class="tl-date-header">
                 <button class="tl-collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-date="${escapeHtml(dateStr)}" title="${isCollapsed ? 'Expand' : 'Collapse'}">
@@ -1074,23 +1080,33 @@ const TimelineView = {
             this.expandAll();
         });
 
-        document.getElementById('tlLoadMoreBtn')?.addEventListener('click', async () => {
-            const btn = document.getElementById('tlLoadMoreBtn');
-            const text = btn.querySelector('.tl-btn-text');
-            const spinner = btn.querySelector('.tl-spinner-small');
-            
-            btn.disabled = true;
-            if (text) text.textContent = 'Loading...';
-            if (spinner) spinner.style.display = 'block';
-            
-            try {
-                await this.loadMore();
-            } catch (err) {
-                console.error('Failed to load more history:', err);
-                if (text) text.textContent = 'Failed to load history';
-                btn.disabled = false;
-            }
-        });
+        const loadMoreBtn = document.getElementById('tlLoadMoreBtn');
+        if (this._loadMoreHandler) {
+            this._loadMoreHandler();
+        }
+        if (loadMoreBtn) {
+            const loadMoreHandler = async () => {
+                const btn = document.getElementById('tlLoadMoreBtn');
+                const text = btn.querySelector('.tl-btn-text');
+                const spinner = btn.querySelector('.tl-spinner-small');
+
+                btn.disabled = true;
+                if (text) text.textContent = 'Loading...';
+                if (spinner) spinner.style.display = 'block';
+
+                try {
+                    await this.loadMore();
+                } catch (err) {
+                    console.error('Failed to load more history:', err);
+                    if (text) text.textContent = 'Failed to load history';
+                    btn.disabled = false;
+                }
+            };
+            loadMoreBtn.addEventListener('click', loadMoreHandler);
+            this._loadMoreHandler = () => {
+                loadMoreBtn.removeEventListener('click', loadMoreHandler);
+            };
+        }
     },
 
     renderTagSubGroups(events, namespace) {
