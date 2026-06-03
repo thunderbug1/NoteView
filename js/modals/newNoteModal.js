@@ -324,6 +324,9 @@ const NewNoteModal = {
         let createdBlockId = null;
         let isCreating = false;
 
+        // Prevent auto-save while in modal
+        DocumentView._isInModalOrCreation = true;
+
         const self = this;
 
         const renderModalTags = () => {
@@ -466,6 +469,9 @@ const NewNoteModal = {
             content,
             modalClass: 'tag-modal content-modal active-recording-preventer',
             onClose: async () => {
+                // Re-enable auto-save after modal closes
+                DocumentView._isInModalOrCreation = false;
+                
                 DocumentView.stopSpeechRecognition();
                 if (self._aiDictationActive && !self._aiIsProcessing) {
                     const rawTranscript = (self._aiTranscript || '').trim();

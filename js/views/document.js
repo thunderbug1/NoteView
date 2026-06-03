@@ -22,6 +22,8 @@ const DocumentView = {
     pendingNewTags: null,
     saveTimeouts: new Map(), // blockId -> timeoutId
     originalContents: new Map(), // blockId -> original content for change detection
+    // Flag to prevent auto-save during modal editing or mobile note creation
+    _isInModalOrCreation: false,
     // Track which blocks are collapsed by block ID
     collapsedBlocks: new Map(),
     // Track blocks expanded by click that should re-collapse on blur
@@ -4042,6 +4044,9 @@ const DocumentView = {
     },
 
     scheduleSave(blockId, content, options = {}) {
+        // Skip auto-save if in modal or creation view
+        if (this._isInModalOrCreation) return;
+        
         const indicator = document.querySelector(`.save-indicator[data-id="${CSS.escape(blockId)}"]`);
         if (indicator) {
             indicator.textContent = 'saving...';
@@ -4055,7 +4060,7 @@ const DocumentView = {
             clearTimeout(existingTimeout);
         }
 
-        // Schedule save for THIS block
+        // Schedule save for THIS block with 10 second debounce
         const timeout = setTimeout(async () => {
             this.saveTimeouts.delete(blockId);
             try {
@@ -4088,7 +4093,7 @@ const DocumentView = {
                     }
                 }, 2000);
             }
-        }, 1000);
+        }, 10000);
         
         this.saveTimeouts.set(blockId, timeout);
     },

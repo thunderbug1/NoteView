@@ -31,6 +31,8 @@ const CaptureView = {
         this._cleanup();
         this.currentPage = page;
         this._currentTags = [...SelectionManager.getTagsForNewNote()];
+        // Prevent auto-save while in mobile capture view
+        DocumentView._isInModalOrCreation = true;
         this.render(this._blocks);
     },
 
@@ -38,6 +40,8 @@ const CaptureView = {
         this._cleanup();
         this.currentPage = null;
         this._currentTags = [];
+        // Re-enable auto-save when returning to grid
+        DocumentView._isInModalOrCreation = false;
         this.render(this._blocks);
     },
 
