@@ -4,9 +4,6 @@
 
 const SettingsView = {
 
-    /**
-     * Shortcut definitions for the settings UI
-     */
     _shortcutDefs: [
         { key: 'newNote', label: 'New Note', hint: 'Quickly add a new note from anywhere.' },
         { key: 'aiAssistant', label: 'AI Assistant', hint: 'Open AI assistant for the focused note.' },
@@ -29,36 +26,55 @@ const SettingsView = {
                     <button class="edit-profile-btn" data-profile-id="${escapeHtml(p.id)}">Edit</button>
                     <button class="clone-profile-btn" data-profile-id="${escapeHtml(p.id)}">Clone</button>
                     <button class="delete-profile-btn" data-profile-id="${escapeHtml(p.id)}">Delete</button>
-                    </div>
-                    <div class="settings-item">
-                        <div class="settings-item-info">
-                            <label>Default CORS Proxy</label>
-                            <p class="settings-item-hint">Default proxy for new vaults and git operations.</p>
-                        </div>
-                        <button id="configDefaultCorsBtn" class="settings-btn secondary">
-                            Configure...
-                        </button>
-                    </div>
                 </div>
+            </div>
+        `).join('');
+    },
 
-                <div class="settings-section">
-                    <h3>Vault Configuration</h3>
-                    <div class="settings-item">
-                        <div class="settings-item-info">
-                            <label>Current Vault Directory</label>
-                            <div class="directory-path-display">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                                </svg>
-                                <span>${escapeHtml(directoryName)}</span>
-                            </div>
-                            <p class="settings-item-hint">This is the folder where your markdown notes and git history are stored.</p>
+    render(blocks) {
+        const container = document.getElementById('viewContainer');
+        if (!container) return;
+
+        const directoryName = Store.directoryHandle?.name || 'No vault';
+
+        container.className = 'settings-view';
+        container.innerHTML = `
+            <div class="settings-header">
+                <button class="settings-back-btn" id="settingsBackBtn" title="Back to notes">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+                <h2>Settings</h2>
+            </div>
+
+            <div class="settings-section">
+                <h3>Vault Configuration</h3>
+                <div class="settings-item">
+                    <div class="settings-item-info">
+                        <label>Current Vault Directory</label>
+                        <div class="directory-path-display">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            <span>${escapeHtml(directoryName)}</span>
                         </div>
-                        <button id="changeVaultBtn" class="settings-btn secondary">
-                            Change Directory...
-                        </button>
+                        <p class="settings-item-hint">This is the folder where your markdown notes and git history are stored.</p>
                     </div>
+                    <button id="changeVaultBtn" class="settings-btn secondary">
+                        Change Directory...
+                    </button>
                 </div>
+                <div class="settings-item">
+                    <div class="settings-item-info">
+                        <label>Default CORS Proxy</label>
+                        <p class="settings-item-hint">Default proxy for new vaults and git operations.</p>
+                    </div>
+                    <button id="configDefaultCorsBtn" class="settings-btn secondary">
+                        Configure...
+                    </button>
+                </div>
+            </div>
 
                 <div class="settings-section">
                     <h3>Git Sync</h3>
@@ -243,7 +259,7 @@ const SettingsView = {
                     </div>
                 </div>
             </div>
-        `)
+        `;
 
         this.attachEventListeners();
         this._checkForUpdates();
