@@ -1,8 +1,15 @@
 .settings-view {
     padding: 2.5rem;
-    max-width: 800px;
+    max-width: 900px;
     margin: 0 auto;
     animation: settingsFadeIn 0.4s ease-out;
+}
+
+@media (max-width: 1024px) {
+    .settings-view {
+        padding: 2rem;
+        max-width: 100%;
+    }
 }
 
 .settings-header {
@@ -63,6 +70,7 @@
     align-items: center;
     gap: 1.5rem;
     transition: all 0.2s ease;
+    margin-bottom: 1rem;
 }
 
 .settings-item:hover {
@@ -72,6 +80,7 @@
 
 .settings-item-info {
     flex: 1;
+    min-width: 0;
 }
 
 .settings-item label {
@@ -94,11 +103,20 @@
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     font-size: 0.9rem;
     color: var(--text-secondary);
+    min-width: 0;
 }
 
 .directory-path-display svg {
     color: var(--accent);
     opacity: 0.8;
+    flex-shrink: 0;
+}
+
+.directory-path-display span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .settings-item-hint {
@@ -116,6 +134,8 @@
     transition: all 0.2s ease;
     border: none;
     white-space: nowrap;
+    flex-shrink: 0;
+    min-width: fit-content;
 }
 
 .settings-btn.secondary {
@@ -365,11 +385,13 @@
 @media (max-width: 768px) {
     .settings-view {
         padding: 1rem;
+        max-width: 100%;
     }
 
     .settings-header {
         margin-bottom: 1.5rem;
         gap: 0.75rem;
+        padding-bottom: 1rem;
     }
 
     .settings-header h2 {
@@ -382,25 +404,41 @@
 
     .settings-section h3 {
         margin-bottom: 1rem;
+        font-size: 1.1rem;
     }
 
     .settings-item {
         flex-direction: column;
         align-items: stretch;
         padding: 1rem;
-        gap: 1rem;
+        gap: 0.75rem;
+    }
+
+    .settings-btn {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+
+    .directory-path-display {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.75rem;
     }
 
     .directory-path-display span {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        flex: 1;
+        min-width: 0;
     }
 
     .shortcut-key {
         min-width: unset;
         width: 100%;
         text-align: center;
+        padding: 0.6rem 0.75rem;
+        font-size: 0.85rem;
     }
 
     .tag-editor-row {
@@ -412,5 +450,22 @@
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .ai-profile-item {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .ai-profile-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .ai-profile-actions button {
+        flex: 1;
+        min-width: calc(50% - 0.25rem);
+        font-size: 0.8rem;
     }
 }
