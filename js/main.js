@@ -210,6 +210,9 @@ const App = {
                 SelectionManager.init({ isSwitch: true });
                 SelectionManager.updateTagCounts();
                 this.updateVaultSwitcherName();
+                DocumentView.clearVaultState();
+                KanbanView.clearVaultState();
+                TimelineView.clearVaultState();
                 this.render();
                 Logger.log('[App] completeInitialization:reenter', {
                     currentView: Store.currentView,
@@ -229,6 +232,9 @@ const App = {
             SelectionManager.updateTagCounts();
             await AIAssistant.init();
             this.updateVaultSwitcherName();
+            DocumentView.clearVaultState();
+            KanbanView.clearVaultState();
+            TimelineView.clearVaultState();
             this.render();
             // Collapse right sidebar on initial load when there are no deadlines
             this._collapseRightIfNoDeadlines();
@@ -1037,6 +1043,12 @@ const App = {
         const blocks = Store.getFilteredBlocks();
         const view = Store.currentView;
         const groupBy = GroupManager.getGroupBy(view);
+
+        const container = document.getElementById('viewContainer');
+        if (container) {
+            container.innerHTML = '';
+            container.className = '';
+        }
 
         switch (view) {
             case 'document':

@@ -765,6 +765,21 @@ const Store = {
         if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
             await DocumentView.flushAllPendingSaves();
         }
+        
+        // Clear all view state to prevent stale data from persisting
+        if (window.DocumentView && typeof DocumentView.clearVaultState === 'function') {
+            DocumentView.clearVaultState();
+        }
+        if (window.KanbanView && typeof KanbanView.clearVaultState === 'function') {
+            KanbanView.clearVaultState();
+        }
+        if (window.TimelineView && typeof TimelineView.clearVaultState === 'function') {
+            TimelineView.clearVaultState();
+        }
+        
+        // Clear cache to ensure new vault data is used
+        this._filteredBlocksCache.invalidate();
+        
         // Check / request permission — skip for OPFS vaults
         const vaultList = await this.getVaultList();
         const vaultEntry = vaultList.find(v => v.name === handle.name);
@@ -794,6 +809,21 @@ const Store = {
     async createOPFSVault(name) {
         const opfsRoot = await navigator.storage.getDirectory();
         const vaultHandle = await opfsRoot.getDirectoryHandle(name, { create: true });
+        
+        // Clear all view state to prevent stale data from persisting
+        if (window.DocumentView && typeof DocumentView.clearVaultState === 'function') {
+            DocumentView.clearVaultState();
+        }
+        if (window.KanbanView && typeof KanbanView.clearVaultState === 'function') {
+            KanbanView.clearVaultState();
+        }
+        if (window.TimelineView && typeof TimelineView.clearVaultState === 'function') {
+            TimelineView.clearVaultState();
+        }
+        
+        // Clear cache to ensure new vault data is used
+        this._filteredBlocksCache.invalidate();
+        
         this.directoryHandle = vaultHandle;
         await this._activateVault(vaultHandle, { vaultType: 'opfs', clearUndo: true });
         return vaultHandle;

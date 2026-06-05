@@ -66,10 +66,11 @@ const KanbanView = {
         return this.columns.find(col => col.id === id) || null;
     },
 
-    /**
-     * Build parent-child relationships from task indentation.
-     * Returns a Map of taskId -> { parentId: string|null, children: string[] }.
-     */
+    clearVaultState() {
+        this.collapsedGroups.clear();
+        this.expandedColumns.clear();
+    },
+
     buildTaskHierarchy(tasks) {
         const hierarchy = new Map();
 

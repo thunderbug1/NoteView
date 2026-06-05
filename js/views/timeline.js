@@ -81,10 +81,17 @@ const TimelineView = {
         if (vaultName) Store.deleteTimelineCache(vaultName);
     },
 
-    /**
-     * Extract tasks from raw markdown content (mirrors KanbanView logic).
-     * Returns a Map of taskKey -> { state, text, badges }
-     */
+    clearVaultState() {
+        this.collapsedDays.clear();
+        this._allCollapsed = false;
+        this._allCommits = [];
+        this._loadMoreHandler = null;
+        this._hasMore = false;
+        this._startIdx = 0;
+        this._prevAllTasks = new Map();
+        this._prevFileSet = new Map();
+    },
+
     extractTasksFromContent(content) {
         return TaskParser.parseTasksFromContent(content);
     },

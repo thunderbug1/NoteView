@@ -65,6 +65,23 @@ const DocumentView = {
         return this._taskMenus;
     },
 
+    clearVaultState() {
+        this.editors.clear();
+        this._highlightPositions.clear();
+        this.newBlockContent = '';
+        this.pendingNewTags = null;
+        this.saveTimeouts.clear();
+        this.originalContents.clear();
+        this._isInModalOrCreation = false;
+        this.collapsedBlocks.clear();
+        this._autoCollapseOnBlur.clear();
+        this.collapsedGroups.clear();
+        this._focusedEditor = null;
+        this._dragState = { active: false };
+        this._dragMoveHandler = null;
+        this._dragEndHandler = null;
+    },
+
     async render(blocks, options = {}) {
         // Flush and commit pending auto-saves before DOM rebuild to prevent stale writes and guarantee data persistence
         await this.flushAllPendingSaves();
