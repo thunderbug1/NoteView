@@ -130,6 +130,10 @@ const Store = {
                     db.createObjectStore('timelineCache');
                     Logger.log('Creating timelineCache object store');
                 }
+                if (!db.objectStoreNames.contains('metadataCache')) {
+                    db.createObjectStore('metadataCache');
+                    Logger.log('Creating metadataCache object store');
+                }
                 // Add store for queued notes (survives crashes/reloads)
                 if (!db.objectStoreNames.contains(this._pendingNotesStore)) {
                     const store = db.createObjectStore(this._pendingNotesStore, { 
@@ -1793,7 +1797,6 @@ const Store = {
             entries = this.directoryHandle.values();
         } catch (err) {
             console.error('loadBlocks: failed to iterate directory:', err);
-            // Invalidate cache, clear index, and extract contacts if we failed to iterate
             this._filteredBlocksCache.invalidate();
             TagIndex.clear();
             this.extractContacts();
@@ -1816,23 +1819,59 @@ const Store = {
             return;
         }
 
+        // Get existing metadata cache
+        const cacheStore = 'metadataCache';
+        const vaultPrefix = `vault::${this.directoryHandle.name}::`;
+        const metadataCache = new Map();
+        
+        if (await this._ensureDB()) {
+            try {
+                const tx = this.db.transaction([cacheStore], 'readonly');
+                const store = tx.objectStore(cacheStore);
+                const req = store.openCursor(IDBKeyRange.bound(vaultPrefix, vaultPrefix + '\uffff'));
+                await new Promise(resolve => {
+                    req.onsuccess = (e) => {
+                        const cursor = e.target.result;
+                        if (cursor) {
+                            metadataCache.set(cursor.key.replace(vaultPrefix, ''), cursor.value);
+                            cursor.continue();
+                        } else resolve();
+                    };
+                    req.onerror = () => resolve();
+                });
+            } catch (e) { console.warn('Failed to load metadata cache:', e); }
+        }
+
+        const updatedCache = new Map();
         const readPromises = entriesArray.map(async (entry) => {
             try {
                 const file = await entry.getFile();
+                const cached = metadataCache.get(entry.name);
+                
+                if (cached && cached.mtime === file.lastModified) {
+                    return {
+                        id: entry.name.slice(0, -3),
+                        filename: entry.name,
+                        fileHandle: entry,
+                        ...cached.data
+                    };
+                }
+
+                // Cache miss or stale: read and parse
                 const content = await file.text();
                 const parsed = parseFrontMatter(content);
+                const data = { ...parsed };
+                
+                updatedCache.set(entry.name, { mtime: file.lastModified, data });
+
                 return {
                     id: entry.name.slice(0, -3),
                     filename: entry.name,
                     fileHandle: entry,
-                    ...parsed
+                    ...data
                 };
             } catch (err) {
-                if (err.name === 'NotFoundError') {
-                    console.warn('loadBlocks: skipping stale entry:', err.message);
-                    return null;
-                }
-                // Skip corrupted/unreadable files instead of halting the entire load
+                if (err.name === 'NotFoundError') return null;
                 console.error('loadBlocks: skipping unreadable file:', entry?.name, err);
                 return null;
             }
@@ -1840,6 +1879,29 @@ const Store = {
 
         const results = await Promise.all(readPromises);
         
+        // Update IndexedDB cache with new/changed files and prune deleted ones
+        if (updatedCache.size > 0 || entriesArray.length < metadataCache.size) {
+            if (await this._ensureDB()) {
+                try {
+                    const tx = this.db.transaction([cacheStore], 'readwrite');
+                    const store = tx.objectStore(cacheStore);
+                    
+                    // Update cache for new/changed files
+                    for (const [filename, value] of updatedCache) {
+                        store.put(value, vaultPrefix + filename);
+                    }
+                    
+                    // Prune cache for deleted files
+                    const currentFiles = new Set(entriesArray.map(e => e.name));
+                    for (const filename of metadataCache.keys()) {
+                        if (!currentFiles.has(filename)) {
+                            store.delete(vaultPrefix + filename);
+                        }
+                    }
+                } catch (e) { console.warn('Failed to update metadata cache:', e); }
+            }
+        }
+
         // Atomically update the memory store, cache, index, and contacts only after all async reads resolve
         this.blocks = results.filter(block => block !== null);
         this._filteredBlocksCache.invalidate();

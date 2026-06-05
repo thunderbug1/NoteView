@@ -91,6 +91,11 @@ const App = {
     },
 
     async init() {
+        // Request persistent storage if supported (prevents data eviction on mobile)
+        if (navigator.storage && navigator.storage.persist) {
+            navigator.storage.persist().catch(err => console.warn('[App] Persistence request error:', err));
+        }
+
         ThemeManager.init();
         // Hide sidebars and FAB until a vault is opened
         document.getElementById('app')?.classList.add('no-vault');
@@ -291,7 +296,7 @@ const App = {
         if (!container) return;
 
         Store.currentView = 'capture';
-        CaptureView.renderGrid([]);
+        CaptureView.render([]);
 
         document.getElementById('app')?.classList.remove('no-vault');
         const fab = document.getElementById('fabNewNote');

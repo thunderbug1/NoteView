@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v46';
+const CACHE_NAME = 'noteview-v47';
 
 const PRECACHE_URLS = [
   './',
@@ -60,6 +60,7 @@ const PRECACHE_URLS = [
   './js/utils/backlinksPanel.js',
   './js/utils/aiTaskPanel.js',
   './js/utils/groupManager.js',
+  './js/utils/tagIndex.js',
   './js/widgets/codeMirrorWidgets.js',
   './js/menus/taskMenus.js',
   './js/views/history.js',
