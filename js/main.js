@@ -129,7 +129,17 @@ const App = {
             return;
         }
 
-        // Auto-load on startup
+        // NEW: Mobile fast path - render capture immediately
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        if (isMobile) {
+            this.renderCaptureImmediately();
+            this.initializeInBackground().catch(err => {
+                this.showErrorOnCapture(err);
+            });
+            return;
+        }
+
+        // Desktop: Auto-load on startup
         try {
             const container = document.getElementById('viewContainer');
             if (container) container.innerHTML = '<div class="loading">Loading notes...</div>';
@@ -189,7 +199,7 @@ const App = {
         }
     },
 
-    async completeInitialization() {
+    async completeInitialization(skipRender = false) {
         if (this._initInProgress) return;
         this._initInProgress = true;
         // Show sidebars and FAB now that a vault is open
@@ -213,7 +223,12 @@ const App = {
                 DocumentView.clearVaultState();
                 KanbanView.clearVaultState();
                 TimelineView.clearVaultState();
-                this.render();
+                if (!skipRender) {
+                    this.render();
+                } else {
+                    this.updateCaptureWithVaultName();
+                    this._updateCaptureSyncStatus();
+                }
                 Logger.log('[App] completeInitialization:reenter', {
                     currentView: Store.currentView,
                     context: Array.from(SelectionManager.selections.context)
@@ -235,7 +250,12 @@ const App = {
             DocumentView.clearVaultState();
             KanbanView.clearVaultState();
             TimelineView.clearVaultState();
-            this.render();
+            if (!skipRender) {
+                this.render();
+            } else {
+                this.updateCaptureWithVaultName();
+                this._updateCaptureSyncStatus();
+            }
             // Collapse right sidebar on initial load when there are no deadlines
             this._collapseRightIfNoDeadlines();
             Logger.log('[App] completeInitialization:done', {
@@ -261,6 +281,130 @@ const App = {
         const retryBtn = document.getElementById('retryBtn');
         if (retryBtn) {
             retryBtn.addEventListener('click', () => location.reload());
+        }
+    },
+
+    // --- Mobile Fast Path Methods ---
+
+    renderCaptureImmediately() {
+        const container = document.getElementById('viewContainer');
+        if (!container) return;
+
+        Store.currentView = 'capture';
+        CaptureView.renderGrid([]);
+
+        document.getElementById('app')?.classList.remove('no-vault');
+        const fab = document.getElementById('fabNewNote');
+        if (fab) fab.style.display = '';
+
+        this._setupSyncStatusIndicator();
+        if (window.SyncManager) {
+            window.SyncManager._setStatus('syncing', 'Initializing vault...');
+        }
+    },
+
+    async initializeInBackground() {
+        try {
+            if (window.SyncManager) {
+                window.SyncManager._setStatus('syncing', 'Loading vault...');
+            }
+
+            const initialized = await Store.init();
+
+            if (initialized) {
+                this.updateCaptureWithVaultName();
+
+                if (window.SyncManager) {
+                    window.SyncManager._setStatus('syncing', 'Initializing sync...');
+                }
+
+                await GitRemote.init();
+                await SyncManager.init();
+
+                this.setupEventListeners();
+                this.setupMobilePullToRefresh();
+                SelectionManager.init();
+                SelectionManager.updateTagCounts();
+                await AIAssistant.init();
+                this.updateVaultSwitcherName();
+
+                await this.completeInitialization(true);
+
+                this._updateCaptureSyncStatus();
+            } else {
+                this.showManageVaultsModal();
+            }
+        } catch (err) {
+            if (err.needsPermission && err.handle) {
+                this.showReopenPrompt(err.handle);
+            } else {
+                throw err;
+            }
+        }
+    },
+
+    updateCaptureWithVaultName() {
+        const vaultBtn = document.querySelector('.capture-vault-btn');
+        if (vaultBtn && Store.directoryHandle) {
+            const vaultName = Store.directoryHandle.name;
+            const span = vaultBtn.querySelector('span');
+            if (span) span.textContent = vaultName;
+            vaultBtn.removeAttribute('disabled');
+        }
+    },
+
+    _updateCaptureSyncStatus() {
+        const status = SyncManager.getStatus();
+        const captureView = document.querySelector('.capture-view');
+        
+        if (!captureView) return;
+        
+        let syncIndicator = captureView.querySelector('.capture-sync-indicator');
+        if (!syncIndicator) return;
+        
+        if (status.status === 'syncing') {
+            syncIndicator.innerHTML = '<span class="capture-sync-spinner"></span> Syncing...';
+            syncIndicator.className = 'capture-sync-indicator syncing';
+        } else if (status.status === 'error') {
+            syncIndicator.innerHTML = '<span class="capture-sync-error">!</span> Sync failed';
+            syncIndicator.className = 'capture-sync-indicator error';
+        } else if (!status.hasRemote) {
+            syncIndicator.innerHTML = '<span class="capture-sync-ok">✓</span> No remote';
+            syncIndicator.className = 'capture-sync-indicator ok';
+        } else {
+            syncIndicator.innerHTML = '<span class="capture-sync-ok">✓</span> Synced';
+            syncIndicator.className = 'capture-sync-indicator ok';
+        }
+    },
+
+    showErrorOnCapture(error) {
+        const container = document.getElementById('viewContainer');
+        if (!container) return;
+
+        const message = error.message || 'Failed to load vault';
+        const isPermissionError = error.name === 'NotAllowedError' || message.includes('permission');
+
+        container.innerHTML = `
+            <div class="capture-view">
+                <div class="capture-error-overlay">
+                    <div class="capture-error-icon">!</div>
+                    <h3>Unable to load vault</h3>
+                    <p>${escapeHtml(message)}</p>
+                    <button class="capture-error-retry" data-action="retry">Retry</button>
+                    ${isPermissionError ? '<button class="capture-error-picker" data-action="picker">Choose vault</button>' : ''}
+                </div>
+            </div>
+        `;
+
+        container.querySelector('[data-action="retry"]')?.addEventListener('click', () => {
+            this.renderCaptureImmediately();
+            this.initializeInBackground().catch(err => this.showErrorOnCapture(err));
+        });
+
+        if (isPermissionError) {
+            container.querySelector('[data-action="picker"]')?.addEventListener('click', () => {
+                this.showManageVaultsModal();
+            });
         }
     },
 

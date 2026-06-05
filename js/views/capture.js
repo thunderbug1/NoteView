@@ -199,14 +199,19 @@ const CaptureView = {
         methods += `<button class="capture-card" data-method="task">${taskIcon}<span class="capture-card-label">Task</span></button>`;
         methods += `<button class="capture-card" data-method="template">${templateIcon}<span class="capture-card-label">Template</span></button>`;
 
-        const vaultName = Store.directoryHandle ? Store.directoryHandle.name : 'No vault';
+        const vaultName = Store.directoryHandle ? Store.directoryHandle.name : 'Loading vault...';
+        const isVaultReady = !!Store.directoryHandle;
 
         container.innerHTML = `
             <div class="capture-view">
-                <button class="capture-vault-btn" data-action="switch-vault">
+                <button class="capture-vault-btn" data-action="switch-vault" ${!isVaultReady ? 'disabled' : ''}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     <span>${Common.escapeHtml(vaultName)}</span>
+                    <span class="capture-pending-indicator" data-role="pending-count"></span>
                 </button>
+                <div class="capture-sync-indicator" data-role="sync-status">
+                    <span class="capture-sync-spinner"></span> Syncing...
+                </div>
                 <div class="capture-grid">${methods}</div>
                 <button class="capture-browse-btn" data-action="browse">${browseIcon}<span>Browse notes</span></button>
             </div>`;
@@ -219,7 +224,70 @@ const CaptureView = {
         if (browseBtn) browseBtn.addEventListener('click', () => App.setView('document'));
 
         const vaultBtn = container.querySelector('[data-action="switch-vault"]');
-        if (vaultBtn) vaultBtn.addEventListener('click', () => VaultModal.showDropdown(vaultBtn));
+        if (vaultBtn) {
+            if (isVaultReady) {
+                vaultBtn.addEventListener('click', () => VaultModal.showDropdown(vaultBtn));
+            }
+            // Listen for vault to become ready
+            if (!isVaultReady) {
+                const checkVault = setInterval(() => {
+                    if (Store.directoryHandle) {
+                        clearInterval(checkVault);
+                        const btn = container.querySelector('[data-action="switch-vault"]');
+                        const span = btn?.querySelector('span');
+                        if (span) span.textContent = Store.directoryHandle.name;
+                        btn?.removeAttribute('disabled');
+                        btn?.addEventListener('click', () => VaultModal.showDropdown(btn));
+                    }
+                }, 100);
+            }
+        }
+
+        // Listen for pending notes updates
+        window.addEventListener('pending-notes-update', (e) => {
+            const indicator = container.querySelector('.capture-pending-indicator');
+            if (indicator) {
+                if (e.detail.count > 0) {
+                    indicator.textContent = e.detail.count;
+                    indicator.classList.add('visible');
+                } else {
+                    indicator.classList.remove('visible');
+                }
+            }
+        });
+
+        // Initial pending count
+        Store._getQueuedNotesCount().then(count => {
+            const indicator = container.querySelector('.capture-pending-indicator');
+            if (indicator && count > 0) {
+                indicator.textContent = count;
+                indicator.classList.add('visible');
+            }
+        });
+
+        // Add view queued notes button if there are queued notes
+        Store._getQueuedNotesCount().then(async count => {
+            if (count > 0 && !Store.directoryHandle) {
+                const captureView = container.querySelector('.capture-view');
+                if (captureView) {
+                    captureView.insertAdjacentHTML('beforeend', `
+                        <button class="capture-view-queued-btn" data-action="view-queued">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="12" y1="18" x2="12" y2="12"/>
+                                <line x1="9" y1="15" x2="15" y2="15"/>
+                            </svg>
+                            <span>${count} note(s) queued</span>
+                        </button>
+                    `);
+                    
+                    captureView.querySelector('[data-action="view-queued"]')?.addEventListener('click', () => {
+                        this._showQueuedNotesModal(container);
+                    });
+                }
+            }
+        });
     },
 
     // ─── Write Page ────────────────────────────────────
@@ -614,6 +682,83 @@ const CaptureView = {
                     this.render(this._blocks);
                 });
             });
+        });
+    },
+
+    async _showQueuedNotesModal(container) {
+        const notes = await Store.getQueuedNotes();
+        
+        if (notes.length === 0) {
+            Common.showToast('No queued notes');
+            this.renderGrid(container);
+            return;
+        }
+
+        const notesHtml = notes.map((note, i) => {
+            const preview = Common.contentPreview(note.content);
+            const date = new Date(note.timestamp).toLocaleTimeString();
+            return `
+                <div class="queued-note-item" data-note-id="${note.id || i}">
+                    <div class="queued-note-preview">${escapeHtml(preview)}</div>
+                    <div class="queued-note-meta">
+                        <span>${date}</span>
+                        ${note.attempted > 0 ? `<span class="queued-note-failed">Failed ${note.attempted}x</span>` : ''}
+                    </div>
+                    <button class="queued-note-retry" data-note-id="${note.id || i}">Retry</button>
+                    <button class="queued-note-delete" data-note-id="${note.id || i}">Delete</button>
+                </div>
+            `;
+        }).join('');
+
+        const modal = Modal.create({
+            title: `Queued Notes (${notes.length})`,
+            content: `
+                <div class="queued-notes-list">
+                    ${notesHtml}
+                </div>
+                <div class="queued-notes-actions">
+                    <button class="queued-notes-retry-all">Retry All</button>
+                </div>
+            `,
+            width: '500px'
+        });
+
+        modal.querySelectorAll('.queued-note-retry').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const noteId = parseInt(btn.dataset.noteId);
+                const success = await Store.retryQueuedNote(noteId);
+                if (success) {
+                    btn.closest('.queued-note-item').remove();
+                    const remaining = modal.querySelectorAll('.queued-note-item').length;
+                    modal.element.querySelector('.modal-title').textContent = `Queued Notes (${remaining})`;
+                }
+            });
+        });
+
+        modal.querySelectorAll('.queued-note-delete').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const noteId = parseInt(btn.dataset.noteId);
+                await Store.deleteQueuedNote(noteId);
+                btn.closest('.queued-note-item').remove();
+                const remaining = modal.querySelectorAll('.queued-note-item').length;
+                modal.element.querySelector('.modal-title').textContent = `Queued Notes (${remaining})`;
+                this.renderGrid(container);
+            });
+        });
+
+        modal.querySelector('.queued-notes-retry-all')?.addEventListener('click', async () => {
+            const btns = modal.querySelectorAll('.queued-note-retry');
+            for (const btn of btns) {
+                const noteId = parseInt(btn.dataset.noteId);
+                await Store.retryQueuedNote(noteId);
+                btn.closest('.queued-note-item')?.remove();
+            }
+            const remaining = modal.querySelectorAll('.queued-note-item').length;
+            modal.element.querySelector('.modal-title').textContent = `Queued Notes (${remaining})`;
+            this.renderGrid(container);
+            if (remaining === 0) {
+                modal.close();
+            }
         });
     }
 };

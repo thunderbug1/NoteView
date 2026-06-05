@@ -83,6 +83,22 @@ const DocumentView = {
     },
 
     async render(blocks, options = {}) {
+        const container = document.getElementById('viewContainer');
+
+        // Handle vault not loaded state
+        if (!Store.directoryHandle && blocks.length === 0) {
+            container.innerHTML = `
+                <div class="document-empty-vault">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <h3>Vault is loading...</h3>
+                    <p>Your notes will appear shortly.</p>
+                </div>
+            `;
+            return;
+        }
+
         // Flush and commit pending auto-saves before DOM rebuild to prevent stale writes and guarantee data persistence
         await this.flushAllPendingSaves();
 

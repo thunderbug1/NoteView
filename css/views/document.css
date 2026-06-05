@@ -2043,3 +2043,26 @@ body.is-dragging-wikilink * {
     border-color: var(--text-muted);
     color: var(--text-primary);
 }
+
+/* Empty vault state */
+.document-empty-vault {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.document-empty-vault h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.document-empty-vault p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}

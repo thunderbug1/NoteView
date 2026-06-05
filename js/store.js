@@ -30,6 +30,8 @@ const Store = {
     directoryHandle: null,
     contacts: new Map(), // Map of username -> Set of tags
     shortcuts: { newNote: 'Ctrl+Alt+N', aiAssistant: 'Ctrl+Shift+A', contextBack: 'Alt+ArrowLeft', contextForward: 'Alt+ArrowRight', toggleTask: 'Alt+T' },
+    _vaultReady: false, // Flag indicating vault is ready for saves
+    _pendingNotesStore: 'queuedNotes', // IndexedDB store for queued notes
 
     // Cache for filtered blocks
     _filteredBlocksCache: CacheManager.createCache(() => {
@@ -127,6 +129,15 @@ const Store = {
                 if (!db.objectStoreNames.contains('timelineCache')) {
                     db.createObjectStore('timelineCache');
                     Logger.log('Creating timelineCache object store');
+                }
+                // Add store for queued notes (survives crashes/reloads)
+                if (!db.objectStoreNames.contains(this._pendingNotesStore)) {
+                    const store = db.createObjectStore(this._pendingNotesStore, { 
+                        keyPath: 'id',
+                        autoIncrement: true 
+                    });
+                    store.createIndex('timestamp', 'timestamp');
+                    Logger.log('Creating queuedNotes object store');
                 }
             };
 
@@ -305,6 +316,375 @@ const Store = {
         });
     },
 
+    // --- Queued Notes (persist before vault loads) ---
+
+    async _queueNoteInDB(content, options) {
+        if (!await this._ensureDB()) {
+            this._queueNoteInLocalStorage(content, options);
+            return;
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
+                const store = tx.objectStore(this._pendingNotesStore);
+
+                const note = {
+                    content,
+                    options,
+                    timestamp: Date.now(),
+                    attempted: 0
+                };
+
+                const request = store.add(note);
+                request.onsuccess = () => resolve();
+                request.onerror = () => {
+                    console.error('Failed to queue note in DB:', request.error);
+                    this._queueNoteInLocalStorage(content, options);
+                    resolve();
+                };
+
+                tx.onerror = () => {
+                    console.error('Transaction error queuing note:', tx.error);
+                    this._queueNoteInLocalStorage(content, options);
+                    resolve();
+                };
+            } catch (e) {
+                console.error('Exception queuing note:', e);
+                this._queueNoteInLocalStorage(content, options);
+                resolve();
+            }
+        });
+    },
+
+    _queueNoteInLocalStorage(content, options) {
+        try {
+            const queued = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
+            queued.push({
+                content,
+                options,
+                timestamp: Date.now(),
+                attempted: 0
+            });
+            localStorage.setItem('noteview_queued_notes', JSON.stringify(queued));
+            console.warn('Queued note in localStorage (DB unavailable)');
+        } catch (e) {
+            console.error('CRITICAL: Could not queue note anywhere!', e);
+            alert('Warning: Could not save note. Vault not loaded and storage unavailable. Please retry.');
+        }
+    },
+
+    async _flushPendingNotes() {
+        await this._flushNotesFromDB();
+        this._flushNotesFromLocalStorage();
+    },
+
+    async _flushNotesFromDB() {
+        if (!await this._ensureDB()) return;
+
+        return new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
+                const store = tx.objectStore(this._pendingNotesStore);
+                const getAllRequest = store.getAll();
+
+                getAllRequest.onsuccess = async () => {
+                    const notes = getAllRequest.result || [];
+                    if (notes.length === 0) {
+                        resolve();
+                        return;
+                    }
+
+                    let savedCount = 0;
+                    let failedNotes = [];
+
+                    for (const note of notes) {
+                        try {
+                            const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                            const block = {
+                                id,
+                                content: note.content,
+                                tags: note.options.tags || [],
+                                creationDate: new Date(note.timestamp).toISOString(),
+                                lastUpdated: new Date().toISOString(),
+                                ...note.options
+                            };
+                            block.id = id;
+                            block.content = note.content;
+                            if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
+
+                            await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
+                            this.blocks.push(block);
+                            await store.delete(note.id);
+                            savedCount++;
+                        } catch (err) {
+                            console.error('Failed to save queued note:', err);
+                            note.attempted++;
+
+                            if (note.attempted < 3) {
+                                await store.put(note);
+                                failedNotes.push(note);
+                            } else {
+                                await store.put(note);
+                                failedNotes.push(note);
+                            }
+                        }
+                    }
+
+                    tx.oncomplete = () => {
+                        if (savedCount > 0) {
+                            this._filteredBlocksCache.invalidate();
+                            TimelineView.invalidateCache();
+                            SelectionManager.updateTagCounts();
+                            if (window.Common) {
+                                window.Common.showToast(`${savedCount} note(s) saved`);
+                            }
+                        }
+
+                        if (failedNotes.length > 0) {
+                            if (window.Common) {
+                                window.Common.showToast(`${failedNotes.length} note(s) failed to save (will retry)`, {
+                                    duration: 5000
+                                });
+                            }
+                        }
+
+                        this._updatePendingNotesCount();
+                        resolve();
+                    };
+
+                    tx.onerror = () => {
+                        console.error('Transaction error flushing notes:', tx.error);
+                        this._updatePendingNotesCount();
+                        resolve();
+                    };
+                };
+
+                getAllRequest.onerror = () => {
+                    console.error('Failed to get queued notes:', getAllRequest.error);
+                    resolve();
+                };
+            } catch (e) {
+                console.error('Exception flushing notes:', e);
+                resolve();
+            }
+        });
+    },
+
+    _flushNotesFromLocalStorage() {
+        try {
+            const queued = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
+            if (queued.length === 0) return;
+
+            const notesToFlush = [...queued];
+            localStorage.removeItem('noteview_queued_notes');
+
+            let savedCount = 0;
+
+            for (const note of notesToFlush) {
+                try {
+                    if (this.directoryHandle) {
+                        const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                        const block = {
+                            id,
+                            content: note.content,
+                            tags: note.options.tags || [],
+                            creationDate: new Date(note.timestamp).toISOString(),
+                            lastUpdated: new Date().toISOString(),
+                            ...note.options
+                        };
+                        block.id = id;
+                        block.content = note.content;
+                        if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
+
+                        this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
+                        this.blocks.push(block);
+                        savedCount++;
+                    } else {
+                        const remaining = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
+                        remaining.push(note);
+                        localStorage.setItem('noteview_queued_notes', JSON.stringify(remaining));
+                    }
+                } catch (err) {
+                    console.error('Failed to save queued note from localStorage:', err);
+                    const remaining = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
+                    remaining.push(note);
+                    localStorage.setItem('noteview_queued_notes', JSON.stringify(remaining));
+                }
+            }
+
+            if (savedCount > 0) {
+                this._filteredBlocksCache.invalidate();
+                TimelineView.invalidateCache();
+                SelectionManager.updateTagCounts();
+                if (window.Common) {
+                    window.Common.showToast(`${savedCount} note(s) saved`);
+                }
+            }
+        } catch (e) {
+            console.error('Error flushing from localStorage:', e);
+        }
+    },
+
+    async _getQueuedNotesCount() {
+        if (await this._ensureDB()) {
+            try {
+                return new Promise((resolve) => {
+                    const tx = this.db.transaction([this._pendingNotesStore], 'readonly');
+                    const store = tx.objectStore(this._pendingNotesStore);
+                    const countRequest = store.count();
+
+                    countRequest.onsuccess = () => {
+                        let dbCount = countRequest.result || 0;
+
+                        try {
+                            const localCount = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]').length;
+                            resolve(dbCount + localCount);
+                        } catch (e) {
+                            resolve(dbCount);
+                        }
+                    };
+
+                    countRequest.onerror = () => resolve(0);
+                });
+            } catch (e) {
+                try {
+                    return JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]').length;
+                } catch (e2) {
+                    return 0;
+                }
+            }
+        }
+
+        try {
+            return JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]').length;
+        } catch (e) {
+            return 0;
+        }
+    },
+
+    _updatePendingNotesCount(count) {
+        if (count === undefined) {
+            this._getQueuedNotesCount().then(c => {
+                window.dispatchEvent(new CustomEvent('pending-notes-update', {
+                    detail: { count: c }
+                }));
+            });
+        } else {
+            window.dispatchEvent(new CustomEvent('pending-notes-update', {
+                detail: { count }
+            }));
+        }
+    },
+
+    async getQueuedNotes() {
+        const notes = [];
+
+        if (await this._ensureDB()) {
+            try {
+                const dbNotes = await new Promise((resolve) => {
+                    const tx = this.db.transaction([this._pendingNotesStore], 'readonly');
+                    const store = tx.objectStore(this._pendingNotesStore);
+                    const request = store.getAll();
+                    request.onsuccess = () => resolve(request.result || []);
+                    request.onerror = () => resolve([]);
+                });
+                notes.push(...dbNotes);
+            } catch (e) {
+                console.error('Error reading queued notes from DB:', e);
+            }
+        }
+
+        try {
+            const localNotes = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
+            notes.push(...localNotes);
+        } catch (e) {
+            console.error('Error reading queued notes from localStorage:', e);
+        }
+
+        return notes;
+    },
+
+    async retryQueuedNote(noteId) {
+        if (await this._ensureDB()) {
+            try {
+                const note = await new Promise((resolve) => {
+                    const tx = this.db.transaction([this._pendingNotesStore], 'readonly');
+                    const store = tx.objectStore(this._pendingNotesStore);
+                    const request = store.get(noteId);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => resolve(null);
+                });
+
+                if (note) {
+                    try {
+                        const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                        const block = {
+                            id,
+                            content: note.content,
+                            tags: note.options.tags || [],
+                            creationDate: new Date(note.timestamp).toISOString(),
+                            lastUpdated: new Date().toISOString(),
+                            ...note.options
+                        };
+                        block.id = id;
+                        block.content = note.content;
+                        if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
+
+                        await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
+                        this.blocks.push(block);
+
+                        await new Promise((resolve) => {
+                            const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
+                            const store = tx.objectStore(this._pendingNotesStore);
+                            const request = store.delete(noteId);
+                            request.onsuccess = () => resolve();
+                            request.onerror = () => resolve();
+                        });
+
+                        this._filteredBlocksCache.invalidate();
+                        TimelineView.invalidateCache();
+                        SelectionManager.updateTagCounts();
+                        if (window.Common) {
+                            window.Common.showToast('Note saved');
+                        }
+                        this._updatePendingNotesCount();
+                        return true;
+                    } catch (err) {
+                        console.error('Failed to retry note:', err);
+                        if (window.Common) {
+                            window.Common.showToast('Failed to save note');
+                        }
+                        return false;
+                    }
+                }
+            } catch (e) {
+                console.error('Error retrying note:', e);
+            }
+        }
+
+        return false;
+    },
+
+    async deleteQueuedNote(noteId) {
+        if (await this._ensureDB()) {
+            try {
+                await new Promise((resolve) => {
+                    const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
+                    const store = tx.objectStore(this._pendingNotesStore);
+                    const request = store.delete(noteId);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => resolve();
+                });
+                this._updatePendingNotesCount();
+                return true;
+            } catch (e) {
+                console.error('Error deleting queued note:', e);
+            }
+        }
+        return false;
+    },
+
     // Initialize file system access
     async init() {
         if (!this.isSupported()) {
@@ -441,6 +821,9 @@ const Store = {
         }
         await GitStore.init(handle);
         await this.loadBlocks();
+        // Mark vault as ready and flush any queued notes
+        this._vaultReady = true;
+        await this._flushPendingNotes();
         if (RecentAccessTracker) {
             RecentAccessTracker.init(handle.name);
             RecentAccessTracker.prune(this.blocks.map(b => b.id));
@@ -989,6 +1372,17 @@ const Store = {
 
     // Create new block
     async createBlock(content = '', extraMetadata = {}) {
+        // If vault not ready, queue note in IndexedDB for guaranteed persistence
+        if (!this._vaultReady || !this.directoryHandle) {
+            await this._queueNoteInDB(content, extraMetadata);
+            if (window.Common) {
+                window.Common.showToast('Note queued (vault loading...)');
+            }
+            const count = await this._getQueuedNotesCount();
+            this._updatePendingNotesCount(count);
+            return null;
+        }
+
         const id = extraMetadata.id || `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const block = {
             id,
