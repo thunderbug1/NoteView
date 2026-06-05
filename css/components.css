@@ -2001,6 +2001,36 @@
     line-height: 1.35;
 }
 
+.wizard-api-key-field {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.wizard-api-key-field input {
+    flex: 1;
+    min-width: 0;
+}
+
+.wizard-toggle-token-visibility {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.3rem;
+    flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+.wizard-toggle-token-visibility:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
 /* Switch styling */
 .wizard-toggle-sync {
     margin-bottom: 1.5rem;

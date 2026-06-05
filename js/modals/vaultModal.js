@@ -428,17 +428,22 @@ const VaultModal = {
                                     <span class="field-hint">HTTPS URL only (SSH is not supported in the browser).</span>
                                 </div>
                                 
-                                <div class="wizard-form-row">
-                                    <div class="wizard-form-group">
-                                        <label for="wizardGitUser">Username</label>
-                                        <input type="text" id="wizardGitUser" placeholder="github-username">
-                                    </div>
-                                    <div class="wizard-form-group">
-                                        <label for="wizardGitToken">Personal Access Token / Password</label>
-                                        <input type="password" id="wizardGitToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-                                        <span class="field-hint">For GitHub, use a Personal Access Token (PAT) with <b>repo</b> scope.</span>
-                                    </div>
-                                </div>
+                                 <div class="wizard-form-row">
+                                     <div class="wizard-form-group">
+                                         <label for="wizardGitUser">Username</label>
+                                         <input type="text" id="wizardGitUser" placeholder="github-username">
+                                     </div>
+                                     <div class="wizard-form-group">
+                                         <label for="wizardGitToken">Personal Access Token / Password</label>
+                                         <div class="wizard-api-key-field">
+                                             <input type="password" id="wizardGitToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+                                             <button type="button" class="wizard-toggle-token-visibility" id="wizardToggleTokenVisibility" title="Show token">
+                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                             </button>
+                                         </div>
+                                         <span class="field-hint">For GitHub, use a Personal Access Token (PAT) with <b>repo</b> scope.</span>
+                                     </div>
+                                 </div>
 
                                 <div class="wizard-form-group">
                                     <label for="wizardGitProxy">CORS Proxy URL</label>
@@ -447,9 +452,10 @@ const VaultModal = {
                                 </div>
                             </div>
 
-                            <div class="wizard-footer">
+                             <div class="wizard-footer">
                                 <button class="vault-manager-action-btn secondary prev-step-btn" data-prev="1">Back</button>
                                 <button class="vault-manager-action-btn primary" id="wizardStartVerificationBtn">Verify & Create Vault</button>
+                                <button class="vault-manager-action-btn secondary" id="wizardSkipVerificationBtn" style="margin-left:0.5rem">Skip Verification</button>
                             </div>
                         </div>
 
@@ -552,6 +558,23 @@ const VaultModal = {
                 });
             });
 
+            // Toggle token visibility
+            const toggleTokenBtn = wizardModal.querySelector('#wizardToggleTokenVisibility');
+            if (toggleTokenBtn) {
+                toggleTokenBtn.addEventListener('click', () => {
+                    const input = wizardModal.querySelector('#wizardGitToken');
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        toggleTokenBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+                        toggleTokenBtn.title = 'Hide token';
+                    } else {
+                        input.type = 'password';
+                        toggleTokenBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+                        toggleTokenBtn.title = 'Show token';
+                    }
+                });
+            }
+
             // Start verification process
             const verifyBtn = wizardModal.querySelector('#wizardStartVerificationBtn');
             if (verifyBtn) {
@@ -651,14 +674,22 @@ const VaultModal = {
                         Store.directoryHandle = tempHandle;
                         await Store.saveRemoteConfig(remoteConfig);
 
-                        // 4. Test connection via fetch
+                        // 4. Add remote and test connection via fetch
+                        statusMsg.textContent = 'Adding remote repository...';
+                        await GitStore.git.addRemote({
+                            fs: GitStore.fs,
+                            dir: GitStore.dir,
+                            remote: 'origin',
+                            url: gitUrl,
+                            force: true
+                        });
+
                         statusMsg.textContent = 'Connecting to git remote repository...';
                         await GitStore.git.fetch({
                             fs: GitStore.fs,
                             dir: GitStore.dir,
                             http: window.GitHttp,
                             remote: 'origin',
-                            url: gitUrl,
                             corsProxy: gitProxy || undefined,
                             onAuth: () => auth,
                             singleBranch: true,
@@ -813,6 +844,60 @@ const VaultModal = {
                 });
             }
 
+            // Skip verification - create vault without testing connection
+            const skipVerifyBtn = wizardModal.querySelector('#wizardSkipVerificationBtn');
+            if (skipVerifyBtn) {
+                skipVerifyBtn.addEventListener('click', async () => {
+                    const name = wizardModal.querySelector('#wizardVaultName').value.trim();
+                    const gitUrl = wizardModal.querySelector('#wizardGitUrl').value.trim();
+                    const gitUser = wizardModal.querySelector('#wizardGitUser').value.trim();
+                    const gitToken = wizardModal.querySelector('#wizardGitToken').value.trim();
+                    const gitProxy = wizardModal.querySelector('#wizardGitProxy').value.trim();
+
+                    if (!name) {
+                        alert('Please enter a vault name.');
+                        showPanel(1);
+                        return;
+                    }
+
+                    if (!gitUrl) {
+                        alert('Please enter a Git repository URL.');
+                        showPanel(2);
+                        return;
+                    }
+
+                    try {
+                        wizardModal.close();
+                        const container = document.getElementById('viewContainer');
+                        if (container) container.innerHTML = '<div class="loading">Creating browser vault...</div>';
+
+                        // Create OPFS vault
+                        await Store.createOPFSVault(name);
+
+                        // Configure git remote
+                        const auth = (gitUser || gitToken) ? { username: gitUser, password: gitToken } : null;
+                        const remoteConfig = { 
+                            name: 'origin', 
+                            url: gitUrl, 
+                            auth,
+                            sync: {
+                                corsProxy: gitProxy || undefined,
+                                branch: 'main'
+                            }
+                        };
+
+                        await Store.saveRemoteConfig(remoteConfig);
+                        GitRemote.config = remoteConfig;
+
+                        await App.completeInitialization();
+                        VaultModal.updateVaultSwitcherName();
+                    } catch (err) {
+                        console.error('Skip verification error:', err);
+                        App.showError(err.message || 'Failed to create browser vault');
+                    }
+                });
+            }
+
         // Wire Scan QR button inside wizard step 1
         const wizardScanBtn = wizardModal.querySelector('#wizardScanQrBtn');
         if (wizardScanBtn) {
@@ -847,33 +932,83 @@ const VaultModal = {
     },
 
     _normalizeQrData(raw) {
+        if (!raw || typeof raw !== 'string') {
+            return { success: false, error: 'No data provided or invalid data type.' };
+        }
+
         // Try QRTransfer v1 format first
-        if (window.QRTransfer) {
+        if (window.QRTransfer && typeof QRTransfer._validateData === 'function') {
             const v1Data = QRTransfer._validateData(raw);
-            if (v1Data && v1Data.g) {
+            if (v1Data) {
+                if (!v1Data.g) {
+                    return { success: false, error: 'Missing required git configuration. Expected "g" field with git repository details.' };
+                }
+                if (!v1Data.g.u) {
+                    return { success: false, error: 'Missing required git repository URL. Expected "g.u" field.' };
+                }
                 return {
-                    name: v1Data.n || null,
-                    gitUrl: v1Data.g.u || null,
-                    gitUser: v1Data.g.un || null,
-                    gitToken: v1Data.g.pw || null,
-                    gitProxy: v1Data.g.c || null,
-                    enableGit: !!v1Data.g.u
+                    success: true,
+                    data: {
+                        name: v1Data.n || null,
+                        gitUrl: v1Data.g.u || null,
+                        gitUser: v1Data.g.un || null,
+                        gitToken: v1Data.g.pw || null,
+                        gitProxy: v1Data.g.c || null,
+                        enableGit: !!v1Data.g.u
+                    }
                 };
             }
+            // If QRTransfer validation failed, continue to try vault-config format
         }
 
         // Try simplified vault-config format
         let parsed;
-        try { parsed = JSON.parse(raw); } catch { return null; }
-        if (!parsed || parsed.type !== 'vault-config') return null;
+        try { parsed = JSON.parse(raw); } catch (e) {
+            return { success: false, error: 'Invalid JSON syntax: ' + (e.message || 'unknown error') };
+        }
+        if (!parsed) {
+            return { success: false, error: 'Empty JSON data.' };
+        }
+        
+        // Check if this is QRTransfer v1 format (has "v" field)
+        if (parsed.v === 1) {
+            if (!parsed.g) {
+                return { success: false, error: 'Missing required git configuration. Expected "g" field with git repository details.' };
+            }
+            if (!parsed.g.u) {
+                return { success: false, error: 'Missing required git repository URL. Expected "g.u" field.' };
+            }
+            return {
+                success: true,
+                data: {
+                    name: parsed.n || null,
+                    gitUrl: parsed.g.u || null,
+                    gitUser: parsed.g.un || null,
+                    gitToken: parsed.g.pw || null,
+                    gitProxy: parsed.g.c || null,
+                    enableGit: !!parsed.g.u
+                }
+            };
+        }
+        
+        // Check vault-config format
+        if (parsed.type !== 'vault-config') {
+            return { success: false, error: 'Invalid vault configuration. Expected either QRTransfer v1 format (with "v":1) or vault-config format (with "type":"vault-config").' };
+        }
+        if (!parsed.gitUrl) {
+            return { success: false, error: 'Missing required git repository URL. Expected "gitUrl" field.' };
+        }
 
         return {
-            name: parsed.name || null,
-            gitUrl: parsed.gitUrl || null,
-            gitUser: parsed.gitUser || null,
-            gitToken: parsed.gitToken || null,
-            gitProxy: parsed.gitProxy || null,
-            enableGit: !!parsed.gitUrl
+            success: true,
+            data: {
+                name: parsed.name || null,
+                gitUrl: parsed.gitUrl || null,
+                gitUser: parsed.gitUser || null,
+                gitToken: parsed.gitToken || null,
+                gitProxy: parsed.gitProxy || null,
+                enableGit: !!parsed.gitUrl
+            }
         };
     },
 
@@ -890,7 +1025,7 @@ const VaultModal = {
                 <div class="qr-scanner-status" id="qrScannerStatus">Starting camera...</div>
                 <button class="qr-paste-toggle" id="qrPasteToggle">Or paste vault config JSON</button>
                 <div class="qr-paste-area" id="qrPasteArea">
-                    <textarea id="qrPasteInput" rows="5" placeholder='{"type":"vault-config","name":"My Notes","gitUrl":"https://github.com/user/notes.git","gitUser":"user","gitToken":"ghp_xxx"}'></textarea>
+                    <textarea id="qrPasteInput" rows="5" placeholder='{"type":"vault-config","name":"My Notes","gitUrl":"https://github.com/user/notes.git","gitUser":"user","gitToken":"ghp_xxx"}&#10;&#10;Or QRTransfer v1 format:{"v":1,"n":"My Notes","g":{"u":"https://github.com/user/notes.git","un":"user","pw":"token"}}'></textarea>
                     <button class="settings-btn secondary" id="qrPasteApply">Apply</button>
                 </div>
                 <canvas id="qrScannerCanvas" style="display:none"></canvas>
@@ -908,11 +1043,12 @@ const VaultModal = {
         const handleResult = (raw) => {
             if (window.QRTransfer) QRTransfer._stopScanner();
             scannerModal.close();
-            const normalized = VaultModal._normalizeQrData(raw);
-            if (!normalized) {
-                App.showError('QR code does not contain a valid vault configuration.');
+            const result = VaultModal._normalizeQrData(raw);
+            if (!result.success) {
+                App.showError('QR code does not contain a valid vault configuration.\n\nDetails: ' + result.error);
                 return;
             }
+            const normalized = result.data;
             if (targetWizard) {
                 // Populate existing wizard fields
                 const nameInput = targetWizard.querySelector('#wizardVaultName');
@@ -964,7 +1100,24 @@ const VaultModal = {
 
         pasteApply.addEventListener('click', () => {
             const raw = pasteInput.value.trim();
-            if (!raw) return;
+            if (!raw) {
+                App.showError('Please paste vault configuration JSON first.');
+                return;
+            }
+            
+            // Basic validation to catch common mistakes
+            if (!raw.startsWith('{') && !raw.startsWith('[')) {
+                App.showError('Invalid JSON format. JSON must start with { or [\n\nYou pasted: ' + raw.substring(0, 100) + (raw.length > 100 ? '...' : ''));
+                return;
+            }
+            
+            try {
+                JSON.parse(raw);
+            } catch (e) {
+                App.showError('Invalid JSON syntax: ' + (e.message || 'unknown error') + '\n\nYou pasted: ' + raw.substring(0, 200) + (raw.length > 200 ? '...' : ''));
+                return;
+            }
+            
             handleResult(raw);
         });
     }
