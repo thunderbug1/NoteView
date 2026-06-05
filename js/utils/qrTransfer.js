@@ -87,23 +87,35 @@ const QRTransfer = {
         const hasAI = !!data.a;
         const hasSync = !!data.s;
 
-        // Apply git remote config
+        let remoteConfig = await Store.getRemoteConfig() || {};
+
         if (hasGit) {
-            const config = await Store.getRemoteConfig() || {};
-            config.url = data.g.u || config.url;
-            config.name = data.g.n || config.name || 'origin';
-            config.branch = data.g.b || config.branch || 'main';
-            config.auth = {
+            remoteConfig.url = data.g.u || remoteConfig.url;
+            remoteConfig.name = data.g.n || remoteConfig.name || 'origin';
+            remoteConfig.branch = data.g.b || remoteConfig.branch || 'main';
+            remoteConfig.auth = {
                 username: data.g.un || '',
                 password: data.g.pw || ''
             };
-            if (data.g.c !== undefined) config.corsProxy = data.g.c;
-            await Store.saveRemoteConfig(config);
-            GitRemote.config = config;
-            window.GitHttp.setCredentials(config.auth);
+            if (data.g.c !== undefined) remoteConfig.corsProxy = data.g.c;
+
+            await Store.saveRemoteConfig(remoteConfig);
+            GitRemote.config = remoteConfig;
+            window.GitHttp.setCredentials(remoteConfig.auth);
+
+            if (GitStore.git && GitStore.fs && remoteConfig.url) {
+                try {
+                    await GitRemote.setRemote(
+                        remoteConfig.name,
+                        remoteConfig.url,
+                        remoteConfig.auth
+                    );
+                } catch (err) {
+                    console.warn('[QRTransfer] Failed to add remote:', err);
+                }
+            }
         }
 
-        // Apply AI settings
         if (hasAI) {
             await AIAssistant.applyImport({
                 enabled: data.a.e,
@@ -113,7 +125,6 @@ const QRTransfer = {
             });
         }
 
-        // Apply sync settings
         if (hasSync || hasGit) {
             const updates = {};
             if (hasSync) {

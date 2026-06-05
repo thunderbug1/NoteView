@@ -45,13 +45,14 @@ const SyncManager = {
         this._isOnline = navigator.onLine;
         this._setupNetworkListeners();
 
-        // Restore pending count from git state
         if (GitRemote.config) {
             await this._refreshPendingCount();
         }
 
-        if (this._config.autoSync && GitRemote.config) {
-            this._startIntervalSync();
+        if (!window.App || !App._initInProgress) {
+            if (this._config.autoSync && GitRemote.config) {
+                this._startIntervalSync();
+            }
         }
 
         Logger.log('[SyncManager] initialized', {
@@ -79,16 +80,13 @@ const SyncManager = {
 
     async saveConfig(updates) {
         const remoteConfig = await Store.getRemoteConfig() || {};
-        // Merge updates into a copy first
         const newConfig = { ...this._config, ...updates };
         remoteConfig.sync = newConfig;
         await Store.saveRemoteConfig(remoteConfig);
-        // Only update in-memory config after successful persistence
         Object.assign(this._config, updates);
 
-        // Restart interval if settings changed
         this._stopIntervalSync();
-        if (this._config.autoSync && GitRemote.config) {
+        if (this._config.autoSync && GitRemote.config && !App._initInProgress) {
             this._startIntervalSync();
         }
     },
@@ -96,9 +94,17 @@ const SyncManager = {
     // --- Core sync ---
 
     async sync() {
+        if (window.App && App._initInProgress) {
+            this._setStatus('idle', 'Initializing vault...');
+            return false;
+        }
         if (!GitRemote.config) {
             this._setStatus('idle', 'No remote configured');
             return false;
+        }
+        if (!GitRemote.config.name || typeof GitRemote.config.name !== 'string') {
+            this._setStatus('error', 'Remote name is invalid. Please reconfigure in Settings.');
+            throw new Error('Remote name is invalid or missing. Please reconfigure your git remote in Settings.');
         }
         if (!this._isNetworkAvailable()) {
             this._setStatus('idle', 'Offline');
@@ -207,12 +213,14 @@ const SyncManager = {
     },
 
     onTabVisible() {
+        if (window.App && App._initInProgress) return;
         if (this._config.autoSync && GitRemote.config) {
             this._scheduleIdleSync();
         }
     },
 
     onTabHidden() {
+        if (window.App && App._initInProgress) return;
         if (this._syncing || !this._config.autoSync || !GitRemote.config || this._pendingCommits <= 0) return;
         this._syncing = true;
         // Serialize through the same promise chain as sync() to prevent concurrent git operations
@@ -246,6 +254,7 @@ const SyncManager = {
 
     _scheduleIdleSync() {
         if (this._status === 'syncing') return;
+        if (window.App && App._initInProgress) return;
         clearTimeout(this._idleSyncTimer);
         this._idleSyncTimer = setTimeout(() => {
             if (GitRemote.config && this._isNetworkAvailable()) {
@@ -257,6 +266,7 @@ const SyncManager = {
     _startIntervalSync() {
         const minutes = this._config.syncInterval;
         if (!minutes || minutes <= 0) return;
+        if (window.App && App._initInProgress) return;
         this._stopIntervalSync();
         this._syncIntervalId = setInterval(() => {
             if (this._isNetworkAvailable() && GitRemote.config) {

@@ -103,6 +103,9 @@ const GitRemote = {
 
     async push(force = false) {
         if (!this.config) throw new Error('No remote configured');
+        if (!this.config.name || typeof this.config.name !== 'string') {
+            throw new Error('Remote name is invalid or missing. Please reconfigure your git remote in Settings.');
+        }
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
 
@@ -129,6 +132,9 @@ const GitRemote = {
 
     async pull() {
         if (!this.config) throw new Error('No remote configured');
+        if (!this.config.name || typeof this.config.name !== 'string') {
+            throw new Error('Remote name is invalid or missing. Please reconfigure your git remote in Settings.');
+        }
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
         const remoteName = this.config.name;
