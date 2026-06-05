@@ -1051,9 +1051,40 @@ const App = {
             case 'capture':
                 CaptureView.render(blocks);
                 break;
-            case 'settings':
-                SettingsView.render(blocks);
+            case 'settings': {
+                const useWindowSettings = window.SettingsView && typeof window.SettingsView.render === 'function';
+                const useGlobalSettings = typeof SettingsView !== 'undefined' && typeof SettingsView.render === 'function';
+
+                if (useWindowSettings) {
+                    window.SettingsView.render(blocks);
+                } else if (useGlobalSettings) {
+                    SettingsView.render(blocks);
+                } else {
+                    console.error('SettingsView.render not available', {
+                        windowSettingsViewExists: !!window.SettingsView,
+                        windowSettingsViewRenderType: typeof window.SettingsView?.render,
+                        globalSettingsViewExists: typeof SettingsView !== 'undefined',
+                        globalSettingsViewRenderType: typeof SettingsView?.render,
+                        windowSettingsViewKeys: window.SettingsView ? Object.keys(window.SettingsView).slice(0, 5) : null,
+                        allWindowKeys: Object.keys(window).filter(k => k.includes('Settings') || k.includes('View')).slice(0, 10)
+                    });
+
+                    const container = document.getElementById('viewContainer');
+                    if (container) {
+                        container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted)">Settings view loading...</div>';
+
+                        setTimeout(() => {
+                            if (window.SettingsView && typeof window.SettingsView.render === 'function') {
+                                console.log('[App] Retrying SettingsView.render after delay');
+                                window.SettingsView.render(blocks);
+                            } else {
+                                console.error('[App] SettingsView still not available after retry');
+                            }
+                        }, 100);
+                    }
+                }
                 break;
+            }
         }
 
         if (typeof BlockSelector !== 'undefined' && BlockSelector.active) {

@@ -85,7 +85,7 @@ Each view is a global object with a `render(blocks)` method called by `App.rende
 - **`KanbanView`** (`js/views/kanban.js`) — Drag-and-drop task board. Columns map to task states (`[ ]`, `[/]`, `[x]`, `[b]`, `[-]`). Event handling split into `setupCardDragDrop()`, `setupCardClickHandlers()`, `setupMobileInteractions()`, `setupColumnDropTargets()`.
 - **`TimelineView`** (`js/views/timeline.js`) — Git-history-based task timeline. Has its own cache that's invalidated on save/delete.
 - **`HistoryView`** (`js/views/history.js`) — Version browser with side-by-side diff using CodeMirror's merge view.
-- **`SettingsView`** (`js/views/settings.js`) — App configuration: vault info, sync settings, AI model profiles, keyboard shortcut customization. Also provides `openAISettingsModal()` for the AI panel's gear icon (profiles CRUD, presets, import from vault, test connection).
+- **`SettingsView`** (`js/views/settings.js`) — App configuration: vault info, sync settings, AI model profiles, keyboard shortcut customization. Also provides `openAISettingsModal()` for the AI panel's gear icon (profiles CRUD, presets, import from vault, test connection). Includes a "Sync Status" section showing current sync state (from `SyncManager.getStatus()`), last sync time, last error, and a legend explaining all toolbar sync icon variants.
 
 ### Data model
 

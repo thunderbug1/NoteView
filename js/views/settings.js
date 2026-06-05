@@ -31,7 +31,65 @@ const SettingsView = {
         `).join('');
     },
 
+    _renderSyncStatus() {
+        const s = SyncManager.getStatus();
+        const isOffline = !navigator.onLine || s.detail === 'Offline';
+
+        let statusLabel, statusColor, statusIcon, statusDescription;
+
+        if (!s.hasRemote) {
+            statusLabel = 'No Remote';
+            statusColor = 'var(--text-muted)';
+            statusIcon = App._syncIcons.idle;
+            statusDescription = 'No git remote is configured. Tap the cloud icon in the toolbar or go to Git Sync above to set one up.';
+        } else if (isOffline) {
+            statusLabel = 'Offline';
+            statusColor = 'var(--warning-color)';
+            statusIcon = App._syncIcons.idle;
+            statusDescription = 'Your device has no network connection. All changes are saved locally and will sync automatically when you reconnect.';
+        } else if (s.status === 'syncing') {
+            statusLabel = 'Syncing';
+            statusColor = 'var(--accent)';
+            statusIcon = App._syncIcons.syncing;
+            statusDescription = 'Currently pushing or pulling changes from the remote repository.';
+        } else if (s.status === 'error') {
+            statusLabel = 'Error';
+            statusColor = 'var(--danger, #ef4444)';
+            statusIcon = App._syncIcons.error;
+            statusDescription = s.lastError || s.detail || 'Sync failed. Check your remote URL, credentials, and CORS proxy settings.';
+        } else if (s.status === 'conflict') {
+            statusLabel = 'Conflict';
+            statusColor = 'var(--warning-color)';
+            statusIcon = App._syncIcons.conflict;
+            statusDescription = 'Local and remote changes conflict. Use the History view to resolve differences, or force push from Git Sync above.';
+        } else {
+            statusLabel = 'Connected';
+            statusColor = 'var(--text-muted)';
+            statusIcon = App._syncIcons.idle;
+            if (s.pendingCommits > 0) {
+                statusDescription = `${s.pendingCommits} local commit${s.pendingCommits !== 1 ? 's' : ''} not yet pushed. Will sync on next trigger.`;
+            } else {
+                statusDescription = 'Everything is synced.';
+            }
+        }
+
+        const lastSync = s.lastSyncTime ? Common.formatRelativeDate(s.lastSyncTime) : 'Never';
+
+        return `
+            <div class="sync-status-header">
+                <span class="sync-status-icon" style="color:${statusColor};position:relative;display:inline-flex">${statusIcon}</span>
+                <span class="sync-status-label" style="color:${statusColor}">${statusLabel}</span>
+            </div>
+            <p class="sync-status-description">${escapeHtml(statusDescription)}</p>
+            <div class="sync-status-meta">
+                <span>Last sync: ${escapeHtml(lastSync)}</span>
+                ${s.lastError ? `<span class="sync-status-error">Last error: ${escapeHtml(s.lastError)}</span>` : ''}
+            </div>
+        `;
+    },
+
     render(blocks) {
+        console.log('[SettingsView.render] Called with blocks:', blocks);
         const container = document.getElementById('viewContainer');
         if (!container) return;
 
@@ -122,6 +180,44 @@ const SettingsView = {
                             <button id="commitForcePushBtn" class="settings-btn secondary" style="margin-left:0.5rem;color:var(--danger, #ef4444)">
                                 Commit All &amp; Force Push
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Sync Status</h3>
+                    <div class="sync-status-card" id="syncStatusCard">
+                        ${this._renderSyncStatus()}
+                    </div>
+                    <div class="settings-item" style="margin-top:0.75rem">
+                        <div class="settings-item-info">
+                            <label>What do the toolbar icons mean?</label>
+                            <div class="sync-legend">
+                                <div class="sync-legend-row">
+                                    <span class="sync-legend-icon" style="color:var(--text-muted)">${App._syncIcons.idle}</span>
+                                    <span class="sync-legend-text"><strong>Idle</strong> — Connected and synced, or no remote configured.</span>
+                                </div>
+                                <div class="sync-legend-row">
+                                    <span class="sync-legend-icon" style="color:var(--accent)">${App._syncIcons.syncing}</span>
+                                    <span class="sync-legend-text"><strong>Syncing</strong> — Currently pushing or pulling changes.</span>
+                                </div>
+                                <div class="sync-legend-row">
+                                    <span class="sync-legend-icon" style="color:var(--warning-color)">${App._syncIcons.idle}<span class="sync-badge-dot" style="background:var(--warning-color)"></span></span>
+                                    <span class="sync-legend-text"><strong>Offline</strong> — No network. Changes are saved locally and will sync when reconnected.</span>
+                                </div>
+                                <div class="sync-legend-row">
+                                    <span class="sync-legend-icon" style="color:var(--danger,#ef4444)">${App._syncIcons.error}<span class="sync-badge-dot" style="background:var(--danger,#ef4444)"></span></span>
+                                    <span class="sync-legend-text"><strong>Error</strong> — Sync failed. Tap to retry or check the error details above.</span>
+                                </div>
+                                <div class="sync-legend-row">
+                                    <span class="sync-legend-icon" style="color:var(--warning-color)">${App._syncIcons.conflict}<span class="sync-badge-dot" style="background:var(--warning-color)"></span></span>
+                                    <span class="sync-legend-text"><strong>Conflict</strong> — Local and remote changes conflict. Resolve manually via the history view.</span>
+                                </div>
+                                <div class="sync-legend-row">
+                                    <span class="sync-legend-icon" style="color:var(--text-muted)">${App._syncIcons.idle}<span class="sync-badge-dot" style="background:var(--accent)"></span></span>
+                                    <span class="sync-legend-text"><strong>Pending</strong> — Local commits not yet pushed. Will sync on next trigger.</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -954,7 +1050,7 @@ const SettingsView = {
         modal.querySelector('#importConfirmBtn').addEventListener('click', async () => {
             await AIAssistant.applyImport(data);
             modal.close();
-            this.render();
+            this.render(Store.getFilteredBlocks());
             Common.showToast('AI settings imported successfully');
         });
     },
@@ -1422,3 +1518,20 @@ const SettingsView = {
 };
 
 window.SettingsView = SettingsView;
+
+console.log('[SettingsView] Script loaded successfully', {
+    SettingsViewType: typeof SettingsView,
+    RenderType: typeof SettingsView.render,
+    HasRender: typeof SettingsView.render === 'function',
+    WindowSettingsViewType: typeof window.SettingsView,
+    WindowRenderType: typeof window.SettingsView?.render,
+    AllMethods: Object.keys(SettingsView).filter(k => typeof SettingsView[k] === 'function').slice(0, 10)
+});
+
+if (typeof SettingsView.render !== 'function') {
+    console.error('[SettingsView] CRITICAL ERROR: render is not a function!', {
+        SettingsViewKeys: Object.keys(SettingsView),
+        RenderValue: SettingsView.render,
+        RenderType: typeof SettingsView.render
+    });
+}

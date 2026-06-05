@@ -1774,6 +1774,109 @@
     box-shadow: 0 0 4px rgba(0,0,0,0.2);
 }
 
+/* Sync Status Card */
+.sync-status-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 6px);
+    padding: 0.75rem 1rem;
+}
+
+.sync-status-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.sync-status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+.sync-status-icon .sync-badge-dot {
+    position: absolute;
+    top: -1px;
+    right: -3px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
+
+.sync-status-label {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.sync-status-description {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.sync-status-meta {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.sync-status-error {
+    color: var(--danger, #ef4444);
+    word-break: break-word;
+}
+
+/* Sync Legend */
+.sync-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+}
+
+.sync-legend-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+}
+
+.sync-legend-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    position: relative;
+}
+
+.sync-legend-icon .sync-badge-dot {
+    position: absolute;
+    top: 0;
+    right: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
+
+.sync-legend-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.sync-legend-text strong {
+    color: var(--text);
+}
+
 /* Vault Setup Wizard styling */
 .vault-wizard {
     padding: 0.5rem;
