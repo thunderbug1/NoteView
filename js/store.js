@@ -51,7 +51,7 @@ const Store = {
     // IndexedDB for persistence
     db: null,
     DB_NAME: 'NoteViewDB',
-    DB_VERSION: 5,
+    DB_VERSION: 6,
     STORE_NAME: 'handles',
     VIEW_PREFERENCES_STORAGE_KEY: 'noteview-view-preferences',
     CURRENT_VIEW_STORAGE_KEY: 'noteview-current-view',
@@ -328,6 +328,12 @@ const Store = {
             return;
         }
 
+        // Check if store exists
+        if (!this.db.objectStoreNames.contains(this._pendingNotesStore)) {
+            this._queueNoteInLocalStorage(content, options);
+            return;
+        }
+
         return new Promise((resolve, reject) => {
             try {
                 const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
@@ -380,7 +386,7 @@ const Store = {
 
     async _flushPendingNotes() {
         await this._flushNotesFromDB();
-        this._flushNotesFromLocalStorage();
+        await this._flushNotesFromLocalStorage();
     },
 
     async _flushNotesFromDB() {
@@ -388,6 +394,13 @@ const Store = {
 
         return new Promise((resolve, reject) => {
             try {
+                // Check if store exists before accessing
+                if (!this.db.objectStoreNames.contains(this._pendingNotesStore)) {
+                    Logger.log('[Store] queuedNotes store does not exist yet, skipping DB flush');
+                    resolve();
+                    return;
+                }
+
                 const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
                 const store = tx.objectStore(this._pendingNotesStore);
                 const getAllRequest = store.getAll();
@@ -475,7 +488,7 @@ const Store = {
         });
     },
 
-    _flushNotesFromLocalStorage() {
+    async _flushNotesFromLocalStorage() {
         try {
             const queued = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
             if (queued.length === 0) return;
@@ -501,7 +514,7 @@ const Store = {
                         block.content = note.content;
                         if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
 
-                        this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
+                        await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
                         this.blocks.push(block);
                         savedCount++;
                     } else {
@@ -532,6 +545,15 @@ const Store = {
 
     async _getQueuedNotesCount() {
         if (await this._ensureDB()) {
+            // Check if store exists
+            if (!this.db.objectStoreNames.contains(this._pendingNotesStore)) {
+                try {
+                    return JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]').length;
+                } catch (e) {
+                    return 0;
+                }
+            }
+
             try {
                 return new Promise((resolve) => {
                     const tx = this.db.transaction([this._pendingNotesStore], 'readonly');
@@ -585,6 +607,17 @@ const Store = {
         const notes = [];
 
         if (await this._ensureDB()) {
+            // Check if store exists
+            if (!this.db.objectStoreNames.contains(this._pendingNotesStore)) {
+                try {
+                    const localNotes = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
+                    notes.push(...localNotes);
+                } catch (e) {
+                    console.error('Error reading queued notes from localStorage:', e);
+                }
+                return notes;
+            }
+
             try {
                 const dbNotes = await new Promise((resolve) => {
                     const tx = this.db.transaction([this._pendingNotesStore], 'readonly');
@@ -611,6 +644,12 @@ const Store = {
 
     async retryQueuedNote(noteId) {
         if (await this._ensureDB()) {
+            // Check if store exists
+            if (!this.db.objectStoreNames.contains(this._pendingNotesStore)) {
+                console.warn('queuedNotes store does not exist');
+                return false;
+            }
+
             try {
                 const note = await new Promise((resolve) => {
                     const tx = this.db.transaction([this._pendingNotesStore], 'readonly');
@@ -672,6 +711,12 @@ const Store = {
 
     async deleteQueuedNote(noteId) {
         if (await this._ensureDB()) {
+            // Check if store exists
+            if (!this.db.objectStoreNames.contains(this._pendingNotesStore)) {
+                console.warn('queuedNotes store does not exist');
+                return false;
+            }
+
             try {
                 await new Promise((resolve) => {
                     const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
@@ -1826,19 +1871,24 @@ const Store = {
         
         if (await this._ensureDB()) {
             try {
-                const tx = this.db.transaction([cacheStore], 'readonly');
-                const store = tx.objectStore(cacheStore);
-                const req = store.openCursor(IDBKeyRange.bound(vaultPrefix, vaultPrefix + '\uffff'));
-                await new Promise(resolve => {
-                    req.onsuccess = (e) => {
-                        const cursor = e.target.result;
-                        if (cursor) {
-                            metadataCache.set(cursor.key.replace(vaultPrefix, ''), cursor.value);
-                            cursor.continue();
-                        } else resolve();
-                    };
-                    req.onerror = () => resolve();
-                });
+                // Check if store exists before accessing
+                if (!this.db.objectStoreNames.contains(cacheStore)) {
+                    console.warn('[Store] metadataCache store does not exist yet');
+                } else {
+                    const tx = this.db.transaction([cacheStore], 'readonly');
+                    const store = tx.objectStore(cacheStore);
+                    const req = store.openCursor(IDBKeyRange.bound(vaultPrefix, vaultPrefix + '\uffff'));
+                    await new Promise(resolve => {
+                        req.onsuccess = (e) => {
+                            const cursor = e.target.result;
+                            if (cursor) {
+                                metadataCache.set(cursor.key.replace(vaultPrefix, ''), cursor.value);
+                                cursor.continue();
+                            } else resolve();
+                        };
+                        req.onerror = () => resolve();
+                    });
+                }
             } catch (e) { console.warn('Failed to load metadata cache:', e); }
         }
 

@@ -296,7 +296,7 @@ const App = {
         if (!container) return;
 
         Store.currentView = 'capture';
-        CaptureView.render([]);
+        CaptureView.renderGrid(container);
 
         document.getElementById('app')?.classList.remove('no-vault');
         const fab = document.getElementById('fabNewNote');

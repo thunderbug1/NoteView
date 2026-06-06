@@ -113,7 +113,6 @@ const DocumentView = {
         // Clean up mobile keyboard handler before DOM rebuild
         this.cleanupMobileKeyboardHandler();
 
-        const container = document.getElementById('viewContainer');
         container.className = 'document-view';
 
         // Wait for CodeMirror to be loaded
