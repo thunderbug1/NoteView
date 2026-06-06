@@ -131,6 +131,12 @@ const HistoryView = {
         if (!container) return;
         container.innerHTML = '';
 
+        await DocumentView.waitForCodeMirror();
+        if (!window.CodeMirror?.EditorView) {
+            container.innerHTML = '<div style="padding:2rem;color:var(--text-secondary)">Failed to load editor. Please try again.</div>';
+            return;
+        }
+
         const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
 
         this.editorView = new EditorView({

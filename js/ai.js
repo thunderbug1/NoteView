@@ -3,7 +3,7 @@
  * Right-side chat panel with multiple concurrent chats, context management,
  * and Transform/Ask modes. Integrates OpenAI-compatible LLM endpoints.
  */
-const AIAssistant = {
+const AIAssistantReal = {
     // State
     enabled: false,
     profiles: [],
@@ -2178,4 +2178,7 @@ const AIAssistant = {
     }
 };
 
-window.AIAssistant = AIAssistant;
+window.AIAssistantReal = AIAssistantReal;
+
+// Dispatch event to notify stub that the real module is loaded
+window.dispatchEvent(new Event('AIAssistantLoaded'));

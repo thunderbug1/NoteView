@@ -652,6 +652,8 @@ const VaultModal = {
                         // 3. Configure Git credentials & remote URL
                         statusMsg.textContent = 'Setting up credentials...';
                         const auth = (gitUser || gitToken) ? { username: gitUser, password: gitToken } : null;
+
+                        await GitStore._loadGitLibs();
                         
                         // Set credentials in window.GitHttp directly so connection can check it
                         window.GitHttp.clearCredentials();

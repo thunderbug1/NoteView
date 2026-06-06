@@ -263,14 +263,15 @@
 
     <!-- Libraries -->
     <script src="vendor/marked.js"></script>
-    <script src="vendor/isomorphic-git.js"></script>
-    <script src="vendor/isomorphic-git-http.js"></script>
+    <!-- Git Libraries - Loaded dynamically when needed -->
+    <!-- <script src="vendor/isomorphic-git.js"></script> -->
+    <!-- <script src="vendor/isomorphic-git-http.js"></script> -->
     <script src="vendor/qrcode-generator.js"></script>
     <script src="vendor/jsQR.js"></script>
     <script src="vendor/lz-string.js"></script>
 
-    <!-- CodeMirror 6 for Live Preview Markdown Editing -->
-    <script src="vendor/codemirror.js"></script>
+    <!-- CodeMirror 6 for Live Preview Markdown Editing - Loaded dynamically when needed -->
+    <!-- <script src="vendor/codemirror.js"></script> -->
 
     <!-- App Scripts -->
     <script src="js/gitFs.js"></script>
@@ -312,7 +313,9 @@
     <script src="js/views/kanban.js"></script>
     <script src="js/views/settings.js"></script>
     <script src="js/views/capture.js"></script>
-    <script src="js/ai.js"></script>
+    <!-- AI Module Stub - Full module loaded lazily when AI panel is opened -->
+    <script src="js/ai-stub.js"></script>
+    <!-- <script src="js/ai.js"></script> -->
 
     <script src="js/modals/tagModal.js"></script>
     <script src="js/modals/assigneeModal.js"></script>

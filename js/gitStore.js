@@ -6,8 +6,60 @@ const GitStore = {
         name: 'NoteView User',
         email: 'user@noteview.local'
     },
+    _gitLoading: null,
+    
+    async _loadGitLibs() {
+        if (window.git && window.GitHttp) {
+            return;
+        }
+
+        if (this._gitLoading) {
+            return this._gitLoading;
+        }
+
+        this._gitLoading = (async () => {
+            try {
+                await this._loadScript('vendor/isomorphic-git.js');
+                await this._loadScript('vendor/isomorphic-git-http.js');
+                this._gitLoading = null;
+                console.log('Git libraries loaded successfully');
+            } catch (err) {
+                this._gitLoading = null;
+                throw err;
+            }
+        })();
+
+        return this._gitLoading;
+    },
+
+    async _loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            
+            const timeout = setTimeout(() => {
+                reject(new Error(`Timeout loading ${src}`));
+            }, 10000);
+
+            script.onload = () => {
+                clearTimeout(timeout);
+                resolve();
+            };
+
+            script.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error(`Failed to load ${src}`));
+            };
+
+            document.head.appendChild(script);
+        });
+    },
     
     async init(directoryHandle) {
+        // Lazy load git libraries
+        await this._loadGitLibs();
+        
         if (!window.git) {
             console.error('isomorphic-git not loaded');
             return false;
@@ -158,7 +210,28 @@ const GitStore = {
             const logOpts = { fs: this.fs, dir: this.dir };
             if (maxCount) logOpts.depth = maxCount;
             if (ref) logOpts.ref = ref;
+            console.log('[gitStore] getFullHistory called', { maxCount, depth: logOpts.depth, ref: logOpts.ref, dir: this.dir });
             const commits = await this.git.log(logOpts);
+            console.log('[gitStore] getFullHistory result', { requestedDepth: maxCount, returned: commits.length });
+
+            // If depth was requested but we got fewer commits, and we're not using
+            // a ref (i.e. walking from HEAD), try without depth to get the full count.
+            // This works around potential issues with the depth parameter in some
+            // versions of isomorphic-git.
+            if (maxCount && maxCount > commits.length && !ref) {
+                const allLogOpts = { fs: this.fs, dir: this.dir };
+                const allCommits = await this.git.log(allLogOpts);
+                console.log('[gitStore] getFullHistory unlimited fallback', { withDepth: commits.length, withoutDepth: allCommits.length });
+                if (allCommits.length > commits.length) {
+                    return allCommits.map(c => ({
+                        oid: c.oid,
+                        message: c.commit.message,
+                        timestamp: c.commit.author.timestamp * 1000,
+                        author: c.commit.author.name,
+                        parents: c.commit.parent
+                    }));
+                }
+            }
             
             return commits.map(c => ({
                 oid: c.oid,

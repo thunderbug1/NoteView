@@ -44,6 +44,31 @@ class GitFSAdapter {
     get promises() {
         const self = this;
         return {
+            async read(path, options) {
+                const handle = await self._resolvePath(path, false, true);
+                const file = await handle.getFile();
+                // Support byte-range reads for pack file slicing
+                if (options && (options.offset !== undefined || options.length !== undefined)) {
+                    const start = options.offset || 0;
+                    const end = options.length ? start + options.length : undefined;
+                    const slice = file.slice(start, end);
+                    const buffer = await slice.arrayBuffer();
+                    console.log('[GitFS] read range', { path, offset: start, length: options.length, size: buffer.byteLength });
+                    return new Uint8Array(buffer);
+                }
+                // Full file read
+                const buffer = await file.arrayBuffer();
+                const uint8 = new Uint8Array(buffer);
+                if (typeof options === 'string') options = { encoding: options };
+                if (options?.encoding === 'utf8') {
+                    return new TextDecoder().decode(uint8);
+                }
+                if (path.includes('/pack/') || path.includes('/objects/')) {
+                    console.log('[GitFS] readFile (git object)', { path, size: buffer.byteLength });
+                }
+                return uint8;
+            },
+
             async readFile(path, options) {
                 const handle = await self._resolvePath(path, false, true);
                 const file = await handle.getFile();
@@ -53,6 +78,9 @@ class GitFSAdapter {
                 if (typeof options === 'string') options = { encoding: options };
                 if (options?.encoding === 'utf8') {
                     return new TextDecoder().decode(uint8);
+                }
+                if (path.includes('/objects/')) {
+                    console.log('[GitFS] readFile object', { path, size: buffer.byteLength });
                 }
                 return uint8;
             },
@@ -149,6 +177,9 @@ class GitFSAdapter {
                     const entries = [];
                     for await (const name of handle.keys()) {
                         entries.push(name);
+                    }
+                    if (path.includes('/objects/pack')) {
+                        console.log('[GitFS] readdir pack', { path, entries, count: entries.length });
                     }
                     return entries;
                 } catch (e) {

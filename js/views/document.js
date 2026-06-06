@@ -536,22 +536,71 @@ const DocumentView = {
         this.handleSplitNote(view, line.from, line.to);
     },
 
-    waitForCodeMirror() {
-        return new Promise((resolve) => {
-            if (window.CodeMirrorReady) {
-                return resolve();
-            }
+    // Track CodeMirror loading state
+    _codeMirrorLoading: null,
+
+    async waitForCodeMirror() {
+        if (window.CodeMirrorReady) {
+            return;
+        }
+
+        // Show loading state
+        const container = document.getElementById('viewContainer');
+        if (container && !container.querySelector('.codemirror-loading')) {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'codemirror-loading';
+            loadingDiv.innerHTML = '<div class="loading-spinner"></div><p>Loading editor...</p>';
+            container.appendChild(loadingDiv);
+        }
+
+        // Start loading if not already in progress
+        if (!this._codeMirrorLoading) {
+            this._codeMirrorLoading = (async () => {
+                try {
+                    await this._loadCodeMirror();
+                } catch (err) {
+                    this._codeMirrorLoading = null;
+                    console.error('Failed to load CodeMirror:', err);
+                    throw err;
+                }
+            })();
+        }
+
+        try {
+            await this._codeMirrorLoading;
+        } finally {
+            // Remove loading indicator
+            const loadingEl = container?.querySelector('.codemirror-loading');
+            if (loadingEl) loadingEl.remove();
+        }
+    },
+
+    async _loadCodeMirror() {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'vendor/codemirror.js';
+            script.async = true;
             
-            // Safety timeout to prevent app hang if dependency fails to load
             const timeout = setTimeout(() => {
-                console.warn('CodeMirror failed to load within 5s');
-                resolve();
-            }, 5000);
-            
-            window.addEventListener('CodeMirrorReady', () => {
+                reject(new Error('CodeMirror loading timeout'));
+            }, 10000);
+
+            script.onload = () => {
                 clearTimeout(timeout);
-                resolve();
-            }, { once: true });
+                // Wait for CodeMirrorReady event to be dispatched
+                if (window.CodeMirrorReady) {
+                    resolve();
+                } else {
+                    window.addEventListener('CodeMirrorReady', resolve, { once: true });
+                }
+            };
+
+            script.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error('Failed to load CodeMirror script'));
+            };
+
+            document.head.appendChild(script);
         });
     },
 

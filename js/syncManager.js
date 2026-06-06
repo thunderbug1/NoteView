@@ -394,6 +394,7 @@ const SyncManager = {
     },
 
     async _forcePush() {
+        if (!GitStore.git || !GitStore.fs) return;
         try {
             const { git, fs, dir } = GitStore;
             const ref = this._config.branch || 'main';
@@ -435,6 +436,7 @@ const SyncManager = {
         // The failed pull may have left the index/working tree in a dirty merged state.
         // Reset to local HEAD so we can analyze cleanly.
         try {
+            if (!GitStore.git || !GitStore.fs) return;
             const { git, fs, dir } = GitStore;
             const ref = this._config.branch || 'main';
             await git.checkout({ fs, dir, ref, force: true });
@@ -472,6 +474,7 @@ const SyncManager = {
     },
 
     async _detectConflicts() {
+        if (!GitStore.git || !GitStore.fs) return null;
         const { git, fs, dir } = GitStore;
         const ref = this._config.branch || 'main';
         const remoteName = GitRemote.config.name;
@@ -677,6 +680,7 @@ const SyncManager = {
     },
 
     async _applyMergeResolution(conflictData) {
+        if (!GitStore.git || !GitStore.fs) return;
         const { git, fs, dir } = GitStore;
         const { files, localOid, remoteOid } = conflictData;
         const ref = this._config.branch || 'main';
@@ -976,6 +980,7 @@ const SyncManager = {
 
 
     async _showOverwriteHelp(err) {
+        if (!GitStore.git || !GitStore.fs) return;
         const filepaths = err.data?.filepaths || [];
         const { git, fs, dir } = GitStore;
         const ref = this._config.branch || 'main';
@@ -1123,6 +1128,12 @@ const SyncManager = {
             keepBtn.disabled = true;
             pullBtn.querySelector('div:first-child').textContent = 'Pulling...';
             try {
+                if (!GitStore.git || !GitStore.fs) {
+                    showToast('Git not initialized. Please reopen the vault.');
+                    pullBtn.disabled = false;
+                    keepBtn.disabled = false;
+                    return;
+                }
                 const { git, fs, dir } = GitStore;
                 const ref = this._config.branch || 'main';
                 const remoteName = GitRemote.config.name;
@@ -1168,6 +1179,12 @@ const SyncManager = {
             pullBtn.disabled = true;
             keepBtn.querySelector('div:first-child').textContent = 'Saving...';
             try {
+                if (!GitStore.git || !GitStore.fs) {
+                    showToast('Git not initialized. Please reopen the vault.');
+                    keepBtn.disabled = false;
+                    pullBtn.disabled = false;
+                    return;
+                }
                 const { git, fs, dir } = GitStore;
                 const ref = this._config.branch || 'main';
                 const remoteName = GitRemote.config.name;

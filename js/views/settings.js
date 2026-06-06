@@ -1247,7 +1247,7 @@ const SettingsView = {
                 try {
                     await Store.saveRemoteConfig({});
                     GitRemote.config = null;
-                    window.GitHttp.clearCredentials();
+                    if (window.GitHttp) window.GitHttp.clearCredentials();
                     await SyncManager.saveConfig({ autoSync: false });
                     SyncManager._setStatus('idle', 'No remote configured');
                 } catch (err) {

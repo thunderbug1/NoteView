@@ -90,6 +90,7 @@ const QRTransfer = {
         let remoteConfig = await Store.getRemoteConfig() || {};
 
         if (hasGit) {
+            await GitStore._loadGitLibs();
             remoteConfig.url = data.g.u || remoteConfig.url;
             remoteConfig.name = data.g.n || remoteConfig.name || 'origin';
             remoteConfig.branch = data.g.b || remoteConfig.branch || 'main';

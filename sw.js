@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v48';
+const CACHE_NAME = 'noteview-v49';
 
 const PRECACHE_URLS = [
   './',
@@ -35,6 +35,7 @@ const PRECACHE_URLS = [
   './js/undoRedoManager.js',
   './js/store.js',
   './js/selectionManager.js',
+  './js/ai-stub.js',
   './js/ai.js',
   './js/blockSelector.js',
   './js/modals/tagModal.js',
@@ -74,9 +75,9 @@ const PRECACHE_URLS = [
   './js/utils/logger.js',
 ];
 
-function shouldUseNetworkFirst(request) {
+function shouldUseCacheFirst(request) {
   if (request.mode === 'navigate') {
-    return true;
+    return false;
   }
 
   const destination = request.destination;
@@ -104,28 +105,28 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET and cross-origin requests
   if (event.request.method !== 'GET' || url.origin !== location.origin) return;
 
-  if (shouldUseNetworkFirst(event.request)) {
+  if (shouldUseCacheFirst(event.request)) {
+    // Cache-first strategy with background update
     event.respondWith(
-      fetch(event.request, { cache: 'no-cache' })
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(event.request);
-          if (cached) {
+      caches.match(event.request).then((cached) => {
+        // Return cached version immediately
+        const fetchPromise = fetch(event.request, { cache: 'no-cache' })
+          .then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              // Update cache in background
+              event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)));
+            }
+            return response;
+          })
+          .catch(() => {
+            // Network failed, return cached version
             return cached;
-          }
+          });
 
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-
-          throw new Error(`No cached response for ${event.request.url}`);
-        })
+        // Return cached version immediately, or fall back to network
+        return cached || fetchPromise;
+      })
     );
     return;
   }

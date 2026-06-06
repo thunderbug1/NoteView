@@ -7,6 +7,7 @@ const GitRemote = {
     _syncing: false,
 
     async init() {
+        await GitStore._loadGitLibs();
         this.config = await Store.getRemoteConfig();
         if (this.config) {
             window.GitHttp.setCredentials(this.config.auth);
@@ -106,6 +107,7 @@ const GitRemote = {
         if (!this.config.name || typeof this.config.name !== 'string') {
             throw new Error('Remote name is invalid or missing. Please reconfigure your git remote in Settings.');
         }
+        if (!GitStore.git || !GitStore.fs) throw new Error('Git not initialized');
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
 
@@ -135,6 +137,7 @@ const GitRemote = {
         if (!this.config.name || typeof this.config.name !== 'string') {
             throw new Error('Remote name is invalid or missing. Please reconfigure your git remote in Settings.');
         }
+        if (!GitStore.git || !GitStore.fs) throw new Error('Git not initialized');
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
         const remoteName = this.config.name;
@@ -260,6 +263,7 @@ const GitRemote = {
 
     async getStatus() {
         if (!this.config) return { hasRemote: false };
+        if (!GitStore.git || !GitStore.fs) return { hasRemote: false };
         const { git, fs, dir } = GitStore;
         const ref = (window.SyncManager && SyncManager._config?.branch) || 'main';
 

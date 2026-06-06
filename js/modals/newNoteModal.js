@@ -68,7 +68,7 @@ const NewNoteModal = {
         const buttons = modal.querySelectorAll('.creation-btn');
         buttons.forEach(b => { b.disabled = locked; });
         const view = DocumentView.editors.get(blockId);
-        if (view && view.dom) {
+        if (view && view.dom && window.CodeMirror?.EditorView) {
             try {
                 const { EditorView, EditorState } = window.CodeMirror;
                 view.dispatch({ effects: [EditorView.editable.of(!locked), EditorState.readOnly.of(locked)] });

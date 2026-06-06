@@ -888,7 +888,9 @@ const Store = {
             await GitStore.init(handle);
             await this._setGitInitialized(handle.name);
         } else {
-            // Just set up the adapter without re-running git init
+            // Just set up the adapter without re-running git init,
+            // but ensure git libs are loaded (they're lazy now)
+            await GitStore._loadGitLibs();
             if (window.git) {
                 const adapter = new window.GitFSAdapter(handle);
                 GitStore.fs = adapter.promises;

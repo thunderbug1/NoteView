@@ -10,7 +10,9 @@ const TimelineView = {
     BATCH_SIZE: 50,
     _allCommits: [],
     _loadMoreHandler: null,
+    _loadingMore: false,
     _hasMore: false,
+    _totalCommitsFetched: 0,
     _startIdx: 0,
     _prevAllTasks: new Map(),
     _prevFileSet: new Map(),
@@ -74,6 +76,8 @@ const TimelineView = {
         this._rawDataCache.events = [];
         this._allCommits = [];
         this._hasMore = false;
+        this._loadingMore = false;
+        this._totalCommitsFetched = 0;
         this._startIdx = 0;
         this._prevAllTasks = new Map();
         this._prevFileSet = new Map();
@@ -86,7 +90,9 @@ const TimelineView = {
         this._allCollapsed = false;
         this._allCommits = [];
         this._loadMoreHandler = null;
+        this._loadingMore = false;
         this._hasMore = false;
+        this._totalCommitsFetched = 0;
         this._startIdx = 0;
         this._prevAllTasks = new Map();
         this._prevFileSet = new Map();
@@ -430,12 +436,25 @@ const TimelineView = {
     },
 
     async _buildTimelineInternal() {
+        // Ensure git libraries are loaded (idempotent)
+        await GitStore._loadGitLibs();
+
         // Quick HEAD check to potentially skip the full git log walk
         const cached = await this._restoreFromDB();
         const currentHeadOid = await this._resolveHead();
 
+        console.log('[Timeline] build start', {
+            hasDBCache: !!cached,
+            dbHeadOid: cached?.headOid,
+            currentHeadOid,
+            dbEventCount: cached?.events?.length,
+            rawCacheHeadOid: this._rawDataCache.headOid,
+            rawCacheEventCount: this._rawDataCache.events.length,
+            gitLoaded: !!(GitStore.git && GitStore.fs)
+        });
+
         if (cached && currentHeadOid && cached.headOid === currentHeadOid) {
-            Logger.log('Timeline: cache hit (HEAD unchanged)');
+            console.log('[Timeline] DB cache hit (HEAD unchanged)');
             this._rawDataCache.headOid = currentHeadOid;
             this._rawDataCache.events = cached.events;
             this._hasMore = false; // Cached full history
@@ -451,14 +470,43 @@ const TimelineView = {
             return cached.events;
         }
 
+        // In-memory cache check: preserve events loaded via loadMore() across re-renders
+        if (this._rawDataCache.events.length > 0 && currentHeadOid && this._rawDataCache.headOid === currentHeadOid) {
+            console.log('[Timeline] in-memory cache hit (HEAD unchanged)', {
+                eventCount: this._rawDataCache.events.length,
+                hasMore: this._hasMore
+            });
+
+            const commits = await GitStore.getFullHistory(500);
+            if (commits.length > 0) {
+                const unpushedOids = await this._getUnpushedOids(commits);
+                for (const event of this._rawDataCache.events) {
+                    event.unpushed = unpushedOids.has(event.oid);
+                }
+            }
+            return this._rawDataCache.events;
+        }
+
         // Fresh build: Get only the most recent batch of commits
         // We fetch BATCH_SIZE + 1 so the last one can serve as the baseline
+        console.log('[Timeline] starting fresh build from git');
         const recentCommits = await GitStore.getFullHistory(this.BATCH_SIZE + 1);
-        if (recentCommits.length === 0) return [];
+        if (recentCommits.length === 0) {
+            console.log('[Timeline] fresh build — no commits returned');
+            return [];
+        }
 
         this._rawDataCache.headOid = currentHeadOid;
         this._rawDataCache.events = [];
-        this._hasMore = recentCommits.length > this.BATCH_SIZE;
+        this._totalCommitsFetched = recentCommits.length;
+        this._hasMore = recentCommits.length >= this.BATCH_SIZE + 1;
+
+        console.log('[Timeline] fresh build batch', {
+            commitsTotal: recentCommits.length,
+            totalSoFar: this._totalCommitsFetched,
+            batchSize: this.BATCH_SIZE,
+            hasMore: this._hasMore
+        });
         
         // chronological = [C_oldest_in_batch, ..., C_newest_in_batch]
         const chronological = [...recentCommits].reverse();
@@ -478,7 +526,7 @@ const TimelineView = {
             startIdx = 1; // Start processing events from the next commit
         }
 
-        Logger.log('Timeline: building first batch (newest first)');
+        console.log('[Timeline] building first batch (newest first)');
         for (let i = startIdx; i < chronological.length; i++) {
             const commit = chronological[i];
             const parentCommit = i > 0 ? chronological[i - 1] : null;
@@ -500,97 +548,137 @@ const TimelineView = {
             event.unpushed = unpushedOids.has(event.oid);
         }
 
+        // Persist to DB when all commits fit in one batch
+        if (!this._hasMore) {
+            const frontierSnapshot = { tasks: this._prevAllTasks, fileSet: this._prevFileSet };
+            this._persistToDB(eventsReversed, frontierSnapshot, this._rawDataCache.headOid).catch(e =>
+                console.warn('Timeline: failed to persist cache:', e)
+            );
+        }
+
         return eventsReversed;
     },
 
     /**
      * Load the next batch of commits and append to the timeline.
+     * Fetches from HEAD with increasing depth rather than using a raw OID
+     * as ref, which can follow the wrong parent chain on merge commits.
      */
     async loadMore() {
         if (!this._hasMore || this._rawDataCache.events.length === 0) return;
-        
-        // Find the oldest commit we have processed so far
-        const oldestEvent = this._rawDataCache.events[this._rawDataCache.events.length - 1];
-        const oldestOid = oldestEvent.oid;
-        
-        // Find the parent of that oldest commit to start our next batch
-        const oldestCommitRaw = (await GitStore.getFullHistory(1, oldestOid))[0];
-        if (!oldestCommitRaw || !oldestCommitRaw.parents || oldestCommitRaw.parents.length === 0) {
-            this._hasMore = false;
-            await this.render(Store.getFilteredBlocks());
+        if (this._loadingMore) {
+            console.log('[Timeline] loadMore already in progress, skipping');
             return;
         }
+        this._loadingMore = true;
 
-        const parentOid = oldestCommitRaw.parents[0];
-        
-        // Fetch next batch starting from that parent
-        const nextBatch = await GitStore.getFullHistory(this.BATCH_SIZE + 1, parentOid);
-        if (nextBatch.length === 0) {
-            this._hasMore = false;
-            await this.render(Store.getFilteredBlocks());
-            return;
+        try {
+            await GitStore._loadGitLibs();
+            
+            // Fetch totalCommitsFetched + batchSize + 1 commits from HEAD.
+            // This avoids using 'ref' with a raw OID (which can mis-walk parent chains).
+            // We skip the first totalCommitsFetched we've already processed.
+            const fetchDepth = this._totalCommitsFetched + this.BATCH_SIZE + 1;
+            console.log('[Timeline] loadMore fetching from HEAD', { totalFetched: this._totalCommitsFetched, fetchDepth });
+            const allCommits = await GitStore.getFullHistory(fetchDepth);
+            
+            if (allCommits.length <= this._totalCommitsFetched) {
+                // No more commits to process — we've reached the beginning
+                console.log('[Timeline] loadMore — no more commits beyond', allCommits.length);
+                this._hasMore = false;
+                await this.render(Store.getFilteredBlocks());
+                return;
+            }
+
+            // New commits: the excess beyond what we've already seen
+            // allCommits is newest-first. Index _totalCommitsFetched starts the new range.
+            const nextBatch = allCommits.slice(this._totalCommitsFetched);
+            this._totalCommitsFetched = allCommits.length;
+            this._hasMore = nextBatch.length >= this.BATCH_SIZE + 1;
+
+            console.log('[Timeline] loadMore batch', {
+                commitsInBatch: nextBatch.length,
+                totalFetched: this._totalCommitsFetched,
+                hasMore: this._hasMore,
+                totalEventsSoFar: this._rawDataCache.events.length
+            });
+
+            // chronological = [C_oldest_new, ..., C_newest_new] (oldest first)
+            const chronological = [...nextBatch].reverse();
+            
+            // Determine the parent commit for the first new commit in our window.
+            // If there are more commits beyond this batch, chronological[0] serves
+            // as the baseline (we establish state but skip events). Otherwise,
+            // we need to find the parent of chronological[0] from the already-known
+            // commits (specifically, the next newest commit after chronological[N-1]
+            // would be allCommits[_totalCommitsFetchedOld] which is the newest of
+            // the previously-processed commits).
+            let batchPrevTasks = new Map();
+            let batchPrevFileSet = new Map();
+            const newEvents = [];
+
+            let startIdx = 0;
+            if (this._hasMore) {
+                // Use the oldest new commit as baseline — processCommit returns state but no events
+                const baselineCommit = chronological[0];
+                const { tasks, fileSet } = await this._processCommit(baselineCommit, new Map(), new Map(), null);
+                batchPrevTasks = tasks;
+                batchPrevFileSet = fileSet;
+                startIdx = 1;
+            }
+
+            console.log('[Timeline] loadMore processing commits', { startIdx, chronologicalLength: chronological.length });
+            for (let i = startIdx; i < chronological.length; i++) {
+                const commit = chronological[i];
+                const parentCommit = i > 0 ? chronological[i - 1] : null;
+                const { tasks, fileSet, events } = await this._processCommit(
+                    commit, batchPrevTasks, batchPrevFileSet, parentCommit
+                );
+                newEvents.push(...events);
+                batchPrevTasks = tasks;
+                batchPrevFileSet = fileSet;
+            }
+
+            console.log('[Timeline] loadMore got events', { newEventCount: newEvents.length });
+
+            // Prepend new events (older) to the end of our newest-first list
+            const olderEvents = newEvents.reverse();
+            this._rawDataCache.events.push(...olderEvents);
+            
+            // Update unpushed status
+            const headCommits = await GitStore.getFullHistory(500);
+            const unpushedOids = await this._getUnpushedOids(headCommits);
+            for (const event of olderEvents) {
+                event.unpushed = unpushedOids.has(event.oid);
+            }
+
+            // Update filtered cache
+            this._cache.set(this._rawDataCache.events);
+
+            // If finished, persist
+            if (!this._hasMore) {
+                const frontierSnapshot = { tasks: this._prevAllTasks, fileSet: this._prevFileSet };
+                this._persistToDB(this._rawDataCache.events, frontierSnapshot, this._rawDataCache.headOid).catch(e =>
+                    console.warn('Timeline: failed to persist cache:', e)
+                );
+            }
+
+            console.log('[Timeline] loadMore complete, re-rendering', { totalEvents: this._rawDataCache.events.length, hasMore: this._hasMore });
+
+            // Re-render
+            const filteredBlocks = Store.getFilteredBlocks();
+            const groupBy = window.GroupManager ? GroupManager.activeGrouping : undefined;
+            await this.render(filteredBlocks, { groupBy });
+        } catch (err) {
+            console.error('[Timeline] loadMore error:', err);
+        } finally {
+            this._loadingMore = false;
         }
-
-        this._hasMore = nextBatch.length > this.BATCH_SIZE;
-        const chronological = [...nextBatch].reverse();
-        
-        let batchPrevTasks = new Map();
-        let batchPrevFileSet = new Map();
-        const newEvents = [];
-
-        let startIdx = 0;
-        if (this._hasMore) {
-            // Establish baseline at the end of this new batch
-            const baselineCommit = chronological[0];
-            const { tasks, fileSet } = await this._processCommit(baselineCommit, new Map(), new Map(), null);
-            batchPrevTasks = tasks;
-            batchPrevFileSet = fileSet;
-            startIdx = 1;
-        }
-
-        Logger.log('Timeline: loading older batch');
-        for (let i = startIdx; i < chronological.length; i++) {
-            const commit = chronological[i];
-            const parentCommit = i > 0 ? chronological[i - 1] : null;
-            const { tasks, fileSet, events } = await this._processCommit(
-                commit, batchPrevTasks, batchPrevFileSet, parentCommit
-            );
-            newEvents.push(...events);
-            batchPrevTasks = tasks;
-            batchPrevFileSet = fileSet;
-        }
-
-        // Prepend new events (older) to the end of our newest-first list
-        const olderEvents = newEvents.reverse();
-        this._rawDataCache.events.push(...olderEvents);
-        
-        // Update unpushed status
-        const headCommits = await GitStore.getFullHistory(500);
-        const unpushedOids = await this._getUnpushedOids(headCommits);
-        for (const event of olderEvents) {
-            event.unpushed = unpushedOids.has(event.oid);
-        }
-
-        // Update filtered cache with the now-extended raw events so render()
-        // doesn't trigger a fresh buildTimeline() that discards the older batch.
-        this._cache.set(this._rawDataCache.events);
-
-        // If finished, persist
-        if (!this._hasMore) {
-            const frontierSnapshot = { tasks: this._prevAllTasks, fileSet: this._prevFileSet };
-            this._persistToDB(this._rawDataCache.events, frontierSnapshot, this._rawDataCache.headOid).catch(e =>
-                console.warn('Timeline: failed to persist cache:', e)
-            );
-        }
-
-        // Re-render
-        const filteredBlocks = Store.getFilteredBlocks();
-        const groupBy = window.GroupManager ? GroupManager.activeGrouping : undefined;
-        await this.render(filteredBlocks, { groupBy });
     },
 
     async _getUnpushedOids(commits) {
         const unpushedOids = new Set();
+        if (!GitStore.git || !GitStore.fs) return unpushedOids;
         try {
             const { git, fs, dir } = GitStore;
             const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
@@ -609,11 +697,18 @@ const TimelineView = {
     },
 
     async _resolveHead() {
+        if (!GitStore.git || !GitStore.fs) {
+            console.log('[Timeline] _resolveHead — git or fs not ready', { git: !!GitStore.git, fs: !!GitStore.fs });
+            return null;
+        }
         try {
             const { git, fs, dir } = GitStore;
             const ref = (window.SyncManager && SyncManager._config.branch) || 'main';
-            return await git.resolveRef({ fs, dir, ref: `refs/heads/${ref}` });
+            const oid = await git.resolveRef({ fs, dir, ref: `refs/heads/${ref}` });
+            console.log('[Timeline] _resolveHead resolved', { oid });
+            return oid;
         } catch (e) {
+            console.log('[Timeline] _resolveHead error', { error: e.message });
             return null;
         }
     },
@@ -934,6 +1029,13 @@ const TimelineView = {
             </div>
         `;
 
+        console.log('[Timeline] render start', {
+            isCacheValid: this.isCacheValid(),
+            rawEventCount: this._rawDataCache.events.length,
+            hasMore: this._hasMore,
+            headOid: this._rawDataCache.headOid
+        });
+
         // Build timeline if cache is invalid
         if (!this.isCacheValid()) {
             const timeline = await this.buildTimeline();
@@ -942,6 +1044,13 @@ const TimelineView = {
 
         const filtered = this.filterEvents(this._cache.get());
         const grouped = this.groupByDate(filtered);
+
+        console.log('[Timeline] render result', {
+            rawEventCount: this._rawDataCache.events.length,
+            filteredEventCount: filtered.length,
+            hasMore: this._hasMore,
+            groupedDays: grouped.size
+        });
 
         if (filtered.length === 0) {
             container.innerHTML = `
@@ -1217,9 +1326,13 @@ const TimelineView = {
                 }
                 const currParsed = parseFrontMatter(currContentRaw || '');
 
-                const { EditorView, EditorState, basicSetup, unifiedMergeView, markdown, languages } = window.CodeMirror;
-
                 await DocumentView.waitForCodeMirror();
+                if (!window.CodeMirror?.EditorView) {
+                    container.innerHTML = '<p class="tl-error">Failed to load editor. Please try again.</p>';
+                    return;
+                }
+
+                const { EditorView, EditorState, basicSetup, unifiedMergeView, markdown, languages } = window.CodeMirror;
 
                 if (viewType === 'diff') {
                     let prevContent = '';
