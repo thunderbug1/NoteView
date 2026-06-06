@@ -598,6 +598,7 @@ const CaptureView = {
                     selectedAssignee = '';
                     assigneeBtn.textContent = 'None';
                 }
+                requestAnimationFrame(() => input.focus());
             }, this._currentTags);
         });
 
@@ -607,6 +608,13 @@ const CaptureView = {
                 container.querySelectorAll('.capture-priority-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 selectedPriority = btn.dataset.priority;
+                requestAnimationFrame(() => input.focus());
+            });
+        });
+
+        container.querySelectorAll('.capture-task-date').forEach(dateInput => {
+            dateInput.addEventListener('change', () => {
+                requestAnimationFrame(() => input.focus());
             });
         });
 
@@ -628,6 +636,10 @@ const CaptureView = {
 
         input.addEventListener('input', () => {
             this._setSaveEnabled(container, input.value.trim().length > 0);
+        });
+
+        input.addEventListener('click', () => {
+            input.focus();
         });
 
         requestAnimationFrame(() => input.focus());

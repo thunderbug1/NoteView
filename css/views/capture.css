@@ -358,6 +358,7 @@
     resize: vertical;
     min-height: 48px;
     line-height: 1.5;
+    touch-action: manipulation;
 }
 
 .capture-task-input:focus {
