@@ -280,8 +280,8 @@ const GitRemote = {
                 return { hasRemote: true, unpushed: 0 };
             }
 
-            // Count commits ahead of remote HEAD
-            const commits = await git.log({ fs, dir, depth: 500 });
+            // Count commits ahead of remote HEAD - use smaller depth for performance
+            const commits = await git.log({ fs, dir, depth: 100 });
             let unpushed = 0;
             let foundRemote = false;
             for (const commit of commits) {

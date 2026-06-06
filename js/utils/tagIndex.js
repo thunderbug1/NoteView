@@ -23,11 +23,13 @@ const TagIndex = {
   /**
    * Initialize index from an array of blocks
    */
-  init(blocks) {
+  init(blocks, options = {}) {
     this.clear();
     this._blocksRef = blocks;
     blocks.forEach(block => this.addBlock(block));
-    this.validate();
+    if (!options.skipValidate || Logger.enabled) {
+      this.validate();
+    }
   },
   
   /**

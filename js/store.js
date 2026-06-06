@@ -51,7 +51,7 @@ const Store = {
     // IndexedDB for persistence
     db: null,
     DB_NAME: 'NoteViewDB',
-    DB_VERSION: 6,
+    DB_VERSION: 7,
     STORE_NAME: 'handles',
     VIEW_PREFERENCES_STORAGE_KEY: 'noteview-view-preferences',
     CURRENT_VIEW_STORAGE_KEY: 'noteview-current-view',
@@ -142,6 +142,13 @@ const Store = {
                     });
                     store.createIndex('timestamp', 'timestamp');
                     Logger.log('Creating queuedNotes object store');
+                }
+                // Add store for full block content cache (new in version 7)
+                if (!db.objectStoreNames.contains('blockCache')) {
+                    db.createObjectStore('blockCache');
+                    Logger.log('Creating blockCache object store');
+                    // Clear old corrupted cache - set flag to clear on first load
+                    localStorage.setItem('noteview-clearBlockCache-v1', 'true');
                 }
             };
 
@@ -868,7 +875,27 @@ const Store = {
         if (options.setLastActive !== false) {
             await this.setLastActiveVault(handle.name);
         }
-        await GitStore.init(handle);
+        
+        // Clear block cache once to fix frontmatter display bug (v48 upgrade)
+        if (!localStorage.getItem('noteview-cache-cleared-v48')) {
+            await this._clearVaultBlockCache();
+            localStorage.setItem('noteview-cache-cleared-v48', 'true');
+        }
+        
+        // Skip git init if vault was already initialized (check IndexedDB)
+        const gitInitialized = await this._isGitInitialized(handle.name);
+        if (!gitInitialized) {
+            await GitStore.init(handle);
+            await this._setGitInitialized(handle.name);
+        } else {
+            // Just set up the adapter without re-running git init
+            if (window.git) {
+                const adapter = new window.GitFSAdapter(handle);
+                GitStore.fs = adapter.promises;
+                GitStore.git = window.git;
+            }
+        }
+        
         await this.loadBlocks();
         // Mark vault as ready and flush any queued notes
         this._vaultReady = true;
@@ -1331,6 +1358,9 @@ const Store = {
             console.error('Failed to commit deletion to git:', e);
         }
 
+        // Invalidate block cache entry
+        await this._invalidateBlockCache(fileName);
+
         // Remove from memory only after file and git operations succeed
         this.blocks.splice(index, 1);
         this._deleteSentinels?.delete(id);
@@ -1771,6 +1801,9 @@ const Store = {
             // Invalidate cache
             this._filteredBlocksCache.invalidate();
 
+            // Invalidate block cache entry for this file
+            await this._invalidateBlockCache(fileName);
+
             // Record update command AFTER save (using the captured beforeState)
             if (isUpdate && beforeState) {
                 const diff = UndoRedoManager.createDiff(beforeState, block);
@@ -1864,62 +1897,84 @@ const Store = {
             return;
         }
 
-        // Get existing metadata cache
-        const cacheStore = 'metadataCache';
-        const vaultPrefix = `vault::${this.directoryHandle.name}::`;
-        const metadataCache = new Map();
-        
-        if (await this._ensureDB()) {
+        // Try to load from full block cache first (FAST PATH)
+        const blockCacheStore = 'blockCache';
+        const vaultPrefix = `blockCache::${this.directoryHandle.name}::`;
+        let blockCache = new Map();
+        let cacheHit = false;
+
+        if (await this._ensureDB() && this.db.objectStoreNames.contains(blockCacheStore)) {
             try {
-                // Check if store exists before accessing
-                if (!this.db.objectStoreNames.contains(cacheStore)) {
-                    console.warn('[Store] metadataCache store does not exist yet');
-                } else {
-                    const tx = this.db.transaction([cacheStore], 'readonly');
-                    const store = tx.objectStore(cacheStore);
-                    const req = store.openCursor(IDBKeyRange.bound(vaultPrefix, vaultPrefix + '\uffff'));
-                    await new Promise(resolve => {
-                        req.onsuccess = (e) => {
-                            const cursor = e.target.result;
-                            if (cursor) {
-                                metadataCache.set(cursor.key.replace(vaultPrefix, ''), cursor.value);
-                                cursor.continue();
-                            } else resolve();
-                        };
-                        req.onerror = () => resolve();
-                    });
-                }
-            } catch (e) { console.warn('Failed to load metadata cache:', e); }
+                const tx = this.db.transaction([blockCacheStore], 'readonly');
+                const store = tx.objectStore(blockCacheStore);
+                const req = store.openCursor(IDBKeyRange.bound(vaultPrefix, vaultPrefix + '\uffff'));
+                await new Promise(resolve => {
+                    req.onsuccess = (e) => {
+                        const cursor = e.target.result;
+                        if (cursor) {
+                            const filename = cursor.key.replace(vaultPrefix, '');
+                            blockCache.set(filename, cursor.value);
+                            cursor.continue();
+                        } else resolve();
+                    };
+                    req.onerror = () => resolve();
+                });
+            } catch (e) { console.warn('Failed to load block cache:', e); }
         }
 
-        const updatedCache = new Map();
-        const readPromises = entriesArray.map(async (entry) => {
+        // Check if cache is valid by comparing filenames and mtimes
+        const filesToRead = [];
+        const currentFileSet = new Set(entriesArray.map(e => e.name));
+
+        for (const entry of entriesArray) {
+            const cached = blockCache.get(entry.name);
             try {
                 const file = await entry.getFile();
-                const cached = metadataCache.get(entry.name);
-                
                 if (cached && cached.mtime === file.lastModified) {
-                    return {
-                        id: entry.name.slice(0, -3),
-                        filename: entry.name,
-                        fileHandle: entry,
-                        ...cached.data
-                    };
+                    // Cache hit - use cached data
+                    cacheHit = true;
+                } else {
+                    // Cache miss or stale - need to read
+                    filesToRead.push({ entry, file, mtime: file.lastModified });
                 }
+            } catch (err) {
+                if (err.name === 'NotFoundError') continue;
+                console.error('loadBlocks: error checking file:', entry.name, err);
+                filesToRead.push({ entry, file: null, mtime: null });
+            }
+        }
 
-                // Cache miss or stale: read and parse
-                const content = await file.text();
-                const parsed = parseFrontMatter(content);
-                const data = { ...parsed };
-                
-                updatedCache.set(entry.name, { mtime: file.lastModified, data });
-
-                return {
+        // If full cache hit, use cached data immediately
+        if (cacheHit && filesToRead.length === 0 && blockCache.size === entriesArray.length) {
+            const results = [];
+            for (const entry of entriesArray) {
+                const cached = blockCache.get(entry.name);
+                results.push({
                     id: entry.name.slice(0, -3),
                     filename: entry.name,
                     fileHandle: entry,
-                    ...data
-                };
+                    ...cached.data
+                });
+            }
+            this.blocks = results;
+            this._filteredBlocksCache.invalidate();
+            TagIndex.init(this.blocks, { skipValidate: true });
+            this.extractContacts();
+            Logger.log('Loaded ' + this.blocks.length + ' blocks from cache (instant)');
+            return;
+        }
+
+        // Fall back to reading files (cache miss or partial hit)
+        const readPromises = filesToRead.map(async ({ entry, file, mtime }) => {
+            try {
+                if (!file) {
+                    file = await entry.getFile();
+                    mtime = file.lastModified;
+                }
+                const rawContent = await file.text();
+                const parsed = parseFrontMatter(rawContent);
+                const data = { ...parsed };
+                return { entry, mtime, data };
             } catch (err) {
                 if (err.name === 'NotFoundError') return null;
                 console.error('loadBlocks: skipping unreadable file:', entry?.name, err);
@@ -1927,14 +1982,44 @@ const Store = {
             }
         });
 
-        const results = await Promise.all(readPromises);
-        
-        // Update IndexedDB cache with new/changed files and prune deleted ones
-        if (updatedCache.size > 0 || entriesArray.length < metadataCache.size) {
+        const readResults = await Promise.all(readPromises);
+
+        // Merge cached and newly-read data
+        const results = [];
+        const updatedCache = new Map();
+        const readFileSet = new Set(filesToRead.map(f => f.entry.name));
+
+        for (const entry of entriesArray) {
+            if (readFileSet.has(entry.name)) {
+                const readResult = readResults.find(r => r && r.entry.name === entry.name);
+                if (readResult) {
+                    results.push({
+                        id: entry.name.slice(0, -3),
+                        filename: entry.name,
+                        fileHandle: entry,
+                        ...readResult.data
+                    });
+                    updatedCache.set(entry.name, { mtime: readResult.mtime, data: readResult.data });
+                }
+            } else {
+                const cached = blockCache.get(entry.name);
+                if (cached) {
+                    results.push({
+                        id: entry.name.slice(0, -3),
+                        filename: entry.name,
+                        fileHandle: entry,
+                        ...cached.data
+                    });
+                }
+            }
+        }
+
+        // Update block cache in IndexedDB
+        if (updatedCache.size > 0 || entriesArray.length < blockCache.size) {
             if (await this._ensureDB()) {
                 try {
-                    const tx = this.db.transaction([cacheStore], 'readwrite');
-                    const store = tx.objectStore(cacheStore);
+                    const tx = this.db.transaction([blockCacheStore], 'readwrite');
+                    const store = tx.objectStore(blockCacheStore);
                     
                     // Update cache for new/changed files
                     for (const [filename, value] of updatedCache) {
@@ -1942,23 +2027,87 @@ const Store = {
                     }
                     
                     // Prune cache for deleted files
-                    const currentFiles = new Set(entriesArray.map(e => e.name));
-                    for (const filename of metadataCache.keys()) {
-                        if (!currentFiles.has(filename)) {
+                    for (const filename of blockCache.keys()) {
+                        if (!currentFileSet.has(filename)) {
                             store.delete(vaultPrefix + filename);
                         }
                     }
-                } catch (e) { console.warn('Failed to update metadata cache:', e); }
+                } catch (e) { console.warn('Failed to update block cache:', e); }
             }
         }
 
         // Atomically update the memory store, cache, index, and contacts only after all async reads resolve
         this.blocks = results.filter(block => block !== null);
         this._filteredBlocksCache.invalidate();
-        TagIndex.init(this.blocks);
+        TagIndex.init(this.blocks, { skipValidate: true });
         this.extractContacts();
-        Logger.log('Loaded ' + this.blocks.length + ' blocks');
-    }
+        Logger.log('Loaded ' + this.blocks.length + ' blocks (partial cache: ' + filesToRead.length + ' files read)');
+    },
+
+    // --- Git initialization cache ---
+
+    async _isGitInitialized(vaultName) {
+        const key = `gitInitialized::${vaultName}`;
+        const value = await this._dbGet(this.STORE_NAME, key, { silent: true });
+        return value === true;
+    },
+
+    async _setGitInitialized(vaultName) {
+        const key = `gitInitialized::${vaultName}`;
+        await this._dbPut(this.STORE_NAME, key, true);
+    },
+
+    async _clearGitInitialized(vaultName) {
+        const key = `gitInitialized::${vaultName}`;
+        if (await this._ensureDB() && this.db.objectStoreNames.contains(this.STORE_NAME)) {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                store.delete(key);
+            } catch (e) {
+                console.warn('Failed to clear git initialized flag:', e);
+            }
+        }
+    },
+
+    async _invalidateBlockCache(filename) {
+        const blockCacheStore = 'blockCache';
+        const vaultPrefix = `blockCache::${this.directoryHandle.name}::`;
+        if (await this._ensureDB() && this.db.objectStoreNames.contains(blockCacheStore)) {
+            try {
+                const tx = this.db.transaction([blockCacheStore], 'readwrite');
+                const store = tx.objectStore(blockCacheStore);
+                store.delete(vaultPrefix + filename);
+            } catch (e) {
+                console.warn('Failed to invalidate block cache:', e);
+            }
+        }
+    },
+
+    async _clearVaultBlockCache() {
+        const blockCacheStore = 'blockCache';
+        const vaultPrefix = `blockCache::${this.directoryHandle.name}::`;
+        if (await this._ensureDB() && this.db.objectStoreNames.contains(blockCacheStore)) {
+            try {
+                const tx = this.db.transaction([blockCacheStore], 'readwrite');
+                const store = tx.objectStore(blockCacheStore);
+                const req = store.openCursor(IDBKeyRange.bound(vaultPrefix, vaultPrefix + '\uffff'));
+                await new Promise(resolve => {
+                    req.onsuccess = (e) => {
+                        const cursor = e.target.result;
+                        if (cursor) {
+                            cursor.delete();
+                            cursor.continue();
+                        } else resolve();
+                    };
+                    req.onerror = () => resolve();
+                });
+                Logger.log('Cleared block cache for vault:', this.directoryHandle.name);
+            } catch (e) {
+                console.warn('Failed to clear block cache:', e);
+            }
+        }
+    },
 };
 
 // Parse frontmatter from markdown

@@ -46,7 +46,9 @@ npx serve .
 
 **No build step, no package manager needed for dev.** Dependencies are vendored locally in `vendor/` to ensure offline capability. To update vendored dependencies, run `scripts/vendor.sh` (this will create an ephemeral `node_modules/` to run esbuild, bundle CodeMirror, and download CDN scripts directly). CSS and JS are loaded directly via `<link>` and `<script>` tags.
 
-**Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-v4` to `noteview-v5`) and the `?v=` param on the `sw.js` registration line in `index.html`. This is only two places to update, regardless of how many files changed.
+**Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-v47` to `noteview-v48`) and the `?v=` param on the `sw.js` registration line in `js/sw-register.js`. This is only two places to update, regardless of how many files changed.
+
+**IndexedDB migrations:** When adding new IndexedDB object stores or changing the schema, increment `DB_VERSION` in `js/store.js` and handle the upgrade in `initDB()`. The `onupgradeneeded` event will trigger automatically for users with older versions.
 
 ### Single File Release Packaging
 The entire application can be packaged into a single, fully offline `noteview.html` file (with all CSS, JS, and SVG assets inlined) using `node scripts/build-single-file.js`.
@@ -59,7 +61,7 @@ This process is automated via GitHub Actions (`.github/workflows/release.yml`). 
 All core modules are plain objects on `window` — there are no ES module imports between app scripts. Load order matters and is determined by `<script>` tag sequence in `index.html`.
 
 - **`App`** (`js/main.js`) — Top-level controller. Initializes the app, handles routing between views, manages event listeners. Also contains `ThemeManager`. Delegates modal logic to dedicated modules.
-- **`Store`** (`js/store.js`) — Central state and file I/O. Manages `blocks` array, IndexedDB persistence, directory handle, file read/write, git commit on save, contact/mention tracking. Filtering logic lives in `Store.getFilteredBlocks()`.
+- **`Store`** (`js/store.js`) — Central state and file I/O. Manages `blocks` array, IndexedDB persistence, directory handle, file read/write, git commit on save, contact/mention tracking. Filtering logic lives in `Store.getFilteredBlocks()`. Uses full-block content cache in IndexedDB for instant reloads when files haven't changed. Cache invalidation happens on save/delete via `_invalidateBlockCache()`.
 - **`GitStore`** (`js/gitStore.js`) — Git operations abstraction over isomorphic-git. Init, commit, log, diff, merge base.
 - **`GitFSAdapter`** (`js/gitFs.js`) — Class exported as `window.GitFSAdapter`. Filesystem adapter that bridges the browser File System Access API with isomorphic-git's expected `fs.promises` interface.
 - **`GitRemote`** (`js/gitRemote.js`) — Push/pull to remote git repositories.
