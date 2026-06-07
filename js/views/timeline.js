@@ -698,7 +698,6 @@ const TimelineView = {
 
     async _resolveHead() {
         if (!GitStore.git || !GitStore.fs) {
-            console.log('[Timeline] _resolveHead — git or fs not ready', { git: !!GitStore.git, fs: !!GitStore.fs });
             return null;
         }
         try {

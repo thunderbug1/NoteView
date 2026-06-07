@@ -217,9 +217,7 @@ const GitStore = {
             const logOpts = { fs: this.fs, dir: this.dir };
             if (maxCount) logOpts.depth = maxCount;
             if (ref) logOpts.ref = ref;
-            console.log('[gitStore] getFullHistory called', { maxCount, depth: logOpts.depth, ref: logOpts.ref, dir: this.dir });
             const commits = await this.git.log(logOpts);
-            console.log('[gitStore] getFullHistory result', { requestedDepth: maxCount, returned: commits.length });
 
             // If depth was requested but we got fewer commits, and we're not using
             // a ref (i.e. walking from HEAD), try without depth to get the full count.
@@ -228,7 +226,6 @@ const GitStore = {
             if (maxCount && maxCount > commits.length && !ref) {
                 const allLogOpts = { fs: this.fs, dir: this.dir };
                 const allCommits = await this.git.log(allLogOpts);
-                console.log('[gitStore] getFullHistory unlimited fallback', { withDepth: commits.length, withoutDepth: allCommits.length });
                 if (allCommits.length > commits.length) {
                     return allCommits.map(c => ({
                         oid: c.oid,
