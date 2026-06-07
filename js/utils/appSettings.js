@@ -44,6 +44,10 @@ const AppSettings = {
             console.warn('AppSettings: no vault directory, cannot save');
             return;
         }
+        if (!settings || typeof settings !== 'object') {
+            console.warn('AppSettings: invalid settings, refusing to save:', typeof settings);
+            return;
+        }
 
         try {
             const dir = await Store.directoryHandle.getDirectoryHandle(this._DIR, { create: true });

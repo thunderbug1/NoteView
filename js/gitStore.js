@@ -85,6 +85,7 @@ const GitStore = {
         if (!this.git || !this.fs) return;
         try {
             const entries = await this.fs.readdir(this.dir);
+            const errors = [];
             for (const name of entries) {
                 if (name.endsWith('.md') || name === '.noteview') {
                     try {
@@ -99,8 +100,14 @@ const GitStore = {
                                 }
                             }
                         }
-                    } catch (e) { console.warn('gitStore.commitAll: failed to stage', name, e.message); }
+                    } catch (e) {
+                        errors.push({ name, message: e.message });
+                        console.warn('gitStore.commitAll: failed to stage', name, e.message);
+                    }
                 }
+            }
+            if (errors.length > 0) {
+                console.warn('gitStore.commitAll: some files could not be staged, proceeding with commit:', errors.map(e => e.name));
             }
             const sha = await this.git.commit({
                 fs: this.fs, dir: this.dir, author: this.author, message

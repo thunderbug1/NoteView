@@ -426,7 +426,7 @@ const KanbanView = {
                     <div class="kanban-card-footer">
                         ${task.badges.map(b => {
                             const dueUrgencyCls = (b.type === 'due' && urgency) ? ` badge-due-${urgency}` : '';
-                            const displayValue = b.type === 'completed' ? Common.formatRelativeDate(b.value) : escapeHtml(b.value);
+                            const displayValue = b.type === 'completed' ? escapeHtml(Common.formatRelativeDate(b.value)) : escapeHtml(b.value);
                             return `<span class="badge badge-${b.type} kanban-badge${dueUrgencyCls}" data-type="${b.type}" data-value="${escapeHtml(b.value)}"${b.type === 'priority' ? ` data-priority="${escapeHtml(b.value.toLowerCase())}"` : ''}>${escapeHtml(b.type)}: ${displayValue}</span>`;
                         }).join('')}
                     </div>
@@ -1007,7 +1007,7 @@ const KanbanView = {
         if (value === null) {
             newText = newText.replace(fieldRegex, '');
         } else {
-            const replaced = newText.replace(new RegExp(`\\[${fieldName}::\\s*[^\\]]+\\]`), `[${fieldName}:: ${value}]`);
+            const replaced = newText.replace(new RegExp(`\\[${fieldName}::\\s*[^\\]]+\\]`, 'g'), `[${fieldName}:: ${value}]`);
             if (replaced !== newText) {
                 newText = replaced;
             } else {

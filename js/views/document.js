@@ -159,11 +159,6 @@ const DocumentView = {
         container.innerHTML = html;
 
         // Remove old event delegation listener if exists
-        if (this._deleteHandler) {
-            container.removeEventListener('click', this._deleteHandler);
-        }
-
-        // Add event delegation for split marker click and keyboard
         if (this._splitHandler) {
             container.removeEventListener('mousedown', this._splitHandler);
         }
@@ -1532,6 +1527,13 @@ const DocumentView = {
                 this._recognitionSession++;
                 sessionId = this._recognitionSession; // Update local closure for the new session
                 try {
+                    // Stop old instance before creating new one
+                    if (this._recognition) {
+                        this._recognition.onend = null;
+                        this._recognition.onerror = null;
+                        this._recognition.onresult = null;
+                        try { this._recognition.stop(); } catch (_) {}
+                    }
                     const NewRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                     const newRecognition = new NewRecognition();
                     newRecognition.continuous = true;

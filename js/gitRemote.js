@@ -68,9 +68,17 @@ const GitRemote = {
             }
 
             // 2. Persist config BEFORE adding remote so we don't end up in partial state
+            const configBefore = this.config;
             this.config = { name, url, auth };
             window.GitHttp.setCredentials(auth);
-            await Store.saveRemoteConfig(this.config);
+            try {
+                await Store.saveRemoteConfig(this.config);
+            } catch (persistErr) {
+                this.config = configBefore;
+                window.GitHttp.setCredentials(configBefore?.auth);
+                console.error('Failed to persist remote config:', persistErr);
+                return false;
+            }
 
             // 3. Add remote (atomic operation)
             try {
@@ -314,39 +322,27 @@ const GitRemote = {
             // Configured branch does not exist locally
         }
 
-        // If the configured branch is 'main', and 'master' exists locally, rename 'master' to 'main'
+        // If the configured branch is not found, try to rename the other default branch.
         if (ref === 'main') {
-            try {
-                const masterOid = await git.resolveRef({ fs, dir, ref: 'refs/heads/master' });
-                Logger.log(`[GitRemote] Found local 'master' branch but expected 'main'. Renaming to 'main'...`);
-                
-                // 1. Write the new ref pointing to the current master commit
-                await git.writeRef({
-                    fs,
-                    dir,
-                    ref: 'refs/heads/main',
-                    value: masterOid,
-                    force: true
-                });
-                
-                // 2. Point HEAD to the new ref
-                await git.writeRef({
-                    fs,
-                    dir,
-                    ref: 'HEAD',
-                    value: 'refs/heads/main',
-                    symbolic: true,
-                    force: true
-                });
-                
-                // 3. Delete the old master ref
-                await git.deleteRef({ fs, dir, ref: 'refs/heads/master' });
-                
-                Logger.log(`[GitRemote] Local branch 'master' successfully renamed to 'main'.`);
-            } catch (e) {
-                // 'master' branch does not exist either, meaning it's a completely fresh repo.
-                // We'll let the checkout/pull logic handle creating the branch.
-            }
+            await this._renameBranch('master', 'main');
+        } else if (ref === 'master') {
+            await this._renameBranch('main', 'master');
+        }
+    },
+
+    async _renameBranch(fromBranch, toBranch) {
+        if (!GitStore.git || !GitStore.fs) return false;
+        const { git, fs, dir } = GitStore;
+        try {
+            const fromOid = await git.resolveRef({ fs, dir, ref: `refs/heads/${fromBranch}` });
+            Logger.log(`[GitRemote] Found local '${fromBranch}' branch, renaming to '${toBranch}'...`);
+            await git.writeRef({ fs, dir, ref: `refs/heads/${toBranch}`, value: fromOid, force: true });
+            await git.writeRef({ fs, dir, ref: 'HEAD', value: `refs/heads/${toBranch}`, symbolic: true, force: true });
+            await git.deleteRef({ fs, dir, ref: `refs/heads/${fromBranch}` });
+            Logger.log(`[GitRemote] Local branch '${fromBranch}' renamed to '${toBranch}'.`);
+            return true;
+        } catch (e) {
+            return false;
         }
     },
 

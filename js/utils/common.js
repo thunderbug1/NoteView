@@ -67,9 +67,8 @@ function formatDate(dateStr, includeTime = false) {
  * @returns {string} Truncated text
  */
 function truncateText(html, maxLength) {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    const text = div.textContent || '';
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const text = doc.body.textContent || '';
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
 }
 

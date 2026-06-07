@@ -337,12 +337,14 @@ const SyncManager = {
         if (!window.App || typeof App.render !== 'function') return;
         if (withLoading) App.showViewLoading();
         try {
-            await Store.loadBlocks();
-            Store._filteredBlocksCache.invalidate();
-            SelectionManager.updateTagCounts();
-            TimelineView.invalidateRawDataCache();
-            TimelineView.invalidateCache();
+            // Don't reload blocks from disk while user is editing — their in-editor
+            // state would be overwritten. Render is also deferred until editing stops.
             if (!this._isEditing()) {
+                await Store.loadBlocks();
+                Store._filteredBlocksCache.invalidate();
+                SelectionManager.updateTagCounts();
+                TimelineView.invalidateRawDataCache();
+                TimelineView.invalidateCache();
                 App.render();
             }
         } catch (renderErr) {
@@ -382,8 +384,7 @@ const SyncManager = {
 
     _isCorsError(err) {
         const msg = (err.message || '').toLowerCase();
-        return msg.includes('failed to fetch') || msg.includes('networkerror') ||
-               msg.includes('load failed') || msg.includes('cors');
+        return msg.includes('cors') || msg.includes('load failed');
     },
 
     _isAuthError(err) {
@@ -395,7 +396,8 @@ const SyncManager = {
     _isNetworkError(err) {
         const msg = (err.message || '').toLowerCase();
         return msg.includes('timeout') || msg.includes('timed out') || msg.includes('network') ||
-               msg.includes('connection') || msg.includes('econnrefused') || msg.includes('enotfound');
+               msg.includes('connection') || msg.includes('econnrefused') || msg.includes('enotfound') ||
+               msg.includes('failed to fetch') || msg.includes('networkerror');
     },
 
     _isProtectedBranchError(err) {
@@ -437,7 +439,12 @@ const SyncManager = {
         // Flush any pending saves to disk before resetting the working tree.
         // This prevents data loss if auto-save hasn't fired yet.
         if (window.Store && Store._saveQueue && Store._saveQueue.size > 0) {
-            await Promise.allSettled(Array.from(Store._saveQueue.values()));
+            const results = await Promise.allSettled(Array.from(Store._saveQueue.values()));
+            const failed = results.filter(r => r.status === 'rejected');
+            if (failed.length > 0) {
+                console.warn('[SyncManager] Some saves failed before merge conflict resolution:', failed);
+                showToast('Warning: Some pending saves failed — changes may be lost');
+            }
         }
         // Also flush and commit debounced saves from editors (1-second timers)
         if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {

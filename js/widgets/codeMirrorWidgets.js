@@ -291,7 +291,7 @@ function createCodeMirrorWidgets(documentView) {
             const a = document.createElement("a");
             a.className = "md-link-text";
             const url = this.url;
-            const isSafe = /^https?:\/\//i.test(url) || url.startsWith('#') || url.startsWith('mailto:');
+            const isSafe = url && (/^https?:\/\//i.test(url) || url.startsWith('#') || url.startsWith('mailto:'));
             a.href = isSafe ? url : '';
             a.textContent = this.getDisplayText();
             a.title = isSafe ? url : '';
@@ -726,7 +726,7 @@ function createCodeMirrorWidgets(documentView) {
             wrap.onclick = (e) => {
                 e.stopPropagation();
                 if (e.target.closest('.md-media-play-btn') || e.target === thumb) {
-                    if (/^https?:\/\//i.test(this.url)) {
+                    if (this.url && /^https?:\/\//i.test(this.url)) {
                         window.open(this.url, '_blank', 'noopener');
                     }
                 } else {
@@ -750,7 +750,8 @@ function createCodeMirrorWidgets(documentView) {
             if (a.length !== b.length) return false;
             for (let i = 0; i < a.length; i++) {
                 if (a[i].url !== b[i].url || a[i].caption !== b[i].caption) return false;
-                if ((a[i].notes ? a[i].notes.length : 0) !== (b[i].notes ? b[i].notes.length : 0)) return false;
+                const aNotes = a[i].notes || [], bNotes = b[i].notes || [];
+                if (aNotes.length !== bNotes.length || !aNotes.every((n, j) => n.from === bNotes[j]?.from && n.text === bNotes[j]?.text)) return false;
             }
             return true;
         }
@@ -792,7 +793,9 @@ function createCodeMirrorWidgets(documentView) {
 
                     thumbWrap.onclick = (e) => {
                         e.stopPropagation();
-                        window.open(item.url, '_blank', 'noopener');
+                        if (item.url && /^https?:\/\//i.test(item.url)) {
+                            window.open(item.url, '_blank', 'noopener');
+                        }
                     };
                 } else if (item.type === 'steam') {
                     const thumbWrap = document.createElement('div');
@@ -819,7 +822,9 @@ function createCodeMirrorWidgets(documentView) {
 
                     thumbWrap.onclick = (e) => {
                         e.stopPropagation();
-                        window.open(item.url, '_blank', 'noopener');
+                        if (item.url && /^https?:\/\//i.test(item.url)) {
+                            window.open(item.url, '_blank', 'noopener');
+                        }
                     };
                 } else if (item.type === 'shadertoy') {
                     const thumbWrap = document.createElement('div');
@@ -838,7 +843,9 @@ function createCodeMirrorWidgets(documentView) {
 
                     thumbWrap.onclick = (e) => {
                         e.stopPropagation();
-                        window.open(item.url, '_blank', 'noopener');
+                        if (item.url && /^https?:\/\//i.test(item.url)) {
+                            window.open(item.url, '_blank', 'noopener');
+                        }
                     };
                 } else if (item.type === 'image') {
                     const thumbWrap = document.createElement('div');
@@ -938,7 +945,9 @@ function createCodeMirrorWidgets(documentView) {
 
                     thumbWrap.onclick = (e) => {
                         e.stopPropagation();
-                        window.open(item.url, '_blank', 'noopener');
+                        if (item.url && /^https?:\/\//i.test(item.url)) {
+                            window.open(item.url, '_blank', 'noopener');
+                        }
                     };
                     card.appendChild(thumbWrap);
                 }

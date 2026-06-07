@@ -90,7 +90,14 @@ class GitFSAdapter {
                 try {
                     const handle = await self._resolvePath(path, true, true);
                     writable = await handle.createWritable();
-                    await writable.write(data);
+                    // Ensure data is valid before writing
+                    if (typeof data === 'string') {
+                        await writable.write(new TextEncoder().encode(data));
+                    } else if (data instanceof ArrayBuffer || ArrayBuffer.isView(data) || data instanceof Blob) {
+                        await writable.write(data);
+                    } else {
+                        throw new Error(`Invalid data type for writeFile: ${typeof data}`);
+                    }
                     await writable.close();
                 } catch (e) {
                     if (writable) {

@@ -275,6 +275,7 @@ const App = {
 
     showError(message) {
         const container = document.getElementById('viewContainer');
+        if (!container) return;
         container.innerHTML = `
             <div class="error-message">
                 <h2><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg> Error</h2>
@@ -309,6 +310,10 @@ const App = {
     },
 
     async initializeInBackground() {
+        // Prevent concurrent init calls (e.g., double DOMContentLoaded)
+        if (this._initInProgress) return;
+        this._initInProgress = true;
+
         try {
             if (window.SyncManager) {
                 window.SyncManager._setStatus('syncing', 'Loading vault...');
@@ -323,16 +328,7 @@ const App = {
                     window.SyncManager._setStatus('syncing', 'Initializing sync...');
                 }
 
-                await GitRemote.init();
-                await SyncManager.init();
-
-                this.setupEventListeners();
-                this.setupMobilePullToRefresh();
-                SelectionManager.init();
-                SelectionManager.updateTagCounts();
-                await AIAssistant.init();
-                this.updateVaultSwitcherName();
-
+                // completeInitialization handles all init — don't duplicate calls here
                 await this.completeInitialization(true);
 
                 this._updateCaptureSyncStatus();
@@ -345,6 +341,8 @@ const App = {
             } else {
                 throw err;
             }
+        } finally {
+            this._initInProgress = false;
         }
     },
 
@@ -895,7 +893,7 @@ const App = {
                     await Store.loadBlocks();
                     App.render();
                     Common.showToast('Notes reloaded');
-                } catch { /* ignore */ }
+                } catch (e) { console.warn('Pull-to-refresh reload failed:', e.message); }
                 indicator.classList.remove('spinning');
             }
             indicator.style.transform = '';
@@ -1066,7 +1064,7 @@ const App = {
             leftOpen: sidebar?.classList.contains('sidebar-open') || false,
             rightOpen: sidebarRight?.classList.contains('sidebar-open') || false,
             rightCollapsed: sidebarRight?.classList.contains('collapsed') || false,
-            aiPanelOpen: AIAssistant._panelOpen || false
+            aiPanelOpen: (typeof AIAssistant !== 'undefined' && AIAssistant._panelOpen) || false
         };
     },
 
@@ -1169,8 +1167,10 @@ const App = {
         if (!overlay) return;
         overlay.classList.remove('visible');
         const el = overlay;
-        setTimeout(() => el.remove(), 160);
-        this._loadingOverlay = null;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (el.parentNode) el.remove();
+        }));
+        if (this._loadingOverlay === overlay) this._loadingOverlay = null;
     },
 
     render(options = {}) {
@@ -1318,10 +1318,12 @@ const App = {
         if (filtered === total) { bar.hidden = true; return; }
 
         bar.hidden = false;
-        bar.querySelector('.filter-bar-count').textContent =
+        const countEl = bar.querySelector('.filter-bar-count');
+        if (countEl) countEl.textContent =
             `${filtered} of ${total} notes`;
 
         const tagsEl = bar.querySelector('.filter-bar-tags');
+        if (!tagsEl) return;
         const pills = [];
         if (sel.context?.size > 0) {
             sel.context.forEach(tag => {
@@ -1487,8 +1489,13 @@ const App = {
         if (!entry?.blockData) return;
 
         const block = JSON.parse(JSON.stringify(entry.blockData));
-        // saveBlock handles adding to Store.blocks if it's a new block
-        await Store.saveBlock(block, { commit: true, commitMessage: `Restore deleted note ${block.id}` });
+        try {
+            await Store.saveBlock(block, { commit: true, commitMessage: `Restore deleted note ${block.id}` });
+        } catch (err) {
+            console.error('Failed to restore block from trash:', err);
+            Common.showToast('Failed to restore note');
+            return;
+        }
 
         // Ensure the restored block is in the in-memory array
         if (!Store.blocks.some(b => b.id === block.id)) {
@@ -1642,6 +1649,11 @@ const App = {
             content,
             modalClass: 'tag-modal content-modal',
             onClose: () => {
+                // Close any open block action menu to prevent listener leak
+                if (this._blockActionMenuClose) {
+                    this._blockActionMenuClose();
+                    this._blockActionMenuClose = null;
+                }
                 // Destroy CodeMirror editor to prevent memory leak
                 const view = DocumentView.editors.get(blockId);
                 if (view) {
@@ -1763,7 +1775,12 @@ const App = {
                 const closeMenu = () => {
                     menu.remove();
                     document.removeEventListener('click', closeHandler);
+                    if (App._blockActionMenuClose === closeMenu) {
+                        App._blockActionMenuClose = null;
+                    }
                 };
+                // Store reference so modal onClose can clean up
+                App._blockActionMenuClose = closeMenu;
                 const closeHandler = (evt) => {
                     if (!menu.contains(evt.target) && evt.target !== btn) closeMenu();
                 };

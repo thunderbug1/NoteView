@@ -846,7 +846,8 @@ const AIAssistantReal = {
         if (input) input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (chat.state === 'streaming') return;
+                e.stopPropagation();
+                if (chat.state !== 'idle') return;
                 const instruction = input.value.trim();
                 if (!instruction) return;
                 this._sendToChat(chat, instruction);
@@ -1514,6 +1515,8 @@ const AIAssistantReal = {
     // ==============================
 
     async _sendPerNote(chat, instruction, profile, apiKey) {
+        // Reset abort flag at start to prevent stale flag from a previous run
+        chat._abortRequested = false;
         const contextIds = [...chat.contextBlockIds];
         const total = contextIds.length;
 
@@ -1558,8 +1561,6 @@ const AIAssistantReal = {
                 });
                 break;
             }
-
-            chat._abortRequested = false;
 
             const blockId = contextIds[i];
             const block = Store.blocks.find(b => b.id === blockId);

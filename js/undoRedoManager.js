@@ -246,7 +246,6 @@ const UndoRedoManager = {
 
             // Remove from memory only after successful file deletion
             const index = Store.blocks.findIndex(b => b.id === command.blockId);
-            const block = Store.blocks[index];
             Store.blocks.splice(index, 1);
             TagIndex.removeBlock(command.blockId);
             try {

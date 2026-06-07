@@ -4,6 +4,14 @@
 
 const AssigneeModal = {
     show(onSelect, currentTags = null) {
+        if (typeof onSelect !== 'function') {
+            console.warn('AssigneeModal.show: onSelect is not a function');
+            return;
+        }
+        if (!Store.contacts) {
+            console.warn('AssigneeModal.show: Store.contacts not available');
+            return;
+        }
         // Prioritize contacts that share the current context
         const allContacts = Array.from(Store.contacts.keys()).sort();
         let suggestedContacts = [...allContacts];

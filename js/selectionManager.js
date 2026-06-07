@@ -1218,8 +1218,9 @@ const SelectionManager = {
             }
 
             // Check time tags against block date
-            let dateVal = block[currentProp];
-            if (!dateVal && (currentProp === 'due' || currentProp === 'start' || currentProp === 'completed')) {
+            const isTaskProp = (currentProp === 'due' || currentProp === 'start' || currentProp === 'completed');
+            let dateVal = isTaskProp ? null : block[currentProp];
+            if (isTaskProp) {
                 const tasks = TaskParser.parseTasksFromBlock(block);
                 const dates = tasks
                     .map(t => { const v = TaskParser.getBadgeValue(t, currentProp).trim(); return v ? new Date(v).getTime() : Number.NaN; })

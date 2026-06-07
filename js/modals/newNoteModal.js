@@ -198,8 +198,17 @@ const NewNoteModal = {
         }
 
         try {
-            const profile = AIAssistant.profiles[0];
+            const profiles = AIAssistant?.profiles;
+            if (!profiles || profiles.length === 0) {
+                Common.showToast('No AI profiles configured. Set up a profile in AI Settings.');
+                return;
+            }
+            const profile = profiles[0];
             const apiKey = AIAssistant._apiKeys[profile.id];
+            if (!apiKey) {
+                Common.showToast('No API key configured for the default AI profile.');
+                return;
+            }
 
             const url = profile.endpointUrl.replace(/[\\/]+$/, '') + '/chat/completions';
             const response = await fetch(url, {
@@ -394,7 +403,7 @@ const NewNoteModal = {
                 }
             } catch (err) {
                 console.error('Failed to create note:', err);
-                Common.showToast('Failed to create note: ' + (err.message || 'Unknown error'));
+                Common.showToast('Failed to create note: ' + escapeHtml(err.message || 'Unknown error'));
             } finally {
                 isCreating = false;
             }

@@ -20,8 +20,17 @@ function createTaskMenus(documentView) {
      * @param {string} currentState - Current task state character
      */
     function showTaskMenu(x, y, view, from, to, currentState) {
+        // Clean up any existing menu and its listener
         let existing = document.getElementById('taskContextMenu');
-        if (existing) existing.remove();
+        if (existing) {
+            // Fire cleanup: simulate document click to trigger self-cleaning close handler
+            const handler = existing._closeHandler;
+            if (handler) {
+                document.removeEventListener('click', handler);
+                existing._closeHandler = null;
+            }
+            existing.remove();
+        }
 
         const menu = document.createElement('div');
         menu.id = 'taskContextMenu';
@@ -85,6 +94,7 @@ function createTaskMenus(documentView) {
                 document.removeEventListener('click', closeMenu);
             }
         };
+        menu._closeHandler = closeMenu;
         document.addEventListener('click', closeMenu);
 
         menu.addEventListener('click', (e) => {
@@ -143,7 +153,14 @@ function createTaskMenus(documentView) {
      */
     function showPriorityMenu(x, y, view, from, to) {
         let existing = document.getElementById('taskContextMenu');
-        if (existing) existing.remove();
+        if (existing) {
+            const handler = existing._closeHandler;
+            if (handler) {
+                document.removeEventListener('click', handler);
+                existing._closeHandler = null;
+            }
+            existing.remove();
+        }
 
         const menu = document.createElement('div');
         menu.id = 'taskContextMenu';
@@ -195,6 +212,7 @@ function createTaskMenus(documentView) {
                 document.removeEventListener('click', closeMenu);
             }
         };
+        menu._closeHandler = closeMenu;
         document.addEventListener('click', closeMenu);
 
         menu.addEventListener('click', (e) => {

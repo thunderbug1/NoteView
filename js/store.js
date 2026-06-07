@@ -154,13 +154,8 @@ const Store = {
 
             request.onblocked = () => {
                 console.warn('IndexedDB upgrade blocked. Please close other tabs.');
-                // Mark as completed to prevent the timeout from firing later
-                if (!completed) {
-                    completed = true;
-                    clearTimeout(timeout);
-                    this.db = null;
-                    reject(new Error('IndexedDB upgrade blocked by another tab'));
-                }
+                // Don't reject — onblocked is informational. The upgrade proceeds once the
+                // other tab closes. If it never closes, the timeout will fire.
             };
         });
     },
@@ -175,7 +170,8 @@ const Store = {
         if (this._dbInitFailedAt && now - this._dbInitFailedAt < 30000) return false;
         try {
             await this.initDB();
-        } catch {
+        } catch (e) {
+            console.warn('Store._ensureDB: IndexedDB init failed:', e.message);
             this._dbInitFailedAt = now;
         }
         return !!this.db;
@@ -449,8 +445,8 @@ const Store = {
                                 await store.put(note);
                                 failedNotes.push(note);
                             } else {
-                                await store.put(note);
-                                failedNotes.push(note);
+                                // Give up after 3+ attempts and remove from DB to avoid infinite retry
+                                await store.delete(note.id);
                             }
                         }
                     }
@@ -501,7 +497,8 @@ const Store = {
             if (queued.length === 0) return;
 
             const notesToFlush = [...queued];
-            localStorage.removeItem('noteview_queued_notes');
+            // Don't clear localStorage until after successful saves — crash recovery
+            const failedNotes = [];
 
             let savedCount = 0;
 
@@ -525,16 +522,19 @@ const Store = {
                         this.blocks.push(block);
                         savedCount++;
                     } else {
-                        const remaining = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
-                        remaining.push(note);
-                        localStorage.setItem('noteview_queued_notes', JSON.stringify(remaining));
+                        failedNotes.push(note);
                     }
                 } catch (err) {
                     console.error('Failed to save queued note from localStorage:', err);
-                    const remaining = JSON.parse(localStorage.getItem('noteview_queued_notes') || '[]');
-                    remaining.push(note);
-                    localStorage.setItem('noteview_queued_notes', JSON.stringify(remaining));
+                    failedNotes.push(note);
                 }
+            }
+
+            // Rebuild localStorage with only failed notes after all saves
+            if (failedNotes.length > 0) {
+                localStorage.setItem('noteview_queued_notes', JSON.stringify(failedNotes));
+            } else {
+                localStorage.removeItem('noteview_queued_notes');
             }
 
             if (savedCount > 0) {
@@ -870,6 +870,10 @@ const Store = {
     },
 
     async _activateVault(handle, options = {}) {
+        // Clear delete sentinels from previous vault
+        this._deleteSentinels?.clear();
+        this._saveQueue?.clear();
+
         await this.saveDirectoryHandle(handle, options.vaultType);
         await this.saveVault(handle, options.vaultType);
         if (options.setLastActive !== false) {
@@ -1041,49 +1045,55 @@ const Store = {
     // --- Vault management ---
 
     async saveVault(handle, type = null) {
-        if (!this.db) {
-            await this.initDB();
-            if (!this.db) return;
+        if (this._savingVault) return;
+        this._savingVault = true;
+        try {
+            if (!this.db) {
+                await this.initDB();
+                if (!this.db) return;
+            }
+
+            const name = handle.name;
+
+            // Update vault list and resolve type
+            const list = await this.getVaultList();
+            const existing = list.find(v => v.name === name);
+            const resolvedType = type || (existing ? existing.type : 'local');
+
+            // Store the handle under vault::<name>
+            await new Promise((resolve, reject) => {
+                try {
+                    const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                    const store = tx.objectStore(this.STORE_NAME);
+                    const valueToStore = (resolvedType === 'opfs' && handle && typeof handle.getFileHandle === 'function')
+                        ? { name, type: 'opfs', isPlaceholder: true }
+                        : handle;
+                    const req = store.put(valueToStore, `vault::${name}`);
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => reject(req.error);
+                } catch (e) { reject(e); }
+            });
+
+            if (!existing) {
+                list.push({ name, type: resolvedType, addedAt: new Date().toISOString() });
+            } else {
+                existing.type = resolvedType;
+            }
+            await new Promise((resolve, reject) => {
+                try {
+                    const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                    const store = tx.objectStore(this.STORE_NAME);
+                    const req = store.put(list, 'vaultList');
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => reject(req.error);
+                } catch (e) { reject(e); }
+            });
+
+            // Keep lastDirectory in sync for backward compat
+            await this.saveDirectoryHandle(handle, resolvedType);
+        } finally {
+            this._savingVault = false;
         }
-
-        const name = handle.name;
-
-        // Update vault list and resolve type
-        const list = await this.getVaultList();
-        const existing = list.find(v => v.name === name);
-        const resolvedType = type || (existing ? existing.type : 'local');
-
-        // Store the handle under vault::<name>
-        await new Promise((resolve, reject) => {
-            try {
-                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
-                const store = tx.objectStore(this.STORE_NAME);
-                const valueToStore = (resolvedType === 'opfs' && handle && typeof handle.getFileHandle === 'function')
-                    ? { name, type: 'opfs', isPlaceholder: true }
-                    : handle;
-                const req = store.put(valueToStore, `vault::${name}`);
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
-            } catch (e) { reject(e); }
-        });
-
-        if (!existing) {
-            list.push({ name, type: resolvedType, addedAt: new Date().toISOString() });
-        } else {
-            existing.type = resolvedType;
-        }
-        await new Promise((resolve, reject) => {
-            try {
-                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
-                const store = tx.objectStore(this.STORE_NAME);
-                const req = store.put(list, 'vaultList');
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
-            } catch (e) { reject(e); }
-        });
-
-        // Keep lastDirectory in sync for backward compat
-        await this.saveDirectoryHandle(handle, resolvedType);
     },
 
     async getVaultList() {
@@ -1575,7 +1585,7 @@ const Store = {
                 }
 
                 // Intersect with path group blocks
-                if (candidateBlockIds !== new Set() && pathGroups.length > 0) {
+                if (candidateBlockIds !== null && pathGroups.length > 0) {
                     for (const group of pathGroups) {
                         const groupBlocks = window.TagIndex.getBlocksWithTagGroup(group);
                         if (candidateBlockIds === null) {
@@ -1588,7 +1598,7 @@ const Store = {
                 }
 
                 // Intersect with untagged blocks if needed
-                if (candidateBlockIds !== new Set() && hasUntagged) {
+                if (candidateBlockIds !== null && hasUntagged) {
                     const untagged = window.TagIndex.untaggedBlocks;
                     if (candidateBlockIds === null) {
                         candidateBlockIds = untagged;
