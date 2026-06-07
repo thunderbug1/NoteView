@@ -1488,33 +1488,31 @@ const DocumentView = {
 
         const onresult = (event) => {
             if (this._recognitionSession !== sessionId) return;
-            let currentTranscript = '';
-            for (let i = 0; i < event.results.length; i++) {
+            let newFinalText = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
                 if (event.results[i].isFinal) {
-                    const chunk = event.results[i][0].transcript;
-                    // Detect if this engine provides cumulative results in separate indices (Android bug)
-                    // or standard disjoint chunks. We check if the new chunk naturally extends 
-                    // the previous one.
-                    const normalizedPrev = currentTranscript.trim().toLowerCase();
-                    const normalizedChunk = chunk.trim().toLowerCase();
-                    
-                    if (normalizedPrev && normalizedChunk.startsWith(normalizedPrev)) {
-                        // Buggy cumulative mode: the new chunk already contains the old one
-                        currentTranscript = chunk;
-                    } else {
-                        // Standard mode: chunks are disjoint segments
-                        currentTranscript += chunk;
-                    }
+                    newFinalText += event.results[i][0].transcript;
                 }
             }
 
-            if (currentTranscript.length > this._insertedTranscript.length) {
-                const newText = currentTranscript.substring(this._insertedTranscript.length);
-                this._insertedTranscript = currentTranscript;
-                
+            if (!newFinalText) return;
+
+            const normalizedPrev = this._insertedTranscript.trim().toLowerCase();
+            const normalizedNew = newFinalText.trim().toLowerCase();
+
+            let textToInsert;
+            if (normalizedPrev && normalizedNew.startsWith(normalizedPrev)) {
+                textToInsert = newFinalText.substring(this._insertedTranscript.length);
+                this._insertedTranscript = newFinalText;
+            } else {
+                textToInsert = newFinalText;
+                this._insertedTranscript += newFinalText;
+            }
+
+            if (textToInsert) {
                 const currentView = this.editors.get(blockId);
                 if (currentView) {
-                    this.insertTextAtSelection(currentView, newText, groupAnnotation);
+                    this.insertTextAtSelection(currentView, textToInsert, groupAnnotation);
                 }
             }
         };
@@ -1535,7 +1533,6 @@ const DocumentView = {
                     return;
                 }
                 // Create fresh instance to prevent buffered results leaking across sessions
-                this._insertedTranscript = '';
                 this._recognitionSession++;
                 sessionId = this._recognitionSession; // Update local closure for the new session
                 try {

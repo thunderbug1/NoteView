@@ -408,28 +408,32 @@ const CaptureView = {
 
             this._recognition.onresult = (event) => {
                 if (this._recognitionSession !== sessionId) return;
-                let currentTranscript = '';
-                for (let i = 0; i < event.results.length; i++) {
+                let newFinalText = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
                     if (event.results[i].isFinal) {
-                        const chunk = event.results[i][0].transcript;
-                        const normalizedPrev = currentTranscript.trim().toLowerCase();
-                        const normalizedChunk = chunk.trim().toLowerCase();
-                        if (normalizedPrev && normalizedChunk.startsWith(normalizedPrev)) {
-                            currentTranscript = chunk;
-                        } else {
-                            currentTranscript += chunk;
-                        }
+                        newFinalText += event.results[i][0].transcript;
                     }
                 }
-                if (currentTranscript.length > this._insertedTranscript.length) {
-                    const newText = currentTranscript.substring(this._insertedTranscript.length);
-                    this._insertedTranscript = currentTranscript;
-                    if (newText.trim()) {
-                        const existing = editArea.value;
-                        editArea.value = existing + (existing && !existing.endsWith(' ') ? ' ' : '') + newText.trim();
-                        updateSaveState();
-                        showAiBtns();
-                    }
+
+                if (!newFinalText) return;
+
+                const normalizedPrev = this._insertedTranscript.trim().toLowerCase();
+                const normalizedNew = newFinalText.trim().toLowerCase();
+
+                let textToInsert;
+                if (normalizedPrev && normalizedNew.startsWith(normalizedPrev)) {
+                    textToInsert = newFinalText.substring(this._insertedTranscript.length);
+                    this._insertedTranscript = newFinalText;
+                } else {
+                    textToInsert = newFinalText;
+                    this._insertedTranscript += newFinalText;
+                }
+
+                if (textToInsert.trim()) {
+                    const existing = editArea.value;
+                    editArea.value = existing + (existing && !existing.endsWith(' ') ? ' ' : '') + textToInsert.trim();
+                    updateSaveState();
+                    showAiBtns();
                 }
             };
 
@@ -446,7 +450,6 @@ const CaptureView = {
                 if (!this._isStopping && this._restartCount < this._maxRestarts) {
                     this._restartCount++;
                     try {
-                        this._insertedTranscript = '';
                         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
                         const onresult = this._recognition.onresult;
                         const onerror = this._recognition.onerror;
