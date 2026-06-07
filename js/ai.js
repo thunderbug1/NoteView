@@ -1311,37 +1311,7 @@ const AIAssistantReal = {
     // ==============================
 
     _createDiffEditor(container, original, modified) {
-        const create = () => {
-            const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
-            // Destroy any previous diff editor on this container
-            const prevView = container._diffEditorView;
-            if (prevView) {
-                try { prevView.destroy(); } catch { /* cleanup */ }
-            }
-            const view = new EditorView({
-                doc: modified,
-                extensions: [
-                    basicSetup,
-                    unifiedMergeView({ original, mergeControls: false }),
-                    EditorView.theme({
-                        '&': { height: '100%', width: '100%' },
-                        '.cm-merge-deleted': { backgroundColor: 'rgba(244, 63, 94, 0.2)', textDecoration: 'line-through' },
-                        '.cm-merge-inserted': { backgroundColor: 'rgba(16, 185, 129, 0.2)', outline: 'none' }
-                    }),
-                    EditorView.editable.of(false),
-                    EditorState.readOnly.of(true)
-                ],
-                parent: container
-            });
-            // Track per-container so each diff card's editor is independently managed
-            container._diffEditorView = view;
-        };
-
-        if (window.CodeMirrorReady || window.CodeMirror?.basicSetup) {
-            create();
-        } else {
-            window.addEventListener('CodeMirrorReady', create, { once: true });
-        }
+        DiffEditor.createMergeViewWhenReady(container, original, modified);
     },
 
     async _acceptDiff(chat, msgId) {
@@ -1825,30 +1795,7 @@ const AIAssistantReal = {
                 return;
             }
 
-            const create = () => {
-                const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
-                if (diffEditorView) {
-                    try { diffEditorView.destroy(); } catch { /* cleanup */ }
-                }
-                diffEditorView = new EditorView({
-                    doc: result.modified,
-                    extensions: [
-                        basicSetup,
-                        unifiedMergeView({ original: result.original, mergeControls: false }),
-                        EditorView.theme({
-                            '&': { height: '100%', width: '100%' },
-                            '.cm-merge-deleted': { backgroundColor: 'rgba(244, 63, 94, 0.2)', textDecoration: 'line-through' },
-                            '.cm-merge-inserted': { backgroundColor: 'rgba(16, 185, 129, 0.2)', outline: 'none' }
-                        }),
-                        EditorView.editable.of(false),
-                        EditorState.readOnly.of(true)
-                    ],
-                    parent: container
-                });
-            };
-
-            if (window.CodeMirrorReady || window.CodeMirror?.basicSetup) create();
-            else window.addEventListener('CodeMirrorReady', create, { once: true });
+            diffEditorView = DiffEditor.createMergeView(container, result.original, result.modified);
         }
 
         async function acceptBatchItem(index) {

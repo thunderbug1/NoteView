@@ -136,13 +136,12 @@ const DocumentContentManager = {
             } else {
                 Store.blocks[existingIdx] = tempBlock;
             }
-            DocumentView.pendingNewTags = [...initialTags];
+            DocumentView.setPendingNewTags([...initialTags]);
 
             TagModal.show(tempId, {
                 onClose: () => {
-                    const tags = DocumentView.pendingNewTags || [...initialTags];
+                    const tags = DocumentView.consumePendingNewTags() || [...initialTags];
                     Store.blocks = Store.blocks.filter(b => b.id !== 'new');
-                    DocumentView.pendingNewTags = null;
                     resolve(tags);
                 }
             });
@@ -183,11 +182,12 @@ const DocumentContentManager = {
 
             // 1. Create the block in the store, applying any pending tags
             const extraMeta = {};
-            if (this.pendingNewTags && this.pendingNewTags.length > 0) {
-                extraMeta.tags = this.pendingNewTags;
+            const pending = this.getPendingNewTags();
+            if (pending && pending.length > 0) {
+                extraMeta.tags = pending;
             }
             const newBlock = await Store.createBlock(contentToSave, extraMeta);
-            this.pendingNewTags = null;
+            this.consumePendingNewTags();
 
             // 2. Update DOM of the currently active placeholder
             const currentBlock = document.querySelector('.block[data-id="new"]');

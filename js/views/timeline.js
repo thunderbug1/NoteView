@@ -1335,7 +1335,7 @@ const TimelineView = {
                     return;
                 }
 
-                const { EditorView, EditorState, basicSetup, unifiedMergeView, markdown, languages } = window.CodeMirror;
+                const { EditorView, EditorState, basicSetup, markdown, languages } = window.CodeMirror;
 
                 if (viewType === 'diff') {
                     let prevContent = '';
@@ -1349,25 +1349,13 @@ const TimelineView = {
                     }
 
                     container.innerHTML = '';
-                    this.currentDiffEditor = new EditorView({
-                        doc: currParsed.content,
-                        extensions: [
-                            basicSetup,
-                            markdown({ codeLanguages: languages }),
-                            unifiedMergeView({
-                                original: prevContent,
-                                mergeControls: false
-                            }),
-                            EditorView.theme({
-                                "&": { height: "100%", fontSize: "14px" },
-                                ".cm-merge-deleted": { backgroundColor: "rgba(239, 68, 68, 0.15)", textDecoration: "line-through" },
-                                ".cm-merge-inserted": { backgroundColor: "rgba(34, 197, 94, 0.15)", outline: "none" },
-                                ".cm-scroller": { overflow: "auto" }
-                            }),
-                            EditorView.editable.of(false),
-                            EditorState.readOnly.of(true)
-                        ],
-                        parent: container
+                    this.currentDiffEditor = DiffEditor.createMergeView(container, prevContent, currParsed.content, {
+                        markdown: true,
+                        fontSize: '14px',
+                        colors: {
+                            deleted: 'rgba(239, 68, 68, 0.15)',
+                            inserted: 'rgba(34, 197, 94, 0.15)'
+                        }
                     });
                 } else {
                     container.innerHTML = '';

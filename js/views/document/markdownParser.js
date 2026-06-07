@@ -50,11 +50,11 @@ const DocumentMarkdownParser = {
         return text.replace(/\r\n/g, '\n').replace(/\u0000/g, '');
     },
 
-    getFencedBlocks(text) {
+    getFencedBlocks(text, thresholds) {
         const fencedBlocks = [];
         const regex = /(^|\r?\n)```([^\r\n`]*)\r?\n([\s\S]*?)\r?\n```(?=\r?\n|$)/g;
         let match;
-        const t = DocumentView.fencedBlockThresholds;
+        const t = thresholds || DocumentView.fencedBlockThresholds;
 
         while ((match = regex.exec(text)) !== null) {
             const prefixLength = match[1].length;
@@ -380,47 +380,29 @@ const DocumentMarkdownParser = {
         return galleries;
     },
 
-    buildGalleryLineSet(doc, mediaGalleries) {
+    _buildLineSet(doc, items) {
         const blockedLines = new Set();
-
-        for (const gallery of mediaGalleries) {
-            const startLine = doc.lineAt(gallery.from).number;
-            const endPosition = Math.max(gallery.from, gallery.to - 1);
+        for (const item of items) {
+            const startLine = doc.lineAt(item.from).number;
+            const endPosition = Math.max(item.from, item.to - 1);
             const endLine = doc.lineAt(endPosition).number;
             for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
                 blockedLines.add(lineNumber);
             }
         }
-
         return blockedLines;
+    },
+
+    buildGalleryLineSet(doc, mediaGalleries) {
+        return this._buildLineSet(doc, mediaGalleries);
     },
 
     buildTableLineSet(doc, tables) {
-        const blockedLines = new Set();
-        for (const table of tables) {
-            const startLine = doc.lineAt(table.from).number;
-            const endPosition = Math.max(table.from, table.to - 1);
-            const endLine = doc.lineAt(endPosition).number;
-            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
-                blockedLines.add(lineNumber);
-            }
-        }
-        return blockedLines;
+        return this._buildLineSet(doc, tables);
     },
 
     buildFencedBlockLineSet(doc, fencedBlocks) {
-        const blockedLines = new Set();
-
-        for (const block of fencedBlocks) {
-            const startLine = doc.lineAt(block.from).number;
-            const endPosition = Math.max(block.from, block.to - 1);
-            const endLine = doc.lineAt(endPosition).number;
-            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
-                blockedLines.add(lineNumber);
-            }
-        }
-
-        return blockedLines;
+        return this._buildLineSet(doc, fencedBlocks);
     },
 
     isSelectionInsideBlock(state, block) {

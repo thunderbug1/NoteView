@@ -13,50 +13,71 @@ function getFilterChangedEffect() {
     return _filterChangedEffect;
 }
 
+/** @public Global singleton for the document view. All public API methods consumed by
+  * external callers (main.js, syncManager.js, newNoteModal.js, capture.js, ai.js,
+  * history.js, timeline.js, store.js, blockSelector.js, deadlinePanel.js,
+  * aiTaskPanel.js, backlinksPanel.js) are annotated with @public.
+  * Methods and properties prefixed with _ are @private — do not access from outside. */
 const DocumentView = {
-    // Track CodeMirror editor instances by block ID
+    /** @public Map of blockId -> CodeMirror EditorView */
     editors: new Map(),
-    // Track highlight positions by block ID (set before dispatching to trigger decoration)
+    /** @private Highlight positions by block ID (set before dispatching to trigger decoration) */
     _highlightPositions: new Map(),
+    /** @internal Content of the "new" placeholder block */
     newBlockContent: '',
+    /** @internal Tags queued for next new block. Use setPendingNewTags / consumePendingNewTags instead. */
     pendingNewTags: null,
-    saveTimeouts: new Map(), // blockId -> timeoutId
-    originalContents: new Map(), // blockId -> original content for change detection
-    // Flag to prevent auto-save during modal editing or mobile note creation
+    /** @private blockId -> timeoutId for debounced saves */
+    saveTimeouts: new Map(),
+    /** @private blockId -> original content for change detection */
+    originalContents: new Map(),
+    /** @private Flag to prevent auto-save during modal editing or mobile note creation.
+      * Use setIsInModalOrCreation(val) instead of direct assignment. */
     _isInModalOrCreation: false,
-    // Track which blocks are collapsed by block ID
+    /** @public Map of collapsed block IDs -> true */
     collapsedBlocks: new Map(),
-    // Track blocks expanded by click that should re-collapse on blur
+    /** @private Blocks expanded by click that should re-collapse on blur */
     _autoCollapseOnBlur: new Set(),
-    // Track which groups are collapsed by group key
+    /** @public Map of collapsed group keys -> true */
     collapsedGroups: new Map(),
+    /** @public Thresholds for collapsible fenced blocks */
     fencedBlockThresholds: {
         lines: 12,
         chars: 800,
         previewLines: 6
     },
-    // Store widget class for access in closures
+    /** @private Cache for CodeMirror widget class */
     MarkdownWidgetClass: null,
-    // Task menus (initialized on first use)
+    /** @private Lazy-init TaskMenus instance */
     _taskMenus: null,
+    /** @private Lazy-init CodeMirrorWidgets instance */
     _cmWidgets: null,
+    /** @private Cached EditorTheme config */
     _editorTheme: null,
-    // Speech recognition state
+    /** @private Active speech recognition instance */
     _recognition: null,
+    /** @private Block being dictated into */
     _recordingBlockId: null,
+    /** @private Flag during recognition stop */
     _isStopping: false,
+    /** @private Restart counter (max 10) */
     _recognitionRestartCount: 0,
+    /** @private Max auto-restarts for speech recognition */
     _maxRecognitionRestarts: 10,
-    // Mobile toolbar state
+    /** @private Mobile toolbar DOM element */
     _mobileToolbar: null,
+    /** @private Currently focused CodeMirror editor. Use getFocusedEditor() instead. */
     _focusedEditor: null,
-    // Drag-and-drop wikilink state
+    /** @private Drag-and-drop wikilink state */
     _dragState: { active: false },
+    /** @private Bound mousemove handler for drag */
     _dragMoveHandler: null,
+    /** @private Bound mouseup handler for drag */
     _dragEndHandler: null,
 
     /**
      * Get or initialize task menus
+     * @public
      */
     getTaskMenus() {
         if (!this._taskMenus) {
@@ -65,6 +86,47 @@ const DocumentView = {
         return this._taskMenus;
     },
 
+    // ── Public accessors for private state ──────────────────────────────────
+
+    /** @public Returns the currently focused CodeMirror EditorView, or null.
+     *  Replaces direct access to the @private _focusedEditor field. */
+    getFocusedEditor() {
+        return this._focusedEditor || null;
+    },
+
+    /** @public Sets the auto-save suppression flag for modal editing or mobile creation.
+     *  Replaces direct assignment to the @private _isInModalOrCreation field. */
+    setIsInModalOrCreation(flag) {
+        this._isInModalOrCreation = !!flag;
+    },
+
+    /** @public Sets tags for the next new block. Used by TagModal onClose callbacks.
+     *  Replaces direct assignment to the @internal pendingNewTags field. */
+    setPendingNewTags(tags) {
+        this.pendingNewTags = tags;
+    },
+
+    /** @public Returns current pending new-block tags without clearing.
+     *  For polling scenarios (e.g. syncing modal tags from pending state). */
+    getPendingNewTags() {
+        return this.pendingNewTags;
+    },
+
+    /** @public Reads and clears pending new-block tags. Returns the tags that were set
+     *  or null if none. Used by capture.js and newNoteModal.js. */
+    consumePendingNewTags() {
+        const tags = this.pendingNewTags;
+        this.pendingNewTags = null;
+        return tags;
+    },
+
+    /** @public Clean up speech recognition for the current block.
+     *  Also called by newNoteModal.js to clean up on modal close. */
+    cleanupRecognition() {
+        DocumentSpeechRecognition.cleanupRecognition.call(this);
+    },
+
+    /** @public Reset all state when switching vaults. Called by main.js and store.js. */
     clearVaultState() {
         this.editors.clear();
         this._highlightPositions.clear();
@@ -85,6 +147,8 @@ const DocumentView = {
         this.cleanupMobileKeyboardHandler();
     },
 
+    /** @public Main entry point. Renders document view with optional grouping.
+     *  Called by main.js. */
     async render(blocks, options = {}) {
         const container = document.getElementById('viewContainer');
 
@@ -280,6 +344,8 @@ const DocumentView = {
     // Track CodeMirror loading state
     _codeMirrorLoading: null,
 
+    /** @public Wait for CodeMirror to be loaded and ready. Called by main.js,
+     *  newNoteModal.js, capture.js, history.js, and timeline.js. */
     async waitForCodeMirror() {
         if (window.CodeMirrorReady) {
             return;
@@ -1007,20 +1073,29 @@ const DocumentView = {
         if (fab) fab.style.display = '';
     },
 
+    /**
+     * @public Show task context menu. Delegates to TaskMenus.
+     */
     showTaskMenu(x, y, view, from, to, currentState) {
         return this.getTaskMenus().showTaskMenu(x, y, view, from, to, currentState);
     },
 
+    /**
+     * @public Show priority menu. Delegates to TaskMenus.
+     */
     showPriorityMenu(x, y, view, from, to) {
         return this.getTaskMenus().showPriorityMenu(x, y, view, from, to);
     },
 
+    /**
+     * @public Append inline field to task line. Delegates to TaskMenus.
+     */
     appendInlineField(view, checkFrom, checkTo, key, value) {
         return this.getTaskMenus().appendInlineField(view, checkFrom, checkTo, key, value);
     },
 
 
-    // Focus editor for a block
+    /** @public Focus the CodeMirror editor for a block. Called by main.js. */
     focusEditor(blockId) {
         const editor = this.editors.get(blockId);
         if (editor) {
@@ -1028,7 +1103,7 @@ const DocumentView = {
         }
     },
 
-    // Get the ID of the currently focused block
+    /** @public Get the ID of the currently focused block. Called by main.js and timeline.js. */
     getFocusedBlockId() {
         return this._focusedBlockId || null;
     },
@@ -1096,7 +1171,7 @@ const DocumentView = {
         this.hideMobileToolbar();
     },
 
-    // Focus the "new note" block at the bottom
+    /** @public Focus the 'new' placeholder block at the top of the document view. */
     focusNewBlock() {
         const doFocus = () => {
             const newBlock = document.querySelector('.block[data-id="new"]');
@@ -1165,7 +1240,7 @@ const DocumentView = {
         }, 1000);
     },
 
-    // Navigate to a block by wikilink target — scroll into view in document, or open modal if filtered out
+    /** @public Navigate to a block by wikilink target. Called by main.js and backlinksPanel.js. */
     navigateToBlock(targetId) {
         const block = Store.findBlockByWikilink(targetId);
         if (!block) {
@@ -1242,6 +1317,9 @@ Object.assign(DocumentView, DocumentSpeechRecognition);
 Object.assign(DocumentView, DocumentHtmlRenderer);
 Object.assign(DocumentView, DocumentContentManager);
 Object.assign(DocumentView, DocumentDiffHelper);
+Object.assign(DocumentView, DocumentAutocomplete);
+Object.assign(DocumentView, DocumentPasteHandler);
+Object.assign(DocumentView, DocumentExtractCutModal);
 Object.assign(DocumentView, DocumentInteractions);
 Object.assign(DocumentView, DocumentEditorSetup);
 Object.assign(DocumentView, DocumentDecorations);

@@ -392,6 +392,55 @@ const Store = {
         await this._flushNotesFromLocalStorage();
     },
 
+    /**
+     * Create and save a block from a queued note object.
+     * Shared by _flushNotesFromDB and _flushNotesFromLocalStorage.
+     * @param {Object} note - Pending note with { content, options, timestamp }
+     * @returns {Promise<Object>} The created block
+     */
+    async _createAndSaveQueuedNote(note) {
+        const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const block = {
+            id,
+            content: note.content,
+            tags: note.options.tags || [],
+            creationDate: new Date(note.timestamp).toISOString(),
+            lastUpdated: new Date().toISOString(),
+            ...note.options
+        };
+        block.id = id;
+        block.content = note.content;
+        if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
+
+        await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
+        this.blocks.push(block);
+        return block;
+    },
+
+    /**
+     * Invalidate caches and show toast after saving queued notes.
+     * Shared by _flushNotesFromDB and _flushNotesFromLocalStorage.
+     * @param {number} savedCount
+     * @param {number} failedCount
+     */
+    _onQueuedFlushComplete(savedCount, failedCount = 0) {
+        if (savedCount > 0) {
+            this._filteredBlocksCache.invalidate();
+            TimelineView.invalidateCache();
+            SelectionManager.updateTagCounts();
+            if (window.Common) {
+                window.Common.showToast(`${savedCount} note(s) saved`);
+            }
+        }
+        if (failedCount > 0) {
+            if (window.Common) {
+                window.Common.showToast(`${failedCount} note(s) failed to save (will retry)`, {
+                    duration: 5000
+                });
+            }
+        }
+    },
+
     async _flushNotesFromDB() {
         if (!await this._ensureDB()) return;
 
@@ -420,22 +469,8 @@ const Store = {
 
                     for (const note of notes) {
                         try {
-                            const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-                            const block = {
-                                id,
-                                content: note.content,
-                                tags: note.options.tags || [],
-                                creationDate: new Date(note.timestamp).toISOString(),
-                                lastUpdated: new Date().toISOString(),
-                                ...note.options
-                            };
-                            block.id = id;
-                            block.content = note.content;
-                            if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
-
-                            await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
+                            await this._createAndSaveQueuedNote(note);
                             await store.delete(note.id);
-                            this.blocks.push(block);
                             savedCount++;
                         } catch (err) {
                             console.error('Failed to save queued note:', err);
@@ -452,23 +487,7 @@ const Store = {
                     }
 
                     tx.oncomplete = () => {
-                        if (savedCount > 0) {
-                            this._filteredBlocksCache.invalidate();
-                            TimelineView.invalidateCache();
-                            SelectionManager.updateTagCounts();
-                            if (window.Common) {
-                                window.Common.showToast(`${savedCount} note(s) saved`);
-                            }
-                        }
-
-                        if (failedNotes.length > 0) {
-                            if (window.Common) {
-                                window.Common.showToast(`${failedNotes.length} note(s) failed to save (will retry)`, {
-                                    duration: 5000
-                                });
-                            }
-                        }
-
+                        this._onQueuedFlushComplete(savedCount, failedNotes.length);
                         this._updatePendingNotesCount();
                         resolve();
                     };
@@ -505,21 +524,7 @@ const Store = {
             for (const note of notesToFlush) {
                 try {
                     if (this.directoryHandle) {
-                        const id = `${new Date().toISOString().split('T')[0]}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-                        const block = {
-                            id,
-                            content: note.content,
-                            tags: note.options.tags || [],
-                            creationDate: new Date(note.timestamp).toISOString(),
-                            lastUpdated: new Date().toISOString(),
-                            ...note.options
-                        };
-                        block.id = id;
-                        block.content = note.content;
-                        if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
-
-                        await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
-                        this.blocks.push(block);
+                        await this._createAndSaveQueuedNote(note);
                         savedCount++;
                     } else {
                         failedNotes.push(note);
@@ -538,12 +543,7 @@ const Store = {
             }
 
             if (savedCount > 0) {
-                this._filteredBlocksCache.invalidate();
-                TimelineView.invalidateCache();
-                SelectionManager.updateTagCounts();
-                if (window.Common) {
-                    window.Common.showToast(`${savedCount} note(s) saved`);
-                }
+                this._onQueuedFlushComplete(savedCount);
             }
         } catch (e) {
             console.error('Error flushing from localStorage:', e);

@@ -142,25 +142,8 @@ const HistoryView = {
             return;
         }
 
-        const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
-
-        this.editorView = new EditorView({
-            doc: block.content || '',
-            extensions: [
-                basicSetup,
-                unifiedMergeView({
-                    original: parsedOld.content,
-                    mergeControls: false
-                }),
-                EditorView.theme({
-                    "&": { height: "100%", width: "100%", fontFamily: 'Inter, sans-serif' },
-                    ".cm-merge-deleted": { backgroundColor: "rgba(244, 63, 94, 0.2)", textDecoration: "line-through" },
-                    ".cm-merge-inserted": { backgroundColor: "rgba(16, 185, 129, 0.2)", outline: "none" }
-                }),
-                EditorView.editable.of(false),
-                EditorState.readOnly.of(true)
-            ],
-            parent: container
+        this.editorView = DiffEditor.createMergeView(container, parsedOld.content, block.content || '', {
+            fontFamily: 'Inter, sans-serif'
         });
 
         const restoreBtn = document.getElementById('restoreVersionBtn');

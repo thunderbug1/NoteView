@@ -335,8 +335,8 @@ const SyncManager = {
     _isEditing() {
         return Store.currentView === 'document' &&
             window.DocumentView &&
-            DocumentView._focusedEditor &&
-            DocumentView._focusedEditor.hasFocus;
+            DocumentView.getFocusedEditor() &&
+            DocumentView.getFocusedEditor().hasFocus;
     },
 
     async _postSyncRender(withLoading = false) {

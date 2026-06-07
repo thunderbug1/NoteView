@@ -1,13 +1,8 @@
 const CaptureView = {
     currentPage: null,
     _blocks: null,
-    _recognition: null,
-    _isStopping: false,
-    _recognitionSession: 0,
-    _restartCount: 0,
-    _maxRestarts: 10,
+    _speechSession: null,
     _transcript: '',
-    _interimTranscript: '',
     _currentTags: [],
     _templateContent: '',
     _editor: null,
@@ -32,7 +27,7 @@ const CaptureView = {
         this.currentPage = page;
         this._currentTags = [...SelectionManager.getTagsForNewNote()];
         // Prevent auto-save while in mobile capture view
-        DocumentView._isInModalOrCreation = true;
+        DocumentView.setIsInModalOrCreation(true);
         this.render(this._blocks);
     },
 
@@ -41,16 +36,14 @@ const CaptureView = {
         this.currentPage = null;
         this._currentTags = [];
         // Re-enable auto-save when returning to grid
-        DocumentView._isInModalOrCreation = false;
+        DocumentView.setIsInModalOrCreation(false);
         this.render(this._blocks);
     },
 
     _cleanup() {
-        if (this._recognition) {
-            this._isStopping = true;
-            try { this._recognition.stop(); } catch (e) { /* ignore */ }
-            this._recognition = null;
-        }
+        const session = this._speechSession;
+        this._speechSession = null;
+        if (session) session.stop();
         if (this._vaultCheckInterval) {
             clearInterval(this._vaultCheckInterval);
             this._vaultCheckInterval = null;
@@ -60,7 +53,6 @@ const CaptureView = {
             this._editor = null;
         }
         this._transcript = '';
-        this._interimTranscript = '';
     },
 
     _addTouchFeedback(element) {
@@ -158,12 +150,12 @@ const CaptureView = {
         const existingIdx = Store.blocks.findIndex(b => b.id === tempId);
         if (existingIdx === -1) Store.blocks.push(tempBlock);
         else Store.blocks[existingIdx] = tempBlock;
-        DocumentView.pendingNewTags = [...this._currentTags];
+        DocumentView.setPendingNewTags([...this._currentTags]);
         TagModal.show(tempId, {
             onClose: () => {
-                if (DocumentView.pendingNewTags) {
-                    this._currentTags = [...DocumentView.pendingNewTags];
-                    DocumentView.pendingNewTags = null;
+                const pending = DocumentView.consumePendingNewTags();
+                if (pending) {
+                    this._currentTags = [...pending];
                 }
                 Store.blocks = Store.blocks.filter(b => b.id !== tempId);
                 this._refreshTagBadge(container);
@@ -409,92 +401,39 @@ const CaptureView = {
         editArea.addEventListener('input', () => { updateSaveState(); showAiBtns(); });
 
         const startRecording = () => {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            this._restartCount = 0;
-            this._recognition = new SpeechRecognition();
-            this._recognition.continuous = true;
-            this._recognition.interimResults = true;
-            this._recognitionSession++;
-            let sessionId = this._recognitionSession;
-            this._isStopping = false;
-            this._insertedTranscript = '';
-            this._interimTranscript = '';
-
-            hideAiBtns();
-
-            this._recognition.onresult = (event) => {
-                if (this._recognitionSession !== sessionId) return;
-                let newFinalText = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    if (event.results[i].isFinal) {
-                        newFinalText += event.results[i][0].transcript;
+            const self = this;
+            this._speechSession = SpeechManager.createSession({
+                onResult: (textToInsert) => {
+                    if (textToInsert.trim()) {
+                        const existing = editArea.value;
+                        editArea.value = existing + (existing && !existing.endsWith(' ') ? ' ' : '') + textToInsert.trim();
+                        updateSaveState();
+                        showAiBtns();
                     }
-                }
-
-                if (!newFinalText) return;
-
-                const normalizedPrev = this._insertedTranscript.trim().toLowerCase();
-                const normalizedNew = newFinalText.trim().toLowerCase();
-
-                let textToInsert;
-                if (normalizedPrev && normalizedNew.startsWith(normalizedPrev)) {
-                    textToInsert = newFinalText.substring(this._insertedTranscript.length);
-                    this._insertedTranscript = newFinalText;
-                } else {
-                    textToInsert = newFinalText;
-                    this._insertedTranscript += newFinalText;
-                }
-
-                if (textToInsert.trim()) {
-                    const existing = editArea.value;
-                    editArea.value = existing + (existing && !existing.endsWith(' ') ? ' ' : '') + textToInsert.trim();
-                    updateSaveState();
+                },
+                onError: () => {
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                    statusEl.textContent = 'Stopped';
                     showAiBtns();
+                },
+                onStop: () => {
+                    self._cleanup();
+                },
+                onStart: () => {
+                    isRecording = true;
+                    micBtn.classList.add('recording');
+                    statusEl.textContent = 'Listening...';
+                    hideAiBtns();
                 }
-            };
-
-            this._recognition.onerror = () => {
-                if (this._recognitionSession !== sessionId) return;
-                isRecording = false;
-                micBtn.classList.remove('recording');
-                statusEl.textContent = 'Stopped';
-                showAiBtns();
-            };
-
-            this._recognition.onend = () => {
-                if (this._recognitionSession !== sessionId) return;
-                if (!this._isStopping && this._restartCount < this._maxRestarts) {
-                    if (!this._recognition) return;
-                    this._restartCount++;
-                    try {
-                        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                        const onresult = this._recognition.onresult;
-                        const onerror = this._recognition.onerror;
-                        const onend = this._recognition.onend;
-                        this._recognition = new SR();
-                        this._recognition.continuous = true;
-                        this._recognition.interimResults = true;
-                        this._recognition.onresult = onresult;
-                        this._recognition.onerror = onerror;
-                        this._recognition.onend = onend;
-                        this._recognitionSession++;
-                        sessionId = this._recognitionSession;
-                        this._recognition.start();
-                    } catch (e) { /* ignore */ }
-                }
-            };
-
-            this._recognition.start();
-            isRecording = true;
-            micBtn.classList.add('recording');
-            statusEl.textContent = 'Listening...';
+            });
+            this._speechSession.start();
         };
 
         const stopRecording = () => {
-            this._isStopping = true;
-            if (this._recognition) {
-                try { this._recognition.stop(); } catch (e) { /* ignore */ }
-                this._recognition = null;
+            if (this._speechSession) {
+                this._speechSession.stop();
+                this._speechSession = null;
             }
             isRecording = false;
             micBtn.classList.remove('recording');

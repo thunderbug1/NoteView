@@ -77,7 +77,7 @@ const TagModal = {
         const updatePendingTags = () => {
             if (blockId === 'new') {
                 const newTags = Array.from(selectedTags).sort();
-                DocumentView.pendingNewTags = newTags;
+                DocumentView.setPendingNewTags(newTags);
 
                 for (const tag of newTags) {
                     if (!allTags.includes(tag)) {

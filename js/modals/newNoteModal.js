@@ -334,7 +334,7 @@ const NewNoteModal = {
         let isCreating = false;
 
         // Prevent auto-save while in modal
-        DocumentView._isInModalOrCreation = true;
+        DocumentView.setIsInModalOrCreation(true);
 
         const self = this;
 
@@ -387,7 +387,7 @@ const NewNoteModal = {
                     }
                 }
 
-                DocumentView.pendingNewTags = null;
+                DocumentView.consumePendingNewTags();
                 SelectionManager.updateTagCounts();
 
                 const reasons = Store.getBlockingFilters(newBlock);
@@ -429,7 +429,7 @@ const NewNoteModal = {
                 } else {
                     Store.blocks[existingIdx] = tempBlock;
                 }
-                DocumentView.pendingNewTags = [...modalTags];
+                DocumentView.setPendingNewTags([...modalTags]);
                 TagModal.show(tempId, {
                     onClose: () => syncTagsFromPending()
                 });
@@ -479,7 +479,7 @@ const NewNoteModal = {
             modalClass: 'tag-modal content-modal active-recording-preventer',
             onClose: async () => {
                 // Re-enable auto-save after modal closes
-                DocumentView._isInModalOrCreation = false;
+                DocumentView.setIsInModalOrCreation(false);
                 
                 DocumentView.stopSpeechRecognition();
                 if (self._aiDictationActive && !self._aiIsProcessing) {
@@ -519,8 +519,8 @@ const NewNoteModal = {
         });
 
         const syncTagsFromPending = () => {
-            if (!createdBlockId && DocumentView.pendingNewTags) {
-                const pending = DocumentView.pendingNewTags;
+            if (!createdBlockId && DocumentView.getPendingNewTags()) {
+                const pending = DocumentView.getPendingNewTags();
                 if (JSON.stringify(pending) !== JSON.stringify(modalTags)) {
                     modalTags = [...pending];
                     renderModalTags();

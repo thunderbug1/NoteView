@@ -1208,9 +1208,9 @@ const App = {
 
         const preRenderFocusedBlockId = (view === 'document' &&
             window.DocumentView &&
-            DocumentView._focusedEditor &&
-            DocumentView._focusedEditor.hasFocus)
-            ? DocumentView._focusedBlockId : null;
+            DocumentView.getFocusedEditor() &&
+            DocumentView.getFocusedEditor().hasFocus)
+            ? DocumentView.getFocusedBlockId() : null;
 
         const container = document.getElementById('viewContainer');
         if (container) {

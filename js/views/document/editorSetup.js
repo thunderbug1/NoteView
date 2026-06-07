@@ -619,8 +619,8 @@ const DocumentEditorSetup = {
         const resolveBlockId = () => editorView?.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
         const handleContentChange = (content) => DocumentView.handleContentChange(resolveBlockId(), content);
         const createNewBlock = () => DocumentView.createNewBlock();
-        const mentionCompletionSource = this.createMentionCompletionSource(container, resolveBlockId);
-        const wikilinkCompletionSource = this.createWikilinkCompletionSource(container);
+        const mentionCompletionSource = DocumentView.createMentionCompletionSource(container, resolveBlockId);
+        const wikilinkCompletionSource = DocumentView.createWikilinkCompletionSource(container);
 
         const view = new EditorView({
             doc: (blockId === 'new' && initialContent === '') ? '' : (initialContent.endsWith('\n') ? initialContent : initialContent + '\n'),
@@ -642,17 +642,16 @@ const DocumentEditorSetup = {
                 this.createHighlightExtension(blockId),
                 EditorView.updateListener.of((update) => {
                     if (update.focusChanged && update.view.hasFocus) {
-                        this._focusedEditor = update.view;
-                        this.showMobileToolbar();
+                        DocumentView._focusedEditor = update.view;
+                        DocumentView.showMobileToolbar();
                     } else if (update.focusChanged && !update.view.hasFocus) {
-                        if (this._focusedEditor === update.view) {
-                            this._focusedEditor = null;
-                            this.hideMobileToolbar();
+                        if (DocumentView._focusedEditor === update.view) {
+                            DocumentView._focusedEditor = null;
+                            DocumentView.hideMobileToolbar();
                         }
-                        // Re-collapse block if it was expanded by click
-                        if (this._autoCollapseOnBlur.has(blockId)) {
-                            this._autoCollapseOnBlur.delete(blockId);
-                            this.collapseBlock(blockId);
+                        if (DocumentView._autoCollapseOnBlur.has(blockId)) {
+                            DocumentView._autoCollapseOnBlur.delete(blockId);
+                            DocumentView.collapseBlock(blockId);
                         }
                     }
                 }),

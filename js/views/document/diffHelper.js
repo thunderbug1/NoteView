@@ -26,29 +26,7 @@ const DocumentDiffHelper = {
     },
 
     _createInlineDiffEditor(container, original, modified) {
-        const create = () => {
-            const { EditorView, EditorState, basicSetup, unifiedMergeView } = window.CodeMirror;
-            const existingView = container._cmView;
-            if (existingView) { try { existingView.destroy(); } catch { /* */ } }
-
-            container._cmView = new EditorView({
-                doc: modified,
-                extensions: [
-                    basicSetup,
-                    unifiedMergeView({ original, mergeControls: false }),
-                    EditorView.theme({
-                        '&': { height: '100%', width: '100%' },
-                        '.cm-merge-deleted': { backgroundColor: 'rgba(244, 63, 94, 0.2)', textDecoration: 'line-through' },
-                        '.cm-merge-inserted': { backgroundColor: 'rgba(16, 185, 129, 0.2)', outline: 'none' }
-                    }),
-                    EditorView.editable.of(false),
-                    EditorState.readOnly.of(true)
-                ],
-                parent: container
-            });
-        };
-        if (window.CodeMirror?.basicSetup) create();
-        else window.addEventListener('CodeMirrorReady', create, { once: true });
+        DiffEditor.createMergeViewWhenReady(container, original, modified);
     },
 
     showPendingInlineDiffs() {
