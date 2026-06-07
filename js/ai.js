@@ -345,7 +345,7 @@ const AIAssistantReal = {
         this._activeChatId = chatId;
         this._renderTabs();
         this._renderActiveChat();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
     closeChat(chatId) {
@@ -367,7 +367,7 @@ const AIAssistantReal = {
         this._renderTabs();
         this._renderActiveChat();
         this._updateBadge();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
     _updateBadge() {
@@ -1197,7 +1197,7 @@ const AIAssistantReal = {
         this._renderActiveChat();
         this._renderTabs();
         this.showInlineDiffs();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
     async _readChatStream(response, chat, msgId) {
@@ -1378,9 +1378,9 @@ const AIAssistantReal = {
 
         this._renderMessages(chat);
         this._renderTabs();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
-
+    
     _rejectDiff(chat, msgId) {
         const msg = chat.messages.find(m => m.id === msgId);
         if (!msg || msg.accepted !== null) return;
@@ -1394,7 +1394,7 @@ const AIAssistantReal = {
         this._renderTabs();
         this._updateBadge();
         this.showInlineDiffs();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
     async _acceptCreateNote(chat, msgId) {
@@ -1420,7 +1420,7 @@ const AIAssistantReal = {
 
         this._renderMessages(chat);
         this._renderTabs();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
     _rejectCreateNote(chat, msgId) {
@@ -1435,7 +1435,7 @@ const AIAssistantReal = {
         this._renderMessages(chat);
         this._renderTabs();
         this._updateBadge();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
     // ==============================
@@ -1720,7 +1720,7 @@ const AIAssistantReal = {
         this._renderActiveChat();
         this._renderTabs();
         this.showInlineDiffs();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
 
         } catch (err) {
             console.error('[AI] _sendPerNote unexpected error:', err);
@@ -1734,7 +1734,7 @@ const AIAssistantReal = {
             });
             this._renderActiveChat();
             this._renderTabs();
-            this.saveChats();
+            this.saveChats().catch(e => console.error('Failed to save chats:', e));
         }
     },
 
@@ -2037,7 +2037,7 @@ const AIAssistantReal = {
         const hasPendingOther = chat.messages.some(m => (m.type === 'diff' || m.type === 'create') && m.accepted === null);
         chat.state = (hasPendingBatch || hasPendingOther) ? 'awaiting_input' : 'idle';
         this._renderTabs();
-        this.saveChats();
+        this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
     // ==============================

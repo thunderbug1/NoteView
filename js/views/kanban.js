@@ -993,12 +993,12 @@ const KanbanView = {
      * Update or remove a badge field on a task within block content and save.
      * Pass null as value to remove the badge.
      */
-    updateTaskBadge(card, fieldName, value) {
+    async updateTaskBadge(card, fieldName, value) {
         const block = Store.blocks.find(b => b.id === card.dataset.blockId);
         if (!block) return;
 
-        const tasks = KanbanView.extractTasks([block]);
-        const task = tasks.find(t => t.id === card.dataset.id);
+        const allTasks = TaskParser.parseTasksFromContent(block.content);
+        const task = allTasks.find(t => t.id === card.dataset.id);
         if (!task) return;
 
         let newText = task.originalText;
@@ -1025,9 +1025,8 @@ const KanbanView = {
 
         const action = value === null ? 'Remove' : 'Update';
         const commitMessage = `${action} ${fieldName} for '${task.text}'`;
-        App.saveBlockContent(block.id, newContent, { commit: true, commitMessage }).then(() => {
-            App.render();
-        });
+        await App.saveBlockContent(block.id, newContent, { commit: true, commitMessage });
+        App.render();
     },
 
     /**

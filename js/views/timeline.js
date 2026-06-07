@@ -1169,7 +1169,7 @@ const TimelineView = {
                     btn.innerHTML = `Undoing...`;
                     try {
                         await this.undoChange(blockId, filename, oid, parentsRaw);
-                        showToast(`Successfully undid changes to ${blockId}.`);
+                        Common.showToast(`Successfully undid changes to ${blockId}.`);
                     } catch (err) {
                         btn.disabled = false;
                         btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg> Undo`;
@@ -1329,6 +1329,10 @@ const TimelineView = {
                 await DocumentView.waitForCodeMirror();
                 if (!window.CodeMirror?.EditorView) {
                     container.innerHTML = '<p class="tl-error">Failed to load editor. Please try again.</p>';
+                    return;
+                }
+
+                if (!document.getElementById('tlDiffContainer')) {
                     return;
                 }
 

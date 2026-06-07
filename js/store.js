@@ -1273,6 +1273,7 @@ const Store = {
         } catch (err) {
             this.directoryHandle = prevHandle;
             this.blocks = prevBlocks;
+            this._vaultReady = false;
             throw err;
         }
     },

@@ -98,6 +98,7 @@ function createTaskMenus(documentView) {
         document.addEventListener('click', closeMenu);
 
         menu.addEventListener('click', (e) => {
+            e.stopPropagation();
             const item = e.target.closest('.menu-item');
             if (!item) return;
 
@@ -216,6 +217,7 @@ function createTaskMenus(documentView) {
         document.addEventListener('click', closeMenu);
 
         menu.addEventListener('click', (e) => {
+            e.stopPropagation();
             const item = e.target.closest('.menu-item');
             if (!item) return;
 

@@ -51,13 +51,16 @@ const CaptureView = {
             try { this._recognition.stop(); } catch (e) { /* ignore */ }
             this._recognition = null;
         }
+        if (this._vaultCheckInterval) {
+            clearInterval(this._vaultCheckInterval);
+            this._vaultCheckInterval = null;
+        }
         if (window.CodeMirror && window.CodeMirror.EditorView && this._editor) {
             this._editor.destroy();
             this._editor = null;
         }
         this._transcript = '';
         this._interimTranscript = '';
-        this._isStopping = false;
     },
 
     _addTouchFeedback(element) {
@@ -230,9 +233,13 @@ const CaptureView = {
             }
             // Listen for vault to become ready
             if (!isVaultReady) {
-                const checkVault = setInterval(() => {
+                if (this._vaultCheckInterval) {
+                    clearInterval(this._vaultCheckInterval);
+                }
+                this._vaultCheckInterval = setInterval(() => {
                     if (Store.directoryHandle) {
-                        clearInterval(checkVault);
+                        clearInterval(this._vaultCheckInterval);
+                        this._vaultCheckInterval = null;
                         const btn = container.querySelector('[data-action="switch-vault"]');
                         const span = btn?.querySelector('span');
                         if (span) span.textContent = Store.directoryHandle.name;
@@ -243,8 +250,11 @@ const CaptureView = {
             }
         }
 
-        // Listen for pending notes updates
-        window.addEventListener('pending-notes-update', (e) => {
+        // Remove any previous pending-notes listener and add a fresh one
+        if (this._pendingNotesHandler) {
+            window.removeEventListener('pending-notes-update', this._pendingNotesHandler);
+        }
+        this._pendingNotesHandler = (e) => {
             const indicator = container.querySelector('.capture-pending-indicator');
             if (indicator) {
                 if (e.detail.count > 0) {
@@ -254,7 +264,8 @@ const CaptureView = {
                     indicator.classList.remove('visible');
                 }
             }
-        });
+        };
+        window.addEventListener('pending-notes-update', this._pendingNotesHandler);
 
         // Initial pending count
         Store._getQueuedNotesCount().then(count => {
@@ -309,6 +320,8 @@ const CaptureView = {
         this._wireSave(container, () => this._getEditorContent());
 
         DocumentView.waitForCodeMirror().then(() => {
+            if (this.currentPage !== 'write') return;
+
             const cmContainer = container.querySelector('.codemirror-container');
             if (!cmContainer) return;
 
@@ -448,6 +461,7 @@ const CaptureView = {
             this._recognition.onend = () => {
                 if (this._recognitionSession !== sessionId) return;
                 if (!this._isStopping && this._restartCount < this._maxRestarts) {
+                    if (!this._recognition) return;
                     this._restartCount++;
                     try {
                         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -652,6 +666,8 @@ const CaptureView = {
 
     renderTemplatePicker(container) {
         DocumentView.waitForCodeMirror().then(async () => {
+            if (this.currentPage !== 'template') return;
+
             const templates = await AppSettings.getTemplates();
 
             if (templates.length === 0) {

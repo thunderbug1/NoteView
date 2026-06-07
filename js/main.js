@@ -419,6 +419,9 @@ const App = {
     },
 
     _setupSyncStatusIndicator() {
+        if (this._syncIndicatorSetup) return;
+        this._syncIndicatorSetup = true;
+
         const btn = document.getElementById('toolbarSyncBtn');
         if (!btn) return;
 

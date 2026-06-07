@@ -278,9 +278,6 @@ const UndoRedoManager = {
             Store.blocks.push(block);
         }
 
-        // Update tag index
-        TagIndex.addBlock(block);
-
         // Update contacts and cache
         Store.extractContacts();
         Store._filteredBlocksCache.invalidate();

@@ -115,7 +115,7 @@ window.BlockFilter = {
             }
 
             // Use tag index for untagged check if available
-            if (hasUntagged && window.TagIndex?.untaggedBlocks?.size >= 0) {
+            if (hasUntagged && window.TagIndex) {
                 if (!window.TagIndex.isBlockUntagged(block.id)) {
                     return false;
                 }
@@ -199,7 +199,7 @@ window.BlockFilter = {
             }
 
             // Use tag index for untagged exclusion if available
-            if (hasUntagged && window.TagIndex?.untaggedBlocks?.size >= 0) {
+            if (hasUntagged && window.TagIndex) {
                 if (window.TagIndex.isBlockUntagged(block.id)) {
                     return false;
                 }

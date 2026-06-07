@@ -385,7 +385,12 @@ const DocumentView = {
             if (editorDiv) editorDiv.classList.add('block-editor-diff-hidden');
             article.classList.add('block-has-pending-diff');
 
-            editorDiv.insertAdjacentHTML('afterend', this.renderInlineDiffOverlay(blockId, pendingDiffs));
+            const diffOverlay = this.renderInlineDiffOverlay(blockId, pendingDiffs);
+            if (editorDiv) {
+                editorDiv.insertAdjacentHTML('afterend', diffOverlay);
+            } else {
+                article.insertAdjacentHTML('beforeend', diffOverlay);
+            }
             this.wireInlineDiffEvents(article);
 
             // Auto-create the diff editor for the expanded-by-default body
@@ -4195,10 +4200,12 @@ const DocumentView = {
         this.focusNewBlock();
 
         // Scroll to top where the new placeholder is
-        setTimeout(() => {
-            const container = document.getElementById('viewContainer');
-            container.scrollTop = 0;
-        }, 100);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const container = document.getElementById('viewContainer');
+                if (container) container.scrollTop = 0;
+            });
+        });
     },
 
     // Focus editor for a block

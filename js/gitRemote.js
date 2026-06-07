@@ -347,7 +347,7 @@ const GitRemote = {
     },
 
     _getCorsProxy() {
-        return (window.SyncManager && SyncManager._config.corsProxy) || undefined;
+        return (window.SyncManager ? SyncManager._config?.corsProxy : undefined) || undefined;
     }
 };
 

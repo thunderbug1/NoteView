@@ -244,6 +244,10 @@ const TagIndex = {
     this.blocksByTag.delete(blockId);
     this.parsedTags.delete(blockId);
     this.untaggedBlocks.delete(blockId);
+
+    for (const set of this.todoToBlocks.values()) {
+        set.delete(blockId);
+    }
   },
   
   /**

@@ -963,6 +963,32 @@ const TagModal = {
             } else if (e.key === 'ArrowUp' && isAcOpen) {
                 e.preventDefault();
                 acSelectedIndex = Math.max(acSelectedIndex - 1, 0);
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                if (isAcOpen && acSelectedIndex >= 0) {
+                    const item = acItems[acSelectedIndex];
+                    if (item.isGroup) {
+                        input.value = item.completed.toLowerCase();
+                        input.dispatchEvent(new Event('input'));
+                    } else {
+                        toggleTag(item.completed);
+                        input.value = '';
+                        input.dispatchEvent(new Event('input'));
+                    }
+                } else if (isAcOpen && acItems.length > 0) {
+                    const item = acItems[0];
+                    if (item.isGroup) {
+                        input.value = item.completed.toLowerCase();
+                        input.dispatchEvent(new Event('input'));
+                    } else {
+                        input.value = item.completed.toLowerCase();
+                        input.dispatchEvent(new Event('input'));
+                    }
+                } else {
+                    const val = input.value.trim().toLowerCase();
+                    if (!val) return;
+                    computeSuggestions(val);
+                }
             } else if (e.key === 'Enter') {
                 if (isAcOpen && acSelectedIndex >= 0) {
                     e.preventDefault();

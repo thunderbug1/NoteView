@@ -122,13 +122,18 @@ const HistoryView = {
 
         const parsedOld = this.parseFrontMatter(oldContent);
         const block = Store.blocks.find(b => b.id === this.currentBlockId);
+        const container = document.getElementById('diffEditorContainer');
         if (!block) {
-            container.innerHTML = '<div style="padding:2rem;color:var(--text-secondary)">Block no longer exists.</div>';
+            if (container) container.innerHTML = '<div style="padding:2rem;color:var(--text-secondary)">Block no longer exists.</div>';
             return;
         }
 
-        const container = document.getElementById('diffEditorContainer');
         if (!container) return;
+
+        if (this.editorView) {
+            this.editorView.destroy();
+            this.editorView = null;
+        }
         container.innerHTML = '';
 
         await DocumentView.waitForCodeMirror();
@@ -161,7 +166,7 @@ const HistoryView = {
         const restoreBtn = document.getElementById('restoreVersionBtn');
         if (restoreBtn) restoreBtn.disabled = false;
         this.selectedOid = oid;
-        this.selectedOldContent = parsedOld.content;
+        this.selectedOldContent = oldContent;
         } catch (e) {
             console.error('Failed to load diff:', e);
             const container = document.getElementById('diffEditorContainer');
@@ -204,15 +209,16 @@ const HistoryView = {
     
     parseFrontMatter(content) {
         let currentContent = content.trimStart();
-        const data = {};
+        let frontmatter = '';
         const regex = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
         
         while (true) {
             const match = currentContent.match(regex);
             if (!match) break;
+            frontmatter += match[0];
             currentContent = currentContent.substring(match[0].length).trimStart();
         }
-        return { content: currentContent };
+        return { content: currentContent, frontmatter };
     }
 };
 

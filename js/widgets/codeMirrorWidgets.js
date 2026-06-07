@@ -4,6 +4,17 @@
  */
 
 /**
+ * Check if a URL uses a safe protocol (http, https, or relative).
+ */
+function isSafeUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (trimmed.startsWith('/') || trimmed.startsWith('#') || trimmed.startsWith('./') || trimmed.startsWith('../')) return true;
+    const lower = trimmed.toLowerCase();
+    return lower.startsWith('http://') || lower.startsWith('https://');
+}
+
+/**
  * Show a unified popover for editing due and start date badges.
  * The start date row is collapsible — expanded if a start value exists.
  * Works on both desktop and mobile (touch-friendly).
@@ -594,7 +605,9 @@ function createCodeMirrorWidgets(documentView) {
             wrap.className = 'md-media-preview md-media-preview-image';
 
             const img = document.createElement('img');
-            img.src = this.url;
+            if (isSafeUrl(this.url)) {
+                img.src = this.url;
+            }
             img.alt = this.alt;
             img.loading = 'lazy';
             img.onerror = () => {
@@ -639,7 +652,9 @@ function createCodeMirrorWidgets(documentView) {
             wrap.className = 'md-media-preview md-media-preview-video';
 
             const video = document.createElement('video');
-            video.src = this.url;
+            if (isSafeUrl(this.url)) {
+                video.src = this.url;
+            }
             video.controls = true;
             video.preload = 'metadata';
             video.onerror = () => {
@@ -1007,10 +1022,10 @@ function createCodeMirrorWidgets(documentView) {
                             } else if (item.type === 'vimeo') {
                                 timeUrl += '#t=' + note.seconds + 's';
                             }
-                            timeBadge.href = timeUrl;
+                            timeBadge.href = isSafeUrl(timeUrl) ? timeUrl : '#';
                             timeBadge.target = '_blank';
                             timeBadge.rel = 'noopener noreferrer';
-                            timeBadge.onclick = (e) => e.stopPropagation();
+                            timeBadge.onclick = isSafeUrl(timeUrl) ? (e) => e.stopPropagation() : (e) => { e.preventDefault(); e.stopPropagation(); };
 
                             thumbWrap.appendChild(timeBadge);
                             noteRow.appendChild(thumbWrap);

@@ -191,6 +191,7 @@ const VaultModal = {
         const modal = Modal.create({
             title: 'Manage Vaults',
             onClose: () => {
+                closeVaultMenu();
                 VaultModal._managerModal = null;
                 if (!Store.directoryHandle) {
                     App.showDirectoryPicker();
@@ -1110,14 +1111,14 @@ const VaultModal = {
             
             // Basic validation to catch common mistakes
             if (!raw.startsWith('{') && !raw.startsWith('[')) {
-                App.showError('Invalid JSON format. JSON must start with { or [\n\nYou pasted: ' + raw.substring(0, 100) + (raw.length > 100 ? '...' : ''));
+                App.showError('Invalid JSON format. JSON must start with { or [');
                 return;
             }
             
             try {
                 JSON.parse(raw);
             } catch (e) {
-                App.showError('Invalid JSON syntax: ' + (e.message || 'unknown error') + '\n\nYou pasted: ' + raw.substring(0, 200) + (raw.length > 200 ? '...' : ''));
+                App.showError('Invalid JSON syntax: ' + (e.message || 'unknown error'));
                 return;
             }
             

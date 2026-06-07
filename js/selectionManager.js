@@ -893,7 +893,6 @@ const SelectionManager = {
                     this.saveSelectionState();
                 } else {
                     this.addContextTag(tag);
-                    this.saveSelectionState();
                 }
                 this.renderContextSidebar();
                 App.render();
