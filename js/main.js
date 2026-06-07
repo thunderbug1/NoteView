@@ -1193,6 +1193,12 @@ const App = {
         const view = Store.currentView;
         const groupBy = GroupManager.getGroupBy(view);
 
+        const preRenderFocusedBlockId = (view === 'document' &&
+            window.DocumentView &&
+            DocumentView._focusedEditor &&
+            DocumentView._focusedEditor.hasFocus)
+            ? DocumentView._focusedBlockId : null;
+
         const container = document.getElementById('viewContainer');
         if (container) {
             container.innerHTML = '';
@@ -1201,7 +1207,7 @@ const App = {
 
         switch (view) {
             case 'document':
-                DocumentView.render(blocks, { groupBy });
+                DocumentView.render(blocks, { groupBy, preRenderFocusedBlockId });
                 break;
             case 'timeline':
                 TimelineView.render(blocks, { groupBy });

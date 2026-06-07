@@ -126,11 +126,7 @@ const DocumentView = {
         // Save scroll anchor before DOM rebuild
         const scrollAnchor = this._saveScrollAnchor();
 
-        // Save focus state before DOM rebuild (only if an editor actually has focus)
-        let activeBlockId = null;
-        if (this._focusedEditor && this._focusedEditor.hasFocus) {
-            activeBlockId = this._focusedBlockId;
-        }
+        const activeBlockId = options.preRenderFocusedBlockId || null;
 
         const { groupBy } = options;
         let html;

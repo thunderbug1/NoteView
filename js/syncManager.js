@@ -326,6 +326,13 @@ const SyncManager = {
         return this._isOnline && navigator.onLine;
     },
 
+    _isEditing() {
+        return Store.currentView === 'document' &&
+            window.DocumentView &&
+            DocumentView._focusedEditor &&
+            DocumentView._focusedEditor.hasFocus;
+    },
+
     async _postSyncRender(withLoading = false) {
         if (!window.App || typeof App.render !== 'function') return;
         if (withLoading) App.showViewLoading();
@@ -335,7 +342,9 @@ const SyncManager = {
             SelectionManager.updateTagCounts();
             TimelineView.invalidateRawDataCache();
             TimelineView.invalidateCache();
-            App.render();
+            if (!this._isEditing()) {
+                App.render();
+            }
         } catch (renderErr) {
             console.error('Post-sync render failed:', renderErr);
         } finally {
