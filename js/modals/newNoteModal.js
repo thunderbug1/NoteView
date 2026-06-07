@@ -685,6 +685,9 @@ const NewNoteModal = {
                 } else {
                     editor.focus();
                 }
+            }).catch(err => {
+                console.error('[NewNoteModal] CodeMirror failed to load:', err);
+                Common.showToast('Failed to load editor. Please try again.');
             });
         };
 
@@ -712,6 +715,9 @@ const NewNoteModal = {
                     const content = template && template.content ? template.content : '';
                     initEditor(content);
                 });
+            }).catch(err => {
+                console.error('[NewNoteModal] CodeMirror failed to load for templates:', err);
+                initEditor('');
             });
         } else {
             initEditor('');

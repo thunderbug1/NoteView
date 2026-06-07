@@ -97,6 +97,9 @@ const GitRemote = {
                     this.config = previousConfig;
                 } catch (rollbackErr) {
                     console.error('Rollback failed, manual intervention may be needed:', rollbackErr);
+                    if (typeof showToast === 'function') {
+                        showToast('Remote config is out of sync — please reconfigure in Settings.');
+                    }
                 }
                 return false;
             }

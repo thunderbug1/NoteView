@@ -1471,8 +1471,15 @@ const AIAssistantReal = {
         if (!vaultName) return;
         try {
             await Store.saveChatHistory(vaultName, this._serializeChats());
+            this._saveChatFailures = 0;
         } catch (e) {
             console.warn('[AI] Failed to save chat history:', e);
+            this._saveChatFailures = (this._saveChatFailures || 0) + 1;
+            if (this._saveChatFailures === 1 || this._saveChatFailures % 5 === 0) {
+                if (typeof Common !== 'undefined' && Common.showToast) {
+                    Common.showToast('Chat history changes may not be saved.', { duration: 3000 });
+                }
+            }
         }
     },
 

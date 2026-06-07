@@ -14,7 +14,7 @@ const SyncManager = {
     _lastSyncTime: null,
     _lastError: null,
     _idleSyncScheduled: false,
-    _syncing: false,
+    _syncLock: null,
     _networkListenersInstalled: false,
     _idleSyncTimer: null,
     _consecutiveErrors: 0,     // Track consecutive sync failures
@@ -39,7 +39,7 @@ const SyncManager = {
         this._pendingCommits = 0;
         this._lastSyncTime = null;
         this._lastError = null;
-        this._syncing = false;
+        this._syncLock = null;
 
         await this._loadConfig();
         this._isOnline = navigator.onLine;
@@ -93,6 +93,21 @@ const SyncManager = {
 
     // --- Core sync ---
 
+    async _acquireSyncLock() {
+        if (this._syncLock) return false;
+        let resolveLock;
+        this._syncLock = new Promise(r => resolveLock = r);
+        this._syncLock._resolve = resolveLock;
+        return true;
+    },
+
+    _releaseSyncLock() {
+        if (this._syncLock && this._syncLock._resolve) {
+            this._syncLock._resolve();
+        }
+        this._syncLock = null;
+    },
+
     async sync() {
         if (window.App && App._initInProgress) {
             this._setStatus('idle', 'Initializing vault...');
@@ -110,8 +125,7 @@ const SyncManager = {
             this._setStatus('idle', 'Offline');
             return false;
         }
-        if (this._syncing) return false;
-        this._syncing = true;
+        if (!(await this._acquireSyncLock())) return false;
 
         this._setStatus('syncing', 'Syncing...');
         try {
@@ -200,7 +214,7 @@ const SyncManager = {
             await this._refreshPendingCount().catch(() => {});
             return false;
         } finally {
-            this._syncing = false;
+            this._releaseSyncLock();
         }
     },
 
@@ -219,35 +233,27 @@ const SyncManager = {
         }
     },
 
-    onTabHidden() {
+    async onTabHidden() {
         if (window.App && App._initInProgress) return;
-        if (this._syncing || !this._config.autoSync || !GitRemote.config || this._pendingCommits <= 0) return;
-        this._syncing = true;
-        // Serialize through the same promise chain as sync() to prevent concurrent git operations
-        const doPush = async () => {
-            try {
-                await GitRemote.push();
-                await this._refreshPendingCount();
-                this._consecutiveErrors = 0;
-            } catch (err) {
-                this._lastError = err.message;
-                this._consecutiveErrors++;
-                console.warn('[SyncManager] background push failed:', err);
-                // Show subtle notification for background sync failures
-                if (this._consecutiveErrors >= 2) {
-                    showToast(`Background sync failed (${this._consecutiveErrors}x). Will retry automatically.`, {
-                        actionLabel: 'View Status',
-                        action: () => document.getElementById('toolbarSyncBtn')?.click()
-                    });
-                }
-            } finally {
-                this._syncing = false;
+        if (!this._config.autoSync || !GitRemote.config || this._pendingCommits <= 0) return;
+        if (!(await this._acquireSyncLock())) return;
+        try {
+            await GitRemote.push();
+            await this._refreshPendingCount();
+            this._consecutiveErrors = 0;
+        } catch (err) {
+            this._lastError = err.message;
+            this._consecutiveErrors++;
+            console.warn('[SyncManager] background push failed:', err);
+            if (this._consecutiveErrors >= 2) {
+                showToast(`Background sync failed (${this._consecutiveErrors}x). Will retry automatically.`, {
+                    actionLabel: 'View Status',
+                    action: () => document.getElementById('toolbarSyncBtn')?.click()
+                });
             }
-        };
-        doPush().catch(err => {
-            console.error('[SyncManager] unexpected push error:', err);
-            this._syncing = false;
-        });
+        } finally {
+            this._releaseSyncLock();
+        }
     },
 
     // --- Scheduling ---
@@ -703,6 +709,11 @@ const SyncManager = {
         const { files, localOid, remoteOid } = conflictData;
         const ref = this._config.branch || 'main';
         const remoteName = GitRemote.config.name;
+
+        // Re-flush pending editor saves before applying resolution
+        if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
+            await DocumentView.flushAllPendingSaves();
+        }
 
         // Write resolved files to working directory
         for (const f of files) {

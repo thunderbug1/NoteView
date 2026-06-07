@@ -80,6 +80,9 @@ const DocumentView = {
         this._dragState = { active: false };
         this._dragMoveHandler = null;
         this._dragEndHandler = null;
+        this._mobileToolbar?.remove();
+        this._mobileToolbar = null;
+        this.cleanupMobileKeyboardHandler();
     },
 
     async render(blocks, options = {}) {
@@ -846,6 +849,20 @@ const DocumentView = {
             }
         }
 
+        // Clear _focusedEditor if it was destroyed
+        if (this._focusedEditor) {
+            let stillExists = false;
+            for (const editor of this.editors.values()) {
+                if (editor === this._focusedEditor) {
+                    stillExists = true;
+                    break;
+                }
+            }
+            if (!stillExists) {
+                this._focusedEditor = null;
+            }
+        }
+
         // 3-dot block menu buttons
         container.querySelectorAll('.block-menu-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -1548,7 +1565,12 @@ const DocumentView = {
                     newRecognition.onerror = onerror;
                     newRecognition.onend = onend;
                     this._recognition = newRecognition;
-                    newRecognition.start();
+                    try {
+                        newRecognition.start();
+                    } catch (startErr) {
+                        console.error('[DocumentView] Speech recognition start failed:', startErr);
+                        this.cleanupRecognition();
+                    }
                 } catch (e) {
                     this.cleanupRecognition();
                 }
@@ -4316,11 +4338,18 @@ const DocumentView = {
         // Try immediately in case the element is already in the DOM
         if (doFocus()) return;
 
+        // Disconnect any previous focus observer
+        if (this._focusObserver) {
+            this._focusObserver.disconnect();
+            this._focusObserver = null;
+        }
+
         // Watch for the block element to be inserted
         const container = document.getElementById('viewContainer');
         let observer;
         const cleanup = () => {
             if (observer) { observer.disconnect(); observer = null; }
+            if (this._focusObserver === observer) this._focusObserver = null;
         };
 
         const attemptFocus = () => {
@@ -4336,6 +4365,7 @@ const DocumentView = {
             }
         });
         observer.observe(container, { childList: true, subtree: true });
+        this._focusObserver = observer;
 
         // Safety: stop trying after 1 second
         setTimeout(() => {

@@ -63,8 +63,8 @@ const VaultModal = {
                     if (perm !== 'granted') {
                         handle.requestPermission({ mode: 'readwrite' }).catch(() => {});
                     }
-                }).catch(() => {});
-            }).catch(() => {});
+                }).catch(err => console.warn('[VaultModal] queryPermission failed for', v.name, err));
+            }).catch(err => console.warn('[VaultModal] getVaultHandle failed for', v.name, err));
         });
 
         // Divider
@@ -305,6 +305,9 @@ const VaultModal = {
                             document.getElementById('viewContainer').innerHTML = '';
                             VaultModal.updateVaultSwitcherName();
                         }
+                    }).catch(err => {
+                        console.error('Failed to delete vault:', err);
+                        showToast('Failed to remove vault: ' + (err.message || 'Unknown error'));
                     });
                 }
             });

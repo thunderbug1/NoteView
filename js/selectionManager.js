@@ -68,6 +68,9 @@ const SelectionManager = {
             this.generateDynamicTimeTags();
             this.renderContextSidebar();
             this.initArchiveToggle();
+        }).catch(e => {
+            console.error('[SelectionManager] Failed to load archived tags:', e);
+            this.renderContextSidebar();
         });
         Logger.log('[SelectionManager] init:complete', {
             restoredContext: Array.from(this.selections.context)

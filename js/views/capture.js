@@ -274,7 +274,7 @@ const CaptureView = {
                 indicator.textContent = count;
                 indicator.classList.add('visible');
             }
-        });
+        }).catch(err => console.error('[CaptureView] Failed to get queued notes count:', err));
 
         // Add view queued notes button if there are queued notes
         Store._getQueuedNotesCount().then(async count => {
@@ -298,7 +298,7 @@ const CaptureView = {
                     });
                 }
             }
-        });
+        }).catch(err => console.error('[CaptureView] Failed to get queued notes count:', err));
     },
 
     // ─── Write Page ────────────────────────────────────
@@ -343,6 +343,9 @@ const CaptureView = {
                 }
                 requestAnimationFrame(() => requestAnimationFrame(() => editor.focus()));
             }
+        }).catch(err => {
+            console.error('[CaptureView] CodeMirror failed to load for write:', err);
+            Common.showToast('Failed to load editor. Please try again.');
         });
     },
 
@@ -713,6 +716,9 @@ const CaptureView = {
                     this.render(this._blocks);
                 });
             });
+        }).catch(err => {
+            console.error('[CaptureView] CodeMirror failed to load for templates:', err);
+            Common.showToast('Failed to load editor. Please try again.');
         });
     },
 

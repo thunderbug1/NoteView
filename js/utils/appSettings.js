@@ -55,10 +55,11 @@ const AppSettings = {
             const writable = await handle.createWritable();
             await writable.write(JSON.stringify(settings, null, 2));
             await writable.close();
-            this._cache = settings;
         } catch (e) {
             console.warn('AppSettings: failed to save', e);
+            throw e;
         }
+        this._cache = settings;
     },
 
     invalidate() {
@@ -150,17 +151,22 @@ const AppSettings = {
     },
 
     async _ensureGitignore(dir) {
+        let writable = null;
         try {
             const handle = await dir.getFileHandle('.gitignore', { create: true });
             const file = await handle.getFile();
             const existing = await file.text();
             if (existing.includes(this._KEYS)) return;
 
-            const writable = await handle.createWritable();
+            writable = await handle.createWritable();
             const content = existing.trim() + (existing.trim() ? '\n' : '') + this._KEYS + '\n';
             await writable.write(content);
             await writable.close();
+            writable = null;
         } catch (e) {
+            if (writable) {
+                try { await writable.abort(); } catch (_) {}
+            }
             console.warn('AppSettings: failed to update .gitignore', e);
         }
     }

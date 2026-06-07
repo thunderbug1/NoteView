@@ -205,8 +205,9 @@ function getStartDateString(task) {
     if (Number.isNaN(ts)) return start;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const startOfToday = today.getTime();
-    const diffDays = Math.round((ts - startOfToday) / 86400000);
+    const startDate = new Date(start);
+    startDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
     if (diffDays < 0) return `Started ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} ago`;
     if (diffDays === 0) return 'Starts today';
     return `Starts in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
@@ -366,9 +367,10 @@ function getDueDateString(task) {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const startOfToday = today.getTime();
+    const dueDate = new Date(due);
+    dueDate.setHours(0, 0, 0, 0);
 
-    const diffDays = Math.round((ts - startOfToday) / 86400000);
+    const diffDays = Math.floor((dueDate.getTime() - today.getTime()) / 86400000);
     if (diffDays < 0) return `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`;
     if (diffDays === 0) return 'Due today';
     return `Due in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;

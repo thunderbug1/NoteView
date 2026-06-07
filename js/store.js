@@ -434,8 +434,8 @@ const Store = {
                             if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
 
                             await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
-                            this.blocks.push(block);
                             await store.delete(note.id);
+                            this.blocks.push(block);
                             savedCount++;
                         } catch (err) {
                             console.error('Failed to save queued note:', err);
@@ -682,7 +682,6 @@ const Store = {
                         if (!Array.isArray(block.tags)) block.tags = note.options.tags || [];
 
                         await this.saveBlock(block, { commit: true, commitMessage: `Create note ${id}`, skipUndo: true });
-                        this.blocks.push(block);
 
                         await new Promise((resolve) => {
                             const tx = this.db.transaction([this._pendingNotesStore], 'readwrite');
@@ -691,6 +690,8 @@ const Store = {
                             request.onsuccess = () => resolve();
                             request.onerror = () => resolve();
                         });
+
+                        this.blocks.push(block);
 
                         this._filteredBlocksCache.invalidate();
                         TimelineView.invalidateCache();
@@ -1706,6 +1707,10 @@ const Store = {
     // Save block to disk and optionally commit to git
     async saveBlock(block, options = {}) {
         const { commit = false, commitMessage = null, skipUndo = false, ...updates } = options;
+
+        if (!this.directoryHandle) {
+            throw new Error('Vault not loaded — cannot save block');
+        }
 
         // Serialize concurrent saves for the same block via promise chain
         const saveKey = block.id;

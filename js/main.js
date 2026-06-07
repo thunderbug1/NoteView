@@ -137,7 +137,13 @@ const App = {
         // NEW: Mobile fast path - render capture immediately
         const isMobile = window.matchMedia('(max-width: 768px)').matches;
         if (isMobile) {
-            this.renderCaptureImmediately();
+            try {
+                this.renderCaptureImmediately();
+            } catch (err) {
+                console.error('[App] renderCaptureImmediately failed:', err);
+                const container = document.getElementById('viewContainer');
+                if (container) container.innerHTML = '<div class="loading">Loading...</div>';
+            }
             this.initializeInBackground().catch(err => {
                 this.showErrorOnCapture(err);
             });
@@ -663,8 +669,12 @@ const App = {
 
         installBtn?.addEventListener('click', async () => {
             if (!deferredPrompt) return;
-            deferredPrompt.prompt();
-            await deferredPrompt.userChoice;
+            try {
+                deferredPrompt.prompt();
+                await deferredPrompt.userChoice;
+            } catch (err) {
+                console.warn('[App] PWA install prompt failed:', err);
+            }
             deferredPrompt = null;
             if (installBanner) installBanner.classList.remove('visible');
         });
@@ -1225,34 +1235,29 @@ const App = {
                 const useWindowSettings = window.SettingsView && typeof window.SettingsView.render === 'function';
                 const useGlobalSettings = typeof SettingsView !== 'undefined' && typeof SettingsView.render === 'function';
 
-                if (useWindowSettings) {
-                    window.SettingsView.render(blocks);
-                } else if (useGlobalSettings) {
-                    SettingsView.render(blocks);
-                } else {
-                    console.error('SettingsView.render not available', {
-                        windowSettingsViewExists: !!window.SettingsView,
-                        windowSettingsViewRenderType: typeof window.SettingsView?.render,
-                        globalSettingsViewExists: typeof SettingsView !== 'undefined',
-                        globalSettingsViewRenderType: typeof SettingsView?.render,
-                        windowSettingsViewKeys: window.SettingsView ? Object.keys(window.SettingsView).slice(0, 5) : null,
-                        allWindowKeys: Object.keys(window).filter(k => k.includes('Settings') || k.includes('View')).slice(0, 10)
-                    });
-
-                    const container = document.getElementById('viewContainer');
-                    if (container) {
-                        container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted)">Settings view loading...</div>';
-
-                        setTimeout(() => {
+                const doRender = () => {
+                    if (useWindowSettings) {
+                        window.SettingsView.render(blocks);
+                    } else if (useGlobalSettings) {
+                        SettingsView.render(blocks);
+                    } else {
+                        const container = document.getElementById('viewContainer');
+                        if (container) {
+                            container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted)">Settings view loading...</div>';
+                        }
+                        DocumentView.waitForCodeMirror().then(() => {
                             if (window.SettingsView && typeof window.SettingsView.render === 'function') {
-                                console.log('[App] Retrying SettingsView.render after delay');
                                 window.SettingsView.render(blocks);
-                            } else {
-                                console.error('[App] SettingsView still not available after retry');
+                            } else if (typeof SettingsView !== 'undefined' && typeof SettingsView.render === 'function') {
+                                SettingsView.render(blocks);
                             }
-                        }, 100);
+                        }).catch(() => {
+                            const container = document.getElementById('viewContainer');
+                            if (container) container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-error)">Failed to load settings view. Please reload.</div>';
+                        });
                     }
-                }
+                };
+                doRender();
                 break;
             }
         }
@@ -2041,11 +2046,29 @@ window.addEventListener('beforeunload', () => {
 document.addEventListener('visibilitychange', async () => {
     if (document.hidden) {
         if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
-            await DocumentView.flushAllPendingSaves();
+            try {
+                await DocumentView.flushAllPendingSaves();
+            } catch (err) {
+                console.warn('[App] flushAllPendingSaves failed on visibility change:', err);
+            }
         }
         if (window.SyncManager && typeof SyncManager.onTabHidden === 'function') SyncManager.onTabHidden();
     } else if (window.SyncManager && typeof SyncManager.onTabVisible === 'function') {
         SyncManager.onTabVisible();
     }
+});
+
+// Global error handlers — catch unhandled rejections and sync errors
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('[App] Unhandled rejection:', event.reason);
+    try {
+        if (window.Common && typeof Common.showToast === 'function') {
+            Common.showToast('An unexpected error occurred. Please reload.', { actionLabel: 'Reload', action: () => location.reload() });
+        }
+    } catch (_) {}
+});
+
+window.addEventListener('error', (event) => {
+    console.error('[App] Uncaught error:', event.error || event.message);
 });
 
