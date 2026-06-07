@@ -360,7 +360,9 @@ const SyncManager = {
     _isConflictError(err) {
         if (err.code === 'MergeConflictError') return true;
         const msg = (err.message || err.data?.message || '').toLowerCase();
-        return msg.includes('conflict') || msg.includes('non-fast-forward');
+        return msg.includes('conflict') || msg.includes('non-fast-forward') ||
+               msg.includes('not updated') || msg.includes('cannot lock ref') ||
+               msg.includes('fetch first');
     },
 
     _isOverwriteError(err) {
