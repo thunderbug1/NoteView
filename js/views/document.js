@@ -612,10 +612,6 @@ const DocumentView = {
             .join('');
     },
 
-    isSpeechRecognitionSupported() {
-        return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-    },
-
     renderCollapseButton(block) {
         const isCollapsed = this.collapsedBlocks.has(block.id);
         return `<button class="collapse-btn ${isCollapsed ? 'collapsed' : ''}" data-id="${escapeHtml(block.id)}" title="${isCollapsed ? 'Expand note' : 'Collapse note'}" aria-label="${isCollapsed ? 'Expand note' : 'Collapse note'}">
@@ -1145,25 +1141,6 @@ const DocumentView = {
         document.addEventListener('click', closeOnOutside);
     },
 
-    handleMicClick(e) {
-        if (this._micDebounce) return;
-        this._micDebounce = true;
-        setTimeout(() => { this._micDebounce = false; }, 300);
-
-        const micBtn = e.target.closest('.mic-btn');
-        if (!micBtn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const blockId = micBtn.dataset.id;
-        if (!blockId) return;
-
-        if (this._recordingBlockId === blockId) {
-            this.stopSpeechRecognition();
-        } else {
-            this.startSpeechRecognition(blockId, micBtn);
-        }
-    },
-
     handleCloneContextClick(e) {
         const btn = e.target.closest('.clone-context-btn');
         if (!btn) return;
@@ -1453,165 +1430,6 @@ const DocumentView = {
                 const editorDiv = blockEl.querySelector('.block-editor');
                 if (editorDiv) editorDiv.style.display = 'none';
                 blockEl.classList.add('block-collapsed');
-            }
-        }
-    },
-
-    startSpeechRecognition(blockId, btnElement) {
-        // Stop any existing recording
-        if (this._recognition) {
-            this.stopSpeechRecognition();
-        }
-
-        this._recognitionRestartCount = 0;
-
-        const view = this.editors.get(blockId);
-        if (!view) return;
-
-        const { Annotation } = window.CodeMirror;
-        const dictationGroup = Annotation.define();
-        const groupAnnotation = dictationGroup.of(Date.now());
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = '';
-
-        this._recognition = recognition;
-        this._recordingBlockId = blockId;
-        this._recordingBtn = btnElement;
-        this._isStopping = false;
-        this._insertedTranscript = '';
-        this._recognitionSession = (this._recognitionSession || 0) + 1;
-        let sessionId = this._recognitionSession;
-
-        // Visual: activate the button
-        btnElement.classList.add('recording');
-        btnElement.title = 'Stop dictation';
-
-        // Keep metadata bar visible during recording
-        const block = btnElement.closest('.block');
-        if (block) {
-            block.classList.add('block-recording');
-        }
-
-        // Focus the editor so cursor position is known
-        view.focus();
-
-        const onresult = (event) => {
-            if (this._recognitionSession !== sessionId) return;
-            let newFinalText = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                    newFinalText += event.results[i][0].transcript;
-                }
-            }
-
-            if (!newFinalText) return;
-
-            const normalizedPrev = this._insertedTranscript.trim().toLowerCase();
-            const normalizedNew = newFinalText.trim().toLowerCase();
-
-            let textToInsert;
-            if (normalizedPrev && normalizedNew.startsWith(normalizedPrev)) {
-                textToInsert = newFinalText.substring(this._insertedTranscript.length);
-                this._insertedTranscript = newFinalText;
-            } else {
-                textToInsert = newFinalText;
-                this._insertedTranscript += newFinalText;
-            }
-
-            if (textToInsert) {
-                const currentView = this.editors.get(blockId);
-                if (currentView) {
-                    this.insertTextAtSelection(currentView, textToInsert, groupAnnotation);
-                }
-            }
-        };
-
-        const onerror = (event) => {
-            if (this._recognitionSession !== sessionId) return;
-            console.warn('Speech recognition error:', event.error);
-            this.stopSpeechRecognition();
-        };
-
-        const onend = () => {
-            if (this._recognitionSession !== sessionId) return;
-            if (!this._isStopping && this._recordingBlockId === blockId) {
-                this._recognitionRestartCount++;
-                if (this._recognitionRestartCount > this._maxRecognitionRestarts) {
-                    console.warn('Speech recognition restart limit reached');
-                    this.stopSpeechRecognition();
-                    return;
-                }
-                // Create fresh instance to prevent buffered results leaking across sessions
-                this._recognitionSession++;
-                sessionId = this._recognitionSession; // Update local closure for the new session
-                try {
-                    // Stop old instance before creating new one
-                    if (this._recognition) {
-                        this._recognition.onend = null;
-                        this._recognition.onerror = null;
-                        this._recognition.onresult = null;
-                        try { this._recognition.stop(); } catch (_) {}
-                    }
-                    const NewRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    const newRecognition = new NewRecognition();
-                    newRecognition.continuous = true;
-                    newRecognition.interimResults = true;
-                    newRecognition.lang = '';
-                    newRecognition.onresult = onresult;
-                    newRecognition.onerror = onerror;
-                    newRecognition.onend = onend;
-                    this._recognition = newRecognition;
-                    try {
-                        newRecognition.start();
-                    } catch (startErr) {
-                        console.error('[DocumentView] Speech recognition start failed:', startErr);
-                        this.cleanupRecognition();
-                    }
-                } catch (e) {
-                    this.cleanupRecognition();
-                }
-            } else {
-                this.cleanupRecognition();
-            }
-        };
-
-        recognition.onresult = onresult;
-        recognition.onerror = onerror;
-        recognition.onend = onend;
-
-        recognition.start();
-    },
-
-    stopSpeechRecognition() {
-        this._isStopping = true;
-        if (this._recognition) {
-            this._recognition.stop();
-            // onend will call cleanupRecognition()
-        } else {
-            this.cleanupRecognition();
-        }
-    },
-
-    cleanupRecognition() {
-        const blockId = this._recordingBlockId;
-        const btn = this._recordingBtn;
-        this._recognition = null;
-        this._recordingBlockId = null;
-        this._recordingBtn = null;
-        this._insertedTranscript = '';
-
-        if (btn) {
-            btn.classList.remove('recording');
-            btn.title = 'Dictate text';
-        }
-        if (blockId) {
-            const block = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
-            if (block) {
-                block.classList.remove('block-recording');
             }
         }
     },
@@ -1910,33 +1728,6 @@ const DocumentView = {
         return this._cmWidgets;
     },
 
-    detectMediaUrl(text) {
-        if (!text || typeof text !== 'string') return null;
-        const trimmed = text.trim();
-        if (trimmed.includes('\n') || /\s/.test(trimmed)) return null;
-        if (!/^https?:\/\//i.test(trimmed)) return null;
-
-        const url = trimmed;
-
-        if (/\.(jpe?g|png|gif|webp|svg|bmp|ico|avif)(\?.*)?$/i.test(url)) {
-            return { type: 'image', url, label: 'Image' };
-        }
-        if (/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url)) {
-            return { type: 'video', url, label: 'Video' };
-        }
-        if (/^https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)[\w-]+/i.test(url)) {
-            return { type: 'youtube', url, label: 'YouTube Video' };
-        }
-        if (/^https?:\/\/(www\.)?vimeo\.com\/\d+/i.test(url)) {
-            return { type: 'vimeo', url, label: 'Vimeo Video' };
-        }
-        if (/^https?:\/\/store\.steampowered\.com\/app\/(\d+)/i.test(url)) {
-            return { type: 'steam', url, label: 'Steam Game' };
-        }
-
-        return null;
-    },
-
     shouldPromptForLargePaste(text) {
         if (!text || typeof text !== 'string') {
             return false;
@@ -1951,21 +1742,6 @@ const DocumentView = {
         }
 
         return lineCount >= this.fencedBlockThresholds.lines || normalized.length >= this.fencedBlockThresholds.chars;
-    },
-
-    isFencedContent(text) {
-        return /^```[^\n`]*\n[\s\S]*\n```$/.test(text.trim());
-    },
-
-    summarizePastedText(text) {
-        const normalized = text.replace(/\r\n/g, '\n');
-        const lines = normalized.split('\n');
-
-        return {
-            chars: normalized.length,
-            lines: lines.length,
-            preview: lines.slice(0, 4).join('\n').trim()
-        };
     },
 
     showLargePasteModal(text) {
@@ -2056,10 +1832,6 @@ const DocumentView = {
                 });
             });
         });
-    },
-
-    normalizePastedText(text) {
-        return text.replace(/\r\n/g, '\n').replace(/\u0000/g, '');
     },
 
     buildFencedPaste(view, text, kind) {
@@ -2329,413 +2101,6 @@ const DocumentView = {
         });
     },
 
-    getFencedBlocks(text) {
-        const fencedBlocks = [];
-        const regex = /(^|\r?\n)```([^\r\n`]*)\r?\n([\s\S]*?)\r?\n```(?=\r?\n|$)/g;
-        let match;
-
-        while ((match = regex.exec(text)) !== null) {
-            const prefixLength = match[1].length;
-            const blockText = match[0].slice(prefixLength);
-            const from = match.index + prefixLength;
-            const to = from + blockText.length;
-            const info = (match[2] || '').trim();
-            const body = (match[3] || '').replace(/\r\n/g, '\n');
-            const lines = body ? body.split('\n') : [];
-            const isLogLike = /^(log|text|console|output|json)$/i.test(info);
-            const isCollapsible = lines.length >= this.fencedBlockThresholds.lines
-                || body.length >= this.fencedBlockThresholds.chars
-                || (isLogLike && lines.length >= 6);
-
-            fencedBlocks.push({
-                from,
-                to,
-                info,
-                body,
-                preview: lines.slice(0, this.fencedBlockThresholds.previewLines).join('\n'),
-                lineCount: lines.length,
-                charCount: body.length,
-                isCollapsible,
-                kind: isLogLike ? 'log' : 'code'
-            });
-        }
-
-        return fencedBlocks;
-    },
-
-    getTables(text, fencedBlocks) {
-        const tables = [];
-        const lines = text.split('\n');
-
-        // Build set of line ranges occupied by fenced blocks to skip them
-        const fencedRanges = [];
-        if (fencedBlocks) {
-            let offset = 0;
-            for (let i = 0; i < lines.length; i++) {
-                for (const fb of fencedBlocks) {
-                    if (offset >= fb.from && offset < fb.to) {
-                        fencedRanges.push(i);
-                        break;
-                    }
-                }
-                offset += lines[i].length + 1;
-            }
-        }
-        const fencedLineSet = new Set(fencedRanges);
-
-        const isTableRow = (line) => line.trim().length > 0 && line.includes('|');
-        const isTableHeaderRow = (line) => line.trim().length > 0 && line.split('|').length >= 3;
-        const parseRow = (line) => {
-            let trimmed = line.trim();
-            if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
-            if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
-            return trimmed.split('|').map(cell => cell.trim());
-        };
-        const isSeparator = (line) => {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('|')) {
-                if (!trimmed.endsWith('|')) return false;
-                const inner = trimmed.slice(1, -1).trim();
-                return inner.split('|').every(cell => /^:?-+:?$/.test(cell.trim()));
-            }
-            return /^\s*:?-+:?\s*(\|\s*:?-+:?\s*)+$/.test(trimmed) || /^:?-+:?$/.test(trimmed.trim());
-        };
-        const parseAlignments = (line) => {
-            let trimmed = line.trim();
-            if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
-            if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
-            return trimmed.split('|').map(cell => {
-                const c = cell.trim();
-                if (c.startsWith(':') && c.endsWith(':')) return 'center';
-                if (c.endsWith(':')) return 'right';
-                return 'left';
-            });
-        };
-
-        let i = 0;
-        while (i < lines.length - 1) {
-            if (fencedLineSet.has(i)) { i++; continue; }
-
-            if (isTableHeaderRow(lines[i]) && isSeparator(lines[i + 1])) {
-                const headers = parseRow(lines[i]);
-                const alignments = parseAlignments(lines[i + 1]);
-                const colCount = headers.length;
-                const bodyRows = [];
-                let j = i + 2;
-
-                while (j < lines.length && isTableRow(lines[j]) && !fencedLineSet.has(j)) {
-                    const row = parseRow(lines[j]);
-                    // Pad or truncate to match header column count
-                    while (row.length < colCount) row.push('');
-                    if (row.length > colCount) row.length = colCount;
-                    bodyRows.push(row);
-                    j++;
-                }
-
-                // Calculate character offsets
-                let from = 0;
-                for (let k = 0; k < i; k++) from += lines[k].length + 1;
-                let to = from;
-                for (let k = i; k < j; k++) to += lines[k].length + 1;
-
-                // Remove trailing newline from to if present
-                if (to > 0 && text[to - 1] === '\n') to--;
-
-                tables.push({
-                    from,
-                    to: Math.min(to, text.length),
-                    headers,
-                    alignments,
-                    rows: bodyRows,
-                    rawText: lines.slice(i, j).join('\n')
-                });
-
-                i = j;
-            } else {
-                i++;
-            }
-        }
-
-        return tables;
-    },
-
-    parseMediaItem(lineText) {
-        const trimmed = lineText.trim();
-        if (!trimmed) return null;
-
-        const youtubePattern = /https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]+)/i;
-        const vimeoPattern = /https?:\/\/(www\.)?vimeo\.com\/(\d+)/i;
-        const steamPattern = /https?:\/\/store\.steampowered\.com\/app\/(\d+)/i;
-        const shadertoyPattern = /https?:\/\/(?:www\.)?shadertoy\.com\/view\/([\w-]+)/i;
-        const videoFilePattern = /https?:\/\/\S+\.(mp4|webm|ogg|mov)(\?\S*)?(?=\s|$)/i;
-        const imageMdPattern = /!\[([^\]]*)\]\(([^)]+)\)/;
-
-        let match, url, type, videoId;
-
-        match = trimmed.match(imageMdPattern);
-        if (match) {
-            url = match[2];
-            type = 'image';
-            videoId = null;
-        }
-
-        if (!match) {
-            match = trimmed.match(youtubePattern);
-            if (match) {
-                url = match[0];
-                type = 'youtube';
-                if (match[4]) videoId = match[4];
-                else {
-                    try { videoId = new URL(url).searchParams.get('v'); } catch { videoId = null; }
-                }
-            }
-        }
-
-        if (!match) {
-            match = trimmed.match(vimeoPattern);
-            if (match) {
-                url = match[0];
-                type = 'vimeo';
-                videoId = match[2];
-            }
-        }
-
-        if (!match) {
-            match = trimmed.match(videoFilePattern);
-            if (match) {
-                url = match[0];
-                type = 'video';
-                videoId = null;
-            }
-        }
-
-        if (!match) {
-            match = trimmed.match(steamPattern);
-            if (match) {
-                url = match[0];
-                type = 'steam';
-                videoId = match[1];
-            }
-        }
-
-        if (!match) {
-            match = trimmed.match(shadertoyPattern);
-            if (match) {
-                url = match[0];
-                type = 'shadertoy';
-                videoId = match[1];
-            }
-        }
-
-        if (!match) {
-            const genericUrlPattern = /https?:\/\/\S+/i;
-            const urlMatch = trimmed.match(genericUrlPattern);
-            if (urlMatch) {
-                const potentialCaption = trimmed.replace(urlMatch[0], '').replace(/\s{2,}/g, ' ').trim().replace(/^[:(]\s*/, '').replace(/\s*[):]$/, '').trim();
-                if (potentialCaption) {
-                    url = urlMatch[0];
-                    type = 'link';
-                    videoId = null;
-                    match = urlMatch;
-                }
-            }
-        }
-
-        if (!match) return null;
-
-        const caption = trimmed.replace(match[0], '').replace(/\s{2,}/g, ' ').trim().replace(/^[:(]\s*/, '').replace(/\s*[):]$/, '').trim();
-
-        return {
-            caption: caption || null,
-            url,
-            type,
-            videoId: videoId || null
-        };
-    },
-
-    parseNoteLine(lineText) {
-        if (!lineText.length) return null;
-        if (lineText[0] !== ' ' && lineText[0] !== '\t') return null;
-        const trimmed = lineText.trim();
-        if (!trimmed) return null;
-
-        const imgRegex = /^!\[([^\]]*)\]\(([^)]+)\)/;
-        const imgMatch = trimmed.match(imgRegex);
-        if (imgMatch) {
-            return { type: 'image', url: imgMatch[2], alt: imgMatch[1] || '', text: imgMatch[1] || '' };
-        }
-
-        const tsRegex = /^@\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s+(.*)$/;
-        const tsMatch = trimmed.match(tsRegex);
-
-        if (tsMatch) {
-            const hours = tsMatch[3] ? parseInt(tsMatch[1], 10) : 0;
-            const minutes = tsMatch[3] ? parseInt(tsMatch[2], 10) : parseInt(tsMatch[1], 10);
-            const seconds = tsMatch[3] ? parseInt(tsMatch[3], 10) : parseInt(tsMatch[2], 10);
-            const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-            const label = tsMatch[3]
-                ? `${tsMatch[1]}:${tsMatch[2]}:${tsMatch[3]}`
-                : `${tsMatch[1]}:${tsMatch[2]}`;
-            return {
-                type: 'timestamp',
-                seconds: totalSeconds,
-                label,
-                text: tsMatch[4] || ''
-            };
-        }
-
-        return { type: 'note', text: trimmed };
-    },
-
-    getMediaGalleries(text, fencedBlocks, tables) {
-        const galleries = [];
-        const lines = text.split('\n');
-
-        // Build line offsets and skip set
-        const lineOffsets = [];
-        const skipSet = new Set();
-        let offset = 0;
-        for (let i = 0; i < lines.length; i++) {
-            lineOffsets.push(offset);
-            for (const fb of fencedBlocks) {
-                if (offset >= fb.from && offset < fb.to) { skipSet.add(i); break; }
-            }
-            if (!skipSet.has(i)) {
-                for (const t of tables) {
-                    if (offset >= t.from && offset < t.to) { skipSet.add(i); break; }
-                }
-            }
-            offset += lines[i].length + 1;
-        }
-
-        let currentItems = [];
-        let currentStartIdx = -1;
-
-        const flushGroup = (endIdx) => {
-            if (currentItems.length === 0) return;
-            const from = lineOffsets[currentStartIdx];
-            let to = from;
-            for (let k = currentStartIdx; k <= endIdx; k++) to += lines[k].length + 1;
-            if (to > 0 && text[to - 1] === '\n') to--;
-
-            galleries.push({
-                from,
-                to: Math.min(to, text.length),
-                items: currentItems
-            });
-            currentItems = [];
-            currentStartIdx = -1;
-        };
-
-        for (let i = 0; i < lines.length; i++) {
-            if (skipSet.has(i)) { flushGroup(i - 1); continue; }
-
-            const lineText = lines[i];
-            const isIndented = lineText.length > 0 && (lineText[0] === ' ' || lineText[0] === '\t');
-
-            if (isIndented && currentItems.length > 0) {
-                const note = this.parseNoteLine(lineText);
-                if (note) {
-                    note.from = lineOffsets[i];
-                    currentItems[currentItems.length - 1].notes.push(note);
-                    continue;
-                }
-            }
-
-            const item = this.parseMediaItem(lineText);
-            if (item) {
-                if (currentItems.length === 0) currentStartIdx = i;
-                item.from = lineOffsets[i];
-                item.notes = [];
-                currentItems.push(item);
-            } else {
-                const note = this.parseNoteLine(lineText);
-                if (note && currentItems.length > 0) {
-                    note.from = lineOffsets[i];
-                    currentItems[currentItems.length - 1].notes.push(note);
-                } else {
-                    flushGroup(i - 1);
-                }
-            }
-        }
-        flushGroup(lines.length - 1);
-
-        return galleries;
-    },
-
-    buildGalleryLineSet(doc, mediaGalleries) {
-        const blockedLines = new Set();
-
-        for (const gallery of mediaGalleries) {
-            const startLine = doc.lineAt(gallery.from).number;
-            const endPosition = Math.max(gallery.from, gallery.to - 1);
-            const endLine = doc.lineAt(endPosition).number;
-            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
-                blockedLines.add(lineNumber);
-            }
-        }
-
-        return blockedLines;
-    },
-
-    buildTableLineSet(doc, tables) {
-        const blockedLines = new Set();
-        for (const table of tables) {
-            const startLine = doc.lineAt(table.from).number;
-            const endPosition = Math.max(table.from, table.to - 1);
-            const endLine = doc.lineAt(endPosition).number;
-            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
-                blockedLines.add(lineNumber);
-            }
-        }
-        return blockedLines;
-    },
-
-    buildFencedBlockLineSet(doc, fencedBlocks) {
-        const blockedLines = new Set();
-
-        for (const block of fencedBlocks) {
-            const startLine = doc.lineAt(block.from).number;
-            const endPosition = Math.max(block.from, block.to - 1);
-            const endLine = doc.lineAt(endPosition).number;
-            for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
-                blockedLines.add(lineNumber);
-            }
-        }
-
-        return blockedLines;
-    },
-
-    isSelectionInsideBlock(state, block) {
-        return state.selection.ranges.some((range) => range.to >= block.from && range.from <= block.to);
-    },
-
-    focusFencedBlock(view, from) {
-        view.dispatch({
-            selection: { anchor: from, head: from },
-            scrollIntoView: true
-        });
-        view.focus();
-    },
-
-    openFencedBlockModal(block) {
-        const title = block.info ? `${Common.capitalizeFirst(block.info)} Block` : 'Code Block';
-        const lineLabel = block.lineCount === 1 ? '1 line' : `${block.lineCount} lines`;
-
-        Modal.create({
-            title,
-            modalClass: 'tag-modal content-modal fenced-block-modal',
-            content: `
-                <div class="fenced-block-modal-meta">
-                    <span class="badge">${escapeHtml(block.kind)}</span>
-                    <span class="meta-date">${lineLabel}</span>
-                    <span class="meta-date">${block.charCount} chars</span>
-                </div>
-                <pre class="fenced-block-modal-content">${escapeHtml(block.body)}</pre>
-            `
-        });
-    },
-
     getMentionSuggestions(blockId) {
         const allContacts = Array.from(Store.contacts.keys());
         if (allContacts.length === 0) return [];
@@ -2838,39 +2203,18 @@ const DocumentView = {
      * Get the set of active task-related context filters that require per-line filtering.
      * Returns only filters that should hide non-matching task lines (excludes Todo.all).
      */
-    getActiveTaskFilter() {
-        return TaskParser.getActiveTaskFilter();
-    },
-
     /**
      * Check whether a task line matches all of the active task filters.
      * Non-task lines (no checkbox) always return true (stay visible).
      */
-    taskLineMatchesFilter(lineText, activeFilters) {
-        return TaskParser.taskLineMatchesFilter(lineText, activeFilters);
-    },
-
     /**
      * Compute which line indices should be hidden based on active task filters.
      * Returns a Set of 0-based indices.
      * Shared by buildDecorations (display) and export (file output).
      */
-    getHiddenTaskLineIndices(lineTexts, activeTaskFilters) {
-        const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
-        return TaskParser.getHiddenTaskLineIndices(lineTexts, activeTaskFilters, excludeFilters);
-    },
-
     /**
      * Filter markdown content, removing lines that don't match active task filters.
      */
-    filterContentLines(content, activeTaskFilters) {
-        const excludeFilters = TaskParser.getActiveExcludedTaskFilter();
-        if ((!activeTaskFilters || activeTaskFilters.size === 0) && (!excludeFilters || excludeFilters.size === 0)) return content;
-        const lines = content.split('\n');
-        const hidden = this.getHiddenTaskLineIndices(lines, activeTaskFilters);
-        return lines.filter((_, i) => !hidden.has(i)).join('\n');
-    },
-
     // Cache parsed fenced blocks and tables per doc to avoid redundant regex passes
     _parseCache: new WeakMap(),
     _getCachedParse(doc) {
@@ -3062,15 +2406,14 @@ const DocumentView = {
      */
     createHiddenLineExtension() {
         const { StateField, EditorView } = window.CodeMirror;
-        const self = this;
         const effect = getFilterChangedEffect();
         return StateField.define({
             create(state) {
-                return self.buildHiddenLineDecorations(state);
+                return DocumentView.buildHiddenLineDecorations(state);
             },
             update(deco, tr) {
                 if (tr.docChanged || tr.selectionSet || (effect && tr.effects.some(e => e.is(effect)))) {
-                    return self.buildHiddenLineDecorations(tr.state);
+                    return DocumentView.buildHiddenLineDecorations(tr.state);
                 }
                 return deco.map(tr.changes);
             },
@@ -3147,8 +2490,7 @@ const DocumentView = {
 
     createCollapsedBlockExtension() {
         const { StateField, EditorView } = window.CodeMirror;
-        const self = this;
-        const effect = getFilterChangedEffect();
+                const effect = getFilterChangedEffect();
         let focused = false;
         return [
             EditorView.updateListener.of((update) => {
@@ -3156,12 +2498,12 @@ const DocumentView = {
             }),
             StateField.define({
                 create(state) {
-                    return self.buildCollapsedBlockDecorations(state, false);
+                    return DocumentView.buildCollapsedBlockDecorations(state, false);
                 },
                 update(deco, tr) {
                     const selectionChanged = tr.selection !== tr.startState.selection;
                     if (tr.docChanged || selectionChanged || (effect && tr.effects.some(e => e.is(effect)))) {
-                        return self.buildCollapsedBlockDecorations(tr.state, focused);
+                        return DocumentView.buildCollapsedBlockDecorations(tr.state, focused);
                     }
                     return deco.map(tr.changes);
                 },
@@ -3175,14 +2517,13 @@ const DocumentView = {
      */
     createLivePreviewPlugin() {
         const { ViewPlugin } = window.CodeMirror;
-        const self = this;
-        return ViewPlugin.fromClass(class {
+                return ViewPlugin.fromClass(class {
             constructor(view) {
-                this.decorations = self.buildDecorations(view.state, view.hasFocus);
+                this.decorations = DocumentView.buildDecorations(view.state, view.hasFocus);
             }
             update(update) {
                 if (update.docChanged || update.selectionSet || update.focusChanged) {
-                    this.decorations = self.buildDecorations(update.view.state, update.view.hasFocus);
+                    this.decorations = DocumentView.buildDecorations(update.view.state, update.view.hasFocus);
                 }
             }
         }, {
@@ -3273,12 +2614,11 @@ const DocumentView = {
      */
     createDomEventHandlers(container) {
         const { EditorView } = window.CodeMirror;
-        const self = this;
-        return EditorView.domEventHandlers({
+                return EditorView.domEventHandlers({
             focus: (event, view) => {
                 const blockId = view.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
                 if (blockId && blockId !== 'new') {
-                    self._focusedBlockId = blockId;
+                    DocumentView._focusedBlockId = blockId;
                     RecentAccessTracker.touch(blockId);
                 }
             },
@@ -3292,7 +2632,7 @@ const DocumentView = {
                             const from = line.from + match[1].length;
                             const to = from + 3;
                             event.preventDefault();
-                            self.showTaskMenu(event.pageX, event.pageY, view, from, to, match[2]);
+                            DocumentView.showTaskMenu(event.pageX, event.pageY, view, from, to, match[2]);
                         }
                     }
                 }
@@ -3300,19 +2640,19 @@ const DocumentView = {
             paste: (event, view) => {
                 const pastedText = event.clipboardData?.getData('text/plain');
 
-                const mediaInfo = self.detectMediaUrl(pastedText);
+                const mediaInfo = DocumentView.detectMediaUrl(pastedText);
                 if (mediaInfo) {
                     event.preventDefault();
-                    self.handleMediaUrlPaste(view, mediaInfo);
+                    DocumentView.handleMediaUrlPaste(view, mediaInfo);
                     return true;
                 }
 
-                if (!self.shouldPromptForLargePaste(pastedText)) {
+                if (!DocumentView.shouldPromptForLargePaste(pastedText)) {
                     return false;
                 }
 
                 event.preventDefault();
-                self.handleLargePaste(view, pastedText);
+                DocumentView.handleLargePaste(view, pastedText);
                 return true;
             },
             cut: (event, view) => {
@@ -3326,7 +2666,7 @@ const DocumentView = {
 
                 event.preventDefault();
                 navigator.clipboard.writeText(selectedText).catch(() => Common.showToast('Clipboard access denied'));
-                self.handleExtractCut(view, selectedText, selection);
+                DocumentView.handleExtractCut(view, selectedText, selection);
                 return true;
             },
             blur: async (event, view) => {
@@ -3344,7 +2684,7 @@ const DocumentView = {
                         return;
                     }
                     if (content.trim() === '') {
-                        const originalContent = self.originalContents.get(currentId);
+                        const originalContent = DocumentView.originalContents.get(currentId);
                         if (originalContent && originalContent.trim() !== '') {
                             const isMobile = 'ontouchstart' in window;
                             if (isMobile) {
@@ -3368,10 +2708,10 @@ const DocumentView = {
                         }
                     } else {
                         // Only commit if content changed
-                        const originalContent = self.originalContents.get(currentId);
+                        const originalContent = DocumentView.originalContents.get(currentId);
                         if (content !== originalContent) {
                             App.saveBlockContent(currentId, content, { commit: true });
-                            self.originalContents.set(currentId, content);
+                            DocumentView.originalContents.set(currentId, content);
                         }
                     }
                 }
@@ -3384,9 +2724,8 @@ const DocumentView = {
      */
     createNewBlockKeymap(container, createNewBlock) {
         const { keymap, Prec } = window.CodeMirror;
-        const self = this;
-        const toggleTaskKey = Store.shortcuts?.toggleTask
-            ? self.shortcutToCM6(Store.shortcuts.toggleTask)
+                const toggleTaskKey = Store.shortcuts?.toggleTask
+            ? DocumentView.shortcutToCM6(Store.shortcuts.toggleTask)
             : 'Mod-Shift-t';
         return Prec.high(keymap.of([
             {
@@ -3447,7 +2786,7 @@ const DocumentView = {
             {
                 key: toggleTaskKey,
                 run: (view) => {
-                    self.toggleTaskOnCurrentLine(view);
+                    DocumentView.toggleTaskOnCurrentLine(view);
                     return true;
                 }
             }
@@ -3465,13 +2804,12 @@ const DocumentView = {
 
         const { EditorView, EditorState, basicSetup, markdown, languages, keymap, indentWithTab, placeholder, foldService } = window.CodeMirror;
 
-        const self = this;
-        // Mutable reference — set after EditorView construction so the closure
+                // Mutable reference — set after EditorView construction so the closure
         // can resolve the blockId from the *live* DOM (handles editor reuse during re-renders).
         let editorView = null;
         const resolveBlockId = () => editorView?.dom?.closest?.('.codemirror-container')?.dataset?.id || container.dataset.id;
-        const handleContentChange = (content) => self.handleContentChange(resolveBlockId(), content);
-        const createNewBlock = () => self.createNewBlock();
+        const handleContentChange = (content) => DocumentView.handleContentChange(resolveBlockId(), content);
+        const createNewBlock = () => DocumentView.createNewBlock();
         const mentionCompletionSource = this.createMentionCompletionSource(container, resolveBlockId);
         const wikilinkCompletionSource = this.createWikilinkCompletionSource(container);
 
@@ -3555,12 +2893,11 @@ const DocumentView = {
      */
     createHighlightExtension(blockId) {
         const { StateField, Decoration, EditorView } = window.CodeMirror;
-        const self = this;
-
+        
         const field = StateField.define({
             create() { return Decoration.none; },
             update(deco, tr) {
-                const pos = self._highlightPositions.get(blockId);
+                const pos = DocumentView._highlightPositions.get(blockId);
                 if (pos == null) return Decoration.none;
                 const p = Math.min(pos, tr.state.doc.length);
                 const line = tr.state.doc.lineAt(p);
@@ -4251,8 +3588,7 @@ const DocumentView = {
         if (!window.visualViewport) return;
         if (this._mobileKeyboardHandler) return;
 
-        const self = this;
-        const handleViewportResize = () => {
+                const handleViewportResize = () => {
             const vv = window.visualViewport;
             const keyboardHeight = window.innerHeight - vv.height;
 
@@ -4269,7 +3605,7 @@ const DocumentView = {
                 if (!block) return;
 
                 // Account for mobile toolbar height
-                const toolbarHeight = self._mobileToolbar ? self._mobileToolbar.offsetHeight : 0;
+                const toolbarHeight = DocumentView._mobileToolbar ? DocumentView._mobileToolbar.offsetHeight : 0;
                 const containerRect = container.getBoundingClientRect();
                 const blockRect = block.getBoundingClientRect();
 
@@ -4472,3 +3808,6 @@ const DocumentView = {
         }
     }
 };
+
+Object.assign(DocumentView, DocumentMarkdownParser);
+Object.assign(DocumentView, DocumentSpeechRecognition);

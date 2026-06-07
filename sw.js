@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v49';
+const CACHE_NAME = 'noteview-v50';
 
 const PRECACHE_URLS = [
   './',
@@ -65,6 +65,8 @@ const PRECACHE_URLS = [
   './js/widgets/codeMirrorWidgets.js',
   './js/menus/taskMenus.js',
   './js/views/history.js',
+  './js/views/document/markdownParser.js',
+  './js/views/document/speechRecognition.js',
   './js/views/document.js',
   './js/views/timeline.js',
   './js/views/kanban.js',

@@ -1,5 +1,5 @@
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js?v=49');
+    navigator.serviceWorker.register('./sw.js?v=50');
 
     // Automatically reload the page when the service worker updates and takes control
     let refreshing = false;
