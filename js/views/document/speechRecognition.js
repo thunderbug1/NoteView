@@ -62,9 +62,9 @@ const DocumentSpeechRecognition = {
         const self = this;
         this._speechSession = SpeechManager.createSession({
             onResult: (textToInsert) => {
-                const currentView = self.editors.get(blockId);
+                const currentView = DocumentView.editors.get(blockId);
                 if (currentView) {
-                    self.insertTextAtSelection(currentView, textToInsert, groupAnnotation);
+                    DocumentView.insertTextAtSelection(currentView, textToInsert, groupAnnotation);
                 }
             },
             onInterimTranscript: (interimText) => {

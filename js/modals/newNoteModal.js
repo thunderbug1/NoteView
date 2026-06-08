@@ -574,8 +574,18 @@ const NewNoteModal = {
                 e.preventDefault();
                 const action = btn.dataset.action;
                 if (action === 'dictate') {
-                    DocumentView.stopSpeechRecognition();
-                    actionsDiv.remove();
+                    const isRecording = btn.classList.contains('recording');
+                    if (isRecording) {
+                        DocumentView.stopSpeechRecognition();
+                        btn.classList.remove('recording');
+                        btn.innerHTML = micSvg + ' Dictate';
+                        btn.title = 'Start dictation';
+                    } else {
+                        DocumentView.startSpeechRecognition(modalBlockId, btn);
+                        btn.classList.add('recording');
+                        btn.innerHTML = micSvg + ' Stop';
+                        btn.title = 'Stop dictation';
+                    }
                 } else if (action === 'ai-dictate') {
                     self.handleAIMicClick(modalBlockId, btn);
                     if (!self._aiSpeechSession && !self._aiIsProcessing) actionsDiv.remove();
@@ -652,6 +662,9 @@ const NewNoteModal = {
                     editor.focus();
                     const btn = modal.querySelector('[data-action="dictate"]');
                     if (btn) {
+                        btn.classList.add('recording');
+                        btn.innerHTML = micSvg + ' Stop';
+                        btn.title = 'Stop dictation';
                         DocumentView.startSpeechRecognition(modalBlockId, btn);
                         Common.showToast('Listening... Tap mic to stop.');
                     }
