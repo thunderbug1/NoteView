@@ -192,10 +192,8 @@ const CaptureView = {
         methods += `<button class="capture-card" data-method="write">${typeIcon}<span class="capture-card-label">Write</span></button>`;
         if (speechSupported) {
             methods += `<button class="capture-card" data-method="dictate">${micIcon}<span class="capture-card-label">Dictate</span></button>`;
-            if (aiConfigured) {
-                const aiSparkle = '<span class="ai-sparkle" style="font-size:0.7rem">✨</span>';
-                methods += `<button class="capture-card" data-method="aidictate">${micIcon}${aiSparkle}<span class="capture-card-label">AI Dictate</span></button>`;
-            }
+            const aiSparkle = '<span class="ai-sparkle" style="font-size:0.7rem">✨</span>';
+            methods += `<button class="capture-card" data-method="aidictate">${micIcon}${aiSparkle}<span class="capture-card-label">AI Dictate</span></button>`;
         }
         methods += `<button class="capture-card" data-method="task">${taskIcon}<span class="capture-card-label">Task</span></button>`;
         methods += `<button class="capture-card" data-method="template">${templateIcon}<span class="capture-card-label">Template</span></button>`;
@@ -366,14 +364,12 @@ const CaptureView = {
 
     renderDictatePage(container) {
         const micIcon = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
-        const aiConfigured = AIAssistant.isConfigured();
 
-        const processBtnHtml = aiConfigured
-            ? `<div class="capture-ai-btns" style="display:none">
-                    <button class="capture-ai-process-btn" data-action="ai-format">Format with AI</button>
-                    <button class="capture-ai-process-btn" data-action="ai-interpret">Interpret with AI</button>
-               </div>`
-            : '';
+        const processBtnHtml = `
+            <div class="capture-ai-btns" style="display:none">
+                <button class="capture-ai-process-btn" data-action="ai-format">Format with AI</button>
+                <button class="capture-ai-process-btn" data-action="ai-interpret">Interpret with AI</button>
+           </div>`;
 
         container.innerHTML = `
             <div class="capture-page">

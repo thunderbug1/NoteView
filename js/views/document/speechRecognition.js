@@ -35,12 +35,21 @@ const DocumentSpeechRecognition = {
 
     /** @public Start dictation for a block */
     startSpeechRecognition(blockId, btnElement) {
+        console.log('[SpeechRecognition] Starting dictation for block:', blockId);
+        
         if (this._speechSession) {
+            console.log('[SpeechRecognition] Stopping existing session');
             this._speechSession.stop();
         }
 
-        const view = this.editors.get(blockId);
-        if (!view) return;
+        const view = DocumentView.editors.get(blockId);
+        console.log('[SpeechRecognition] Editor view found:', !!view, 'Block ID:', blockId);
+        console.log('[SpeechRecognition] All editor IDs:', Array.from(DocumentView.editors.keys()));
+        
+        if (!view) {
+            console.error('[SpeechRecognition] No editor found for block:', blockId);
+            return;
+        }
 
         const { Annotation } = window.CodeMirror;
         const dictationGroup = Annotation.define();
@@ -62,9 +71,14 @@ const DocumentSpeechRecognition = {
         const self = this;
         this._speechSession = SpeechManager.createSession({
             onResult: (textToInsert) => {
+                console.log('[SpeechRecognition] onResult called with text:', textToInsert);
                 const currentView = DocumentView.editors.get(blockId);
+                console.log('[SpeechRecognition] Current view found:', !!currentView);
                 if (currentView) {
+                    console.log('[SpeechRecognition] Calling insertTextAtSelection');
                     DocumentView.insertTextAtSelection(currentView, textToInsert, groupAnnotation);
+                } else {
+                    console.error('[SpeechRecognition] No view found for block:', blockId);
                 }
             },
             onInterimTranscript: (interimText) => {
@@ -72,15 +86,18 @@ const DocumentSpeechRecognition = {
                     btnElement.title = `Dictating... "${interimText}"`;
                 }
             },
-            onError: () => {
+            onError: (error) => {
+                console.error('[SpeechRecognition] Error:', error);
                 self.stopSpeechRecognition();
             },
             onStop: () => {
+                console.log('[SpeechRecognition] onStop called');
                 self.cleanupRecognition();
             },
             maxRestarts: this._maxRecognitionRestarts
         });
 
+        console.log('[SpeechRecognition] Starting speech session');
         this._speechSession.start();
     },
 

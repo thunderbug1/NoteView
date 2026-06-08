@@ -1309,7 +1309,7 @@ const App = {
         if (toolbarAiBtn) {
             const aiReady = AIAssistant.isConfigured();
             toolbarAiBtn.disabled = !aiReady || Store.getFilteredBlocks().length === 0;
-            toolbarAiBtn.hidden = view === 'settings' || !aiReady;
+            toolbarAiBtn.hidden = view === 'settings';
         }
 
         this.updateUndoRedoUI();
@@ -1949,14 +1949,12 @@ const App = {
                 <span class="creation-picker-label">Dictate</span>
                 <span class="creation-picker-desc">Speech to text</span>
             </button>`;
-            if (aiConfigured) {
-                methods += `
+            methods += `
             <button class="creation-picker-card" data-method="ai-dictate">
                 ${micIcon}
                 <span class="creation-picker-label">AI Dictate</span>
                 <span class="creation-picker-desc">AI-formatted speech</span>
             </button>`;
-            }
         }
 
         methods += `
@@ -1981,6 +1979,10 @@ const App = {
             card.addEventListener('click', (e) => {
                 e.preventDefault();
                 const method = card.dataset.method;
+                if (method === 'ai-dictate' && !AIAssistant.isConfigured()) {
+                    showToast('Enable AI Features in Settings first');
+                    return;
+                }
                 modal.close();
                 this.showNewNoteModal(method);
             });

@@ -106,16 +106,21 @@ const SpeechManager = {
 
                 if (!currentFullText) return;
 
+                console.log('[SpeechManager] Final text:', currentFullText, 'Use continuous:', useContinuousMode);
+
                 if (useContinuousMode) {
                     if (accumulatedFullText && currentFullText.startsWith(accumulatedFullText)) {
                         const delta = currentFullText.substring(accumulatedFullText.length);
                         accumulatedFullText = currentFullText;
+                        console.log('[SpeechManager] Delta to insert:', delta);
                         if (delta && onResult) onResult(delta);
                     } else {
                         accumulatedFullText = currentFullText;
+                        console.log('[SpeechManager] Full text to insert:', currentFullText);
                         if (onResult) onResult(currentFullText);
                     }
                 } else {
+                    console.log('[SpeechManager] Mobile mode - inserting text:', currentFullText);
                     if (onResult) onResult(currentFullText);
                 }
             };
