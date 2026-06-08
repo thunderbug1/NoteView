@@ -133,8 +133,7 @@ const SpeechManager = {
                 if (sessionCounter !== sessionId) return;
                 if (!isStopping) {
                     if (useContinuousMode) {
-                        console.log('[SpeechManager] Continuous mode - cleaning up');
-                        cleanup();
+                        console.log('[SpeechManager] Continuous mode ended but not explicitly stopped - this might be browser ending session, keeping cleanup from being called');
                         return;
                     }
                     restartCount++;
