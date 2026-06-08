@@ -87,6 +87,7 @@ const SpeechManager = {
 
         function buildOnResult(sessionId) {
             return (event) => {
+                console.log('[SpeechManager] onResult called, sessionId:', sessionId, 'current:', sessionCounter, 'results.length:', event.results.length);
                 if (sessionCounter !== sessionId) return;
 
                 let interimTranscript = '';
@@ -100,6 +101,8 @@ const SpeechManager = {
                         interimTranscript += result[0].transcript;
                     }
                 }
+
+                console.log('[SpeechManager] Transcripts - interim:', interimTranscript, 'final:', currentFullText);
 
                 if (interimTranscript && onInterimTranscript) {
                     onInterimTranscript(interimTranscript);
