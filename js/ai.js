@@ -263,8 +263,10 @@ const AIAssistantReal = {
 
         this._previouslyFocused = document.activeElement;
         this._panelOpen = true;
-        this._panelElement.classList.add('open');
-        this._panelElement.setAttribute('aria-hidden', 'false');
+        if (this._panelElement) {
+            this._panelElement.classList.add('open');
+            this._panelElement.setAttribute('aria-hidden', 'false');
+        }
 
         // Mobile-only: scroll lock and overlay
         const isMobile = window.innerWidth <= 768;
@@ -288,8 +290,10 @@ const AIAssistantReal = {
 
     closePanel() {
         this._panelOpen = false;
-        this._panelElement.classList.remove('open');
-        this._panelElement.setAttribute('aria-hidden', 'true');
+        if (this._panelElement) {
+            this._panelElement.classList.remove('open');
+            this._panelElement.setAttribute('aria-hidden', 'true');
+        }
         document.body.classList.remove('ai-panel-open');
 
         const overlay = document.getElementById('aiPanelOverlay');

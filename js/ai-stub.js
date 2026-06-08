@@ -64,7 +64,11 @@ const AIAssistant = {
     // Proxy methods that load the module first
     async init() {
         await this._ensureLoaded();
-        return window.AIAssistantReal?.init();
+        const result = await window.AIAssistantReal?.init();
+        if (window.AIAssistantReal) {
+            this._panelElement = window.AIAssistantReal._panelElement;
+        }
+        return result;
     },
 
     isConfigured() {
