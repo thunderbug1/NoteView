@@ -49,8 +49,9 @@ const SpeechManager = {
         let recognition = null;
         let isStopping = false;
         let restartCount = 0;
-        let insertedTranscript = '';
         let sessionCounter = 0;
+        let lastFinalIndex = -1;
+        let resultTranscripts = {};
 
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -72,7 +73,18 @@ const SpeechManager = {
                 let newFinalText = '';
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     if (event.results[i].isFinal) {
-                        newFinalText += event.results[i][0].transcript;
+                        const transcript = event.results[i][0].transcript;
+                        const prev = resultTranscripts[i];
+
+                        if (i <= lastFinalIndex && prev !== undefined) {
+                            if (transcript.length > prev.length && transcript.startsWith(prev)) {
+                                newFinalText += transcript.substring(prev.length);
+                            }
+                        } else {
+                            newFinalText += transcript;
+                        }
+                        resultTranscripts[i] = transcript;
+                        lastFinalIndex = Math.max(lastFinalIndex, i);
                     } else {
                         interimTranscript += event.results[i][0].transcript;
                     }
@@ -84,20 +96,8 @@ const SpeechManager = {
 
                 if (!newFinalText) return;
 
-                const normalizedPrev = insertedTranscript.trim().toLowerCase();
-                const normalizedNew = newFinalText.trim().toLowerCase();
-
-                let textToInsert;
-                if (normalizedPrev && normalizedNew.startsWith(normalizedPrev)) {
-                    textToInsert = newFinalText.substring(insertedTranscript.length);
-                    insertedTranscript = newFinalText;
-                } else {
-                    textToInsert = newFinalText;
-                    insertedTranscript += newFinalText;
-                }
-
-                if (textToInsert && onResult) {
-                    onResult(textToInsert);
+                if (onResult) {
+                    onResult(newFinalText);
                 }
             };
         }
@@ -113,7 +113,8 @@ const SpeechManager = {
                         return;
                     }
                     sessionCounter++;
-                    insertedTranscript = '';
+                    resultTranscripts = {};
+                    lastFinalIndex = -1;
                     const newSessionId = sessionCounter;
                     try {
                         if (recognition) {
@@ -124,7 +125,12 @@ const SpeechManager = {
                         }
                         const newRecognition = createRecognition();
                         newRecognition.onresult = buildOnResult(newSessionId);
-                        newRecognition.onerror = currentOnError;
+                        newRecognition.onerror = (event) => {
+                            if (sessionCounter !== newSessionId) return;
+                            console.warn('Speech recognition error:', event.error);
+                            if (onError) onError();
+                            stop();
+                        };
                         newRecognition.onend = buildOnEnd(newSessionId);
                         recognition = newRecognition;
                         try {
@@ -144,7 +150,8 @@ const SpeechManager = {
 
         function cleanup() {
             recognition = null;
-            insertedTranscript = '';
+            resultTranscripts = {};
+            lastFinalIndex = -1;
             if (onStop) onStop();
         }
 
@@ -154,7 +161,8 @@ const SpeechManager = {
             }
             restartCount = 0;
             isStopping = false;
-            insertedTranscript = '';
+            resultTranscripts = {};
+            lastFinalIndex = -1;
             sessionCounter++;
             const sessionId = sessionCounter;
 
