@@ -14,12 +14,13 @@ const DocumentSpeechRecognition = {
 
     /** @public Handle mic button click — toggle recording for a block */
     handleMicClick(e) {
+        const micBtn = e.target.closest('.mic-btn');
+        if (!micBtn) return;
+        if (micBtn.closest('.content-modal, .tag-modal')) return;
         if (this._micDebounce) return;
         this._micDebounce = true;
         setTimeout(() => { this._micDebounce = false; }, 300);
 
-        const micBtn = e.target.closest('.mic-btn');
-        if (!micBtn) return;
         e.preventDefault();
         e.stopPropagation();
         const blockId = micBtn.dataset.id;

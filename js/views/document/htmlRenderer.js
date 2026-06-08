@@ -296,6 +296,7 @@ const DocumentHtmlRenderer = {
         // Check for collapse button click
         const collapseBtn = e.target.closest('.collapse-btn');
         if (collapseBtn) {
+            if (collapseBtn.closest('.content-modal, .tag-modal')) return;
             e.preventDefault();
             e.stopPropagation();
             const blockId = collapseBtn.dataset.id;
@@ -312,6 +313,7 @@ const DocumentHtmlRenderer = {
         // Click on collapsed block body — expand and focus
         const collapsedBlock = e.target.closest('.block.block-collapsed');
         if (collapsedBlock) {
+            if (collapsedBlock.closest('.content-modal, .tag-modal')) return;
             const blockId = collapsedBlock.dataset.id;
             if (blockId && blockId !== 'new') {
                 this.expandBlock(blockId);
@@ -325,6 +327,8 @@ const DocumentHtmlRenderer = {
     handleGroupCollapseClick(e) {
         const header = e.target.closest('.doc-group-header');
         if (!header) return;
+
+        if (header.closest('.content-modal, .tag-modal')) return;
 
         const group = header.closest('.doc-group');
         if (!group) return;

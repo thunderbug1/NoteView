@@ -314,6 +314,7 @@ const DocumentView = {
     handleSplitMarkerClick(e) {
         const marker = e.target.closest('.block-split-marker');
         if (!marker) return;
+        if (marker.closest('.content-modal, .tag-modal')) return;
         e.preventDefault();
         e.stopPropagation();
 
@@ -625,6 +626,7 @@ const DocumentView = {
     handleTagClick(e) {
         const tagBtn = e.target.closest('.add-tag-btn');
         if (!tagBtn) return;
+        if (tagBtn.closest('.content-modal, .tag-modal')) return;
         e.preventDefault();
         e.stopPropagation();
         const blockId = tagBtn.dataset.id;
@@ -636,6 +638,7 @@ const DocumentView = {
     handleTaskToggleClick(e) {
         const btn = e.target.closest('.task-toggle-btn');
         if (!btn) return;
+        if (btn.closest('.content-modal, .tag-modal')) return;
         e.preventDefault();
         e.stopPropagation();
         const blockId = btn.dataset.id;
@@ -764,6 +767,7 @@ const DocumentView = {
     handleCloneContextClick(e) {
         const btn = e.target.closest('.clone-context-btn');
         if (!btn) return;
+        if (btn.closest('.content-modal, .tag-modal')) return;
         e.preventDefault();
         e.stopPropagation();
         const blockId = btn.dataset.id;
@@ -778,6 +782,7 @@ const DocumentView = {
     handleAiButtonClick(e) {
         const btn = e.target.closest('.ai-btn');
         if (!btn) return;
+        if (btn.closest('.content-modal, .tag-modal')) return;
         e.stopPropagation();
         if (btn.classList.contains('ai-btn-disabled')) {
             showToast('Enable AI Features in Settings first');
