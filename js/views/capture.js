@@ -224,7 +224,14 @@ const CaptureView = {
 
         container.querySelectorAll('.capture-card').forEach(card => {
             this._addTouchFeedback(card);
-            card.addEventListener('click', () => this._navigateTo(card.dataset.method));
+            card.addEventListener('click', () => {
+                const method = card.dataset.method;
+                if (method === 'aidictate' && !AIAssistant.isConfigured()) {
+                    Common.showToast('Enable AI Features in Settings first');
+                    return;
+                }
+                this._navigateTo(method);
+            });
         });
         const browseBtn = container.querySelector('.capture-browse-btn');
         if (browseBtn) browseBtn.addEventListener('click', () => App.setView('document'));
@@ -462,6 +469,10 @@ const CaptureView = {
         });
 
         const handleAiAction = async (btn, mode) => {
+            if (!AIAssistant.isConfigured()) {
+                Common.showToast('Enable AI Features in Settings first');
+                return;
+            }
             const raw = editArea.value.trim();
             if (!raw) return;
             if (isRecording) stopRecording();
@@ -592,6 +603,10 @@ const CaptureView = {
         });
 
         const handleAiAction = async (btn, mode) => {
+            if (!AIAssistant.isConfigured()) {
+                Common.showToast('Enable AI Features in Settings first');
+                return;
+            }
             const raw = editArea.value.trim();
             if (!raw) return;
             if (isRecording) stopRecording();

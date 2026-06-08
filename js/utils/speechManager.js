@@ -81,6 +81,7 @@ const SpeechManager = {
             rec.continuous = useContinuousMode;
             rec.interimResults = true;
             rec.lang = lang;
+            console.log('[SpeechManager] Created recognition:', { continuous: useContinuousMode, lang, isMobile: this.isMobile() });
             return rec;
         }
 
@@ -128,9 +129,11 @@ const SpeechManager = {
 
         function buildOnEnd(sessionId) {
             return () => {
+                console.log('[SpeechManager] onEnd called, sessionId:', sessionId, 'current:', sessionCounter, 'isStopping:', isStopping, 'useContinuousMode:', useContinuousMode);
                 if (sessionCounter !== sessionId) return;
                 if (!isStopping) {
                     if (useContinuousMode) {
+                        console.log('[SpeechManager] Continuous mode - cleaning up');
                         cleanup();
                         return;
                     }
@@ -161,15 +164,18 @@ const SpeechManager = {
                         newRecognition.onend = buildOnEnd(newSessionId);
                         recognition = newRecognition;
                         try {
+                            console.log('[SpeechManager] Restarting speech session, attempt:', restartCount);
                             newRecognition.start();
                         } catch (startErr) {
                             console.error('[SpeechManager] Restart start failed:', startErr);
                             cleanup();
                         }
                     } catch (e) {
+                        console.error('[SpeechManager] Restart failed:', e);
                         cleanup();
                     }
                 } else {
+                    console.log('[SpeechManager] Stopping - cleaning up');
                     cleanup();
                 }
             };
@@ -181,6 +187,7 @@ const SpeechManager = {
         }
 
         function start() {
+            console.log('[SpeechManager] start called, isMobile:', this.isMobile(), 'useContinuousMode:', useContinuousMode);
             if (recognition) {
                 stop();
             }
@@ -194,6 +201,7 @@ const SpeechManager = {
 
             recognition.onresult = buildOnResult(sessionId);
             recognition.onerror = (event) => {
+                console.error('[SpeechManager] onerror:', event.error, 'sessionId:', sessionId, 'current:', sessionCounter);
                 if (sessionCounter !== sessionId) return;
                 console.warn('Speech recognition error:', event.error);
                 if (onError) onError();
@@ -204,6 +212,7 @@ const SpeechManager = {
             try {
                 recognition.start();
                 if (onStart) onStart();
+                console.log('[SpeechManager] Speech session started successfully');
             } catch (err) {
                 console.error('[SpeechManager] Start failed:', err);
                 cleanup();
