@@ -24,6 +24,15 @@
     }
 }
 
+.capture-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: auto;
+    margin-top: 0.5rem;
+}
+
 .capture-vault-btn {
     display: flex;
     align-items: center;
@@ -34,12 +43,33 @@
     font-size: 0.8rem;
     cursor: pointer;
     padding: 0;
-    margin-bottom: auto;
-    margin-top: 0.5rem;
 }
 
 .capture-vault-btn svg {
     opacity: 0.6;
+}
+
+.capture-settings-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+
+.capture-settings-btn:hover {
+    opacity: 0.85;
+}
+
+.capture-settings-btn:active,
+.capture-settings-btn.active {
+    opacity: 1;
 }
 
 .capture-grid {

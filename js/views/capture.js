@@ -203,13 +203,20 @@ const CaptureView = {
         const vaultName = Store.directoryHandle ? Store.directoryHandle.name : 'Loading vault...';
         const isVaultReady = !!Store.directoryHandle;
 
+        const gearIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+
         container.innerHTML = `
             <div class="capture-view">
-                <button class="capture-vault-btn" data-action="switch-vault" ${!isVaultReady ? 'disabled' : ''}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    <span>${Common.escapeHtml(vaultName)}</span>
-                    <span class="capture-pending-indicator" data-role="pending-count"></span>
-                </button>
+                <div class="capture-top-bar">
+                    <button class="capture-vault-btn" data-action="switch-vault" ${!isVaultReady ? 'disabled' : ''}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        <span>${Common.escapeHtml(vaultName)}</span>
+                        <span class="capture-pending-indicator" data-role="pending-count"></span>
+                    </button>
+                    <button class="capture-settings-btn" data-action="settings" title="Settings">
+                        ${gearIcon}
+                    </button>
+                </div>
                 <div class="capture-sync-indicator" data-role="sync-status">
                     <span class="capture-sync-spinner"></span> Syncing...
                 </div>
@@ -223,6 +230,12 @@ const CaptureView = {
         });
         const browseBtn = container.querySelector('.capture-browse-btn');
         if (browseBtn) browseBtn.addEventListener('click', () => App.setView('document'));
+
+        const settingsBtn = container.querySelector('[data-action="settings"]');
+        if (settingsBtn) {
+            this._addTouchFeedback(settingsBtn);
+            settingsBtn.addEventListener('click', () => App.setView('settings'));
+        }
 
         const vaultBtn = container.querySelector('[data-action="switch-vault"]');
         if (vaultBtn) {

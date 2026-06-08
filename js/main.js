@@ -1192,13 +1192,21 @@ const App = {
             const self = this;
             requestAnimationFrame(() => requestAnimationFrame(() => {
                 self._executeViewRender();
-                self._postRender();
+                try {
+                    self._postRender();
+                } catch (err) {
+                    console.error('[App] _postRender failed:', err);
+                }
                 self.hideViewLoading();
             }));
             return;
         }
         this._executeViewRender();
-        this._postRender();
+        try {
+            this._postRender();
+        } catch (err) {
+            console.error('[App] _postRender failed:', err);
+        }
     },
 
     _executeViewRender() {
@@ -1257,7 +1265,13 @@ const App = {
                         });
                     }
                 };
-                doRender();
+                try {
+                    doRender();
+                } catch (err) {
+                    console.error('[App] SettingsView render failed:', err);
+                    const c = document.getElementById('viewContainer');
+                    if (c) c.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text-error)">Settings failed to load: ${Common.escapeHtml(err.message || 'Unknown error')}<br><small style="color:var(--text-muted)">Check the browser console for details.</small></div>`;
+                }
                 break;
             }
         }
