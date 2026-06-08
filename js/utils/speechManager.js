@@ -34,6 +34,15 @@ const SpeechManager = {
     },
 
     /**
+     * @returns {boolean} Whether running on a mobile device.
+     * Mobile browsers handle continuous recognition poorly, so we use discrete sessions.
+     */
+    isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            || window.innerWidth <= 768;
+    },
+
+    /**
      * Create a speech recognition session. Handles discrete recognition sessions
      * (non-continuous), interim results, full-transcript delta deduplication,
      * error handling, and automatic reconnection (up to maxRestarts).
@@ -65,13 +74,11 @@ const SpeechManager = {
         let accumulatedFullText = '';
 
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const useContinuousMode = !this.isMobile();
 
         function createRecognition() {
             const rec = new SR();
-            // Deliberately NOT continuous: Chrome handles discrete sessions more
-            // reliably and doesn't stitch utterances internally (which causes the
-            // duplicate-words bug). We achieve continuity via manual restart on `end`.
-            rec.continuous = false;
+            rec.continuous = useContinuousMode;
             rec.interimResults = true;
             rec.lang = lang;
             return rec;
@@ -99,15 +106,16 @@ const SpeechManager = {
 
                 if (!currentFullText) return;
 
-                // Delta dedup: if the new full text starts with what we've already
-                // emitted, only emit the suffix. Otherwise Chrome has started a
-                // genuinely fresh utterance — emit it all.
-                if (accumulatedFullText && currentFullText.startsWith(accumulatedFullText)) {
-                    const delta = currentFullText.substring(accumulatedFullText.length);
-                    accumulatedFullText = currentFullText;
-                    if (delta && onResult) onResult(delta);
+                if (useContinuousMode) {
+                    if (accumulatedFullText && currentFullText.startsWith(accumulatedFullText)) {
+                        const delta = currentFullText.substring(accumulatedFullText.length);
+                        accumulatedFullText = currentFullText;
+                        if (delta && onResult) onResult(delta);
+                    } else {
+                        accumulatedFullText = currentFullText;
+                        if (onResult) onResult(currentFullText);
+                    }
                 } else {
-                    accumulatedFullText = currentFullText;
                     if (onResult) onResult(currentFullText);
                 }
             };
@@ -117,6 +125,10 @@ const SpeechManager = {
             return () => {
                 if (sessionCounter !== sessionId) return;
                 if (!isStopping) {
+                    if (useContinuousMode) {
+                        cleanup();
+                        return;
+                    }
                     restartCount++;
                     if (restartCount > maxRestarts) {
                         console.warn('Speech recognition restart limit reached');
@@ -124,6 +136,7 @@ const SpeechManager = {
                         return;
                     }
                     sessionCounter++;
+                    accumulatedFullText = '';
                     const newSessionId = sessionCounter;
                     try {
                         if (recognition) {

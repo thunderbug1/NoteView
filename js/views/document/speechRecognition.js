@@ -67,6 +67,11 @@ const DocumentSpeechRecognition = {
                     self.insertTextAtSelection(currentView, textToInsert, groupAnnotation);
                 }
             },
+            onInterimTranscript: (interimText) => {
+                if (btnElement) {
+                    btnElement.title = `Dictating... "${interimText}"`;
+                }
+            },
             onError: () => {
                 self.stopSpeechRecognition();
             },
