@@ -1313,7 +1313,14 @@ const SettingsView = {
 
                 saveBtn.textContent = 'Testing...';
                 try {
-                    await GitRemote.pull();
+                    await GitStore.git.fetch({
+                        fs: GitStore.fs,
+                        dir: GitStore.dir,
+                        http: window.GitHttp,
+                        remote: name,
+                        corsProxy: GitRemote._getCorsProxy(),
+                        onAuth: () => GitRemote.config.auth
+                    });
                     saveBtn.textContent = 'Connected';
                 } catch (testErr) {
                     saveBtn.textContent = 'Saved (connection test failed)';

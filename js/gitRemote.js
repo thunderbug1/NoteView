@@ -252,7 +252,7 @@ const GitRemote = {
                     throw resetErr;
                 }
             }
-            console.error('Pull failed:', err);
+            Logger.log('Pull failed (caller will handle):', err.message);
             throw err;
         }
     },
