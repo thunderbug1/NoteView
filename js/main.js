@@ -1064,7 +1064,7 @@ const App = {
         const recentBtn = document.getElementById('toolbarRecentBtn');
         if (recentBtn) recentBtn.hidden = view !== 'document';
 
-        this.render({ loading: true });
+        this.render(view === 'settings' ? {} : { loading: true });
         Logger.log('[App] setView:done', {
             currentView: Store.currentView
         });
