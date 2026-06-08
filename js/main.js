@@ -250,10 +250,10 @@ const App = {
             return;
         }
         try {
-            await GitRemote.init();
-            await SyncManager.init();
             this.setupEventListeners();
             this.setupMobilePullToRefresh();
+            await GitRemote.init();
+            await SyncManager.init();
             SelectionManager.init();
             SelectionManager.updateTagCounts();
             await AIAssistant.init();
