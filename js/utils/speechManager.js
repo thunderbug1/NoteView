@@ -113,6 +113,7 @@ const SpeechManager = {
                         return;
                     }
                     sessionCounter++;
+                    insertedTranscript = '';
                     const newSessionId = sessionCounter;
                     try {
                         if (recognition) {
