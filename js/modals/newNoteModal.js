@@ -7,21 +7,19 @@ const NewNoteModal = {
     _micSvg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
 
     // AI dictation state
-    _aiRecognition: null,
+    _aiSpeechSession: null,
     _aiDictationBtn: null,
-    _aiDictationActive: false,
     _aiDictationBlockId: null,
     _aiTranscript: '',
     _aiIsProcessing: false,
     _aiIsStreaming: false,
-    _isStoppingAIDictation: false,
     _createModalClose: null,
     _createModalPromote: null,
 
     handleAIMicClick(modalBlockId, btn) {
         if (!DocumentView.isSpeechRecognitionSupported()) return;
 
-        if (this._aiDictationActive) {
+        if (this._aiSpeechSession) {
             this.stopAIDictation(modalBlockId);
         } else {
             this.startAIDictation(modalBlockId, btn);
@@ -79,22 +77,15 @@ const NewNoteModal = {
     },
 
     startAIDictation(modalBlockId, btn) {
-        if (this._aiRecognition) {
-            this.stopAIDictation();
+        if (this._aiSpeechSession) {
+            this.stopAIDictation(modalBlockId);
+            return;
         }
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        this._aiRecognition = new SpeechRecognition();
-        this._aiRecognition.continuous = true;
-        this._aiRecognition.interimResults = true;
 
         this._aiDictationBtn = btn;
         this._setAIButtonState(btn, 'recording');
-
-        this._aiDictationActive = true;
-        this._isStoppingAIDictation = false;
-        this._aiTranscript = '';
         this._aiDictationBlockId = modalBlockId;
+        this._aiTranscript = '';
 
         const modal = btn.closest('.tag-modal');
         let preview = modal && modal.querySelector('.ai-transcript-preview');
@@ -107,53 +98,42 @@ const NewNoteModal = {
             }
         }
 
-        this._aiRecognition.onresult = (event) => {
-            let finalTranscript = '';
-            let interimTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
+        const self = this;
+        this._aiSpeechSession = SpeechManager.createSession({
+            onResult: (text) => {
+                self._aiTranscript += text;
+                if (preview) {
+                    preview.textContent = self._aiTranscript;
+                    preview.classList.toggle('has-content', !!self._aiTranscript);
                 }
-            }
-            if (finalTranscript) {
-                this._aiTranscript += finalTranscript + ' ';
-            }
+            },
+            onInterimTranscript: (interim) => {
+                if (preview) {
+                    const displayText = self._aiTranscript + interim;
+                    preview.textContent = displayText;
+                    preview.classList.toggle('has-content', !!displayText);
+                }
+            },
+            onError: () => {
+                self.stopAIDictation(modalBlockId);
+            },
+            onStop: () => {}
+        });
 
-            if (preview) {
-                const displayText = this._aiTranscript + (interimTranscript ? interimTranscript + '...' : '');
-                preview.textContent = displayText;
-                preview.classList.toggle('has-content', !!displayText);
-            }
-        };
-
-        this._aiRecognition.onerror = (event) => {
-            console.error('AI Speech Recognition Error:', event.error);
-            this.stopAIDictation(modalBlockId);
-        };
-
-        this._aiRecognition.onend = () => {
-            if (this._aiDictationActive && !this._isStoppingAIDictation) {
-                try { this._aiRecognition.start(); } catch(e) { console.warn('Speech recognition restart failed:', e); }
-            }
-        };
-
-        this._aiRecognition.start();
+        this._aiSpeechSession.start();
         Common.showToast('AI Listening... Speak your command.');
     },
 
     async stopAIDictation(modalBlockId) {
-        this._aiDictationActive = false;
-        this._isStoppingAIDictation = true;
+        const session = this._aiSpeechSession;
+        this._aiSpeechSession = null;
 
-        if (this._aiRecognition) {
-            this._aiRecognition.stop();
+        if (session) {
+            session.stop();
         }
 
         const transcript = (this._aiTranscript || '').trim();
         this._aiTranscript = '';
-        this._aiRecognition = null;
 
         if (transcript) {
             Common.showToast('Processing dictation with AI...', 3000);
@@ -165,7 +145,6 @@ const NewNoteModal = {
     },
 
     _cleanupAIDictation(modalBlockId) {
-        this._aiRecognition = null;
         const preview = document.querySelector('.ai-transcript-preview');
         if (preview) preview.remove();
         if (this._aiDictationBtn) {
@@ -482,12 +461,12 @@ const NewNoteModal = {
                 DocumentView.setIsInModalOrCreation(false);
                 
                 DocumentView.stopSpeechRecognition();
-                if (self._aiDictationActive && !self._aiIsProcessing) {
+                if (self._aiSpeechSession && !self._aiIsProcessing) {
+                    const session = self._aiSpeechSession;
+                    self._aiSpeechSession = null;
                     const rawTranscript = (self._aiTranscript || '').trim();
-                    self._aiDictationActive = false;
-                    self._isStoppingAIDictation = true;
-                    if (self._aiRecognition) { self._aiRecognition.stop(); self._aiRecognition = null; }
                     self._aiTranscript = '';
+                    if (session) session.stop();
                     if (rawTranscript) {
                         if (createdBlockId) {
                             // Append transcript to existing promoted block
@@ -599,7 +578,7 @@ const NewNoteModal = {
                     actionsDiv.remove();
                 } else if (action === 'ai-dictate') {
                     self.handleAIMicClick(modalBlockId, btn);
-                    if (!self._aiDictationActive && !self._aiIsProcessing) actionsDiv.remove();
+                    if (!self._aiSpeechSession && !self._aiIsProcessing) actionsDiv.remove();
                 }
             });
         }
@@ -614,7 +593,7 @@ const NewNoteModal = {
                 if (newMethod === method) return;
 
                 DocumentView.stopSpeechRecognition();
-                if (self._aiDictationActive) {
+                if (self._aiSpeechSession) {
                     self.stopAIDictation(createdBlockId || modalBlockId);
                 }
                 const preview = modal.querySelector('.ai-transcript-preview');

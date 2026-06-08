@@ -4,6 +4,14 @@
  * auto-restart with session tracking, transcript dedup) that was duplicated across
  * DocumentView (speechRecognition.js), capture.js, and newNoteModal.js.
  *
+ * Uses full-transcript delta tracking to prevent Chrome's infamous continuous-mode
+ * duplicate words bug. Instead of tracking per-result-index, we accumulate the
+ * running full transcript and only emit the suffix on each result event. The
+ * accumulator survives auto-restarts so Chrome can't re-emit buffered audio as "new".
+ *
+ * Continuous mode is deliberately OFF — Chrome handles discrete sessions more
+ * reliably. We manually restart on each `end` event to maintain continuity.
+ *
  * Usage:
  *   if (!SpeechManager.isSupported()) return;
  *   const session = SpeechManager.createSession({
@@ -26,19 +34,19 @@ const SpeechManager = {
     },
 
     /**
-     * Create a speech recognition session. Handles continuous recognition,
-     * interim results, transcript deduplication, error handling, and
-     * automatic reconnection (up to maxRestarts).
+     * Create a speech recognition session. Handles discrete recognition sessions
+     * (non-continuous), interim results, full-transcript delta deduplication,
+     * error handling, and automatic reconnection (up to maxRestarts).
      *
      * @param {Object} opts
      * @param {function(string): void} opts.onResult - Called with deduplicated transcript text ready to insert.
-     *   The session handles stripping previously-inserted text so the caller only gets the new portion.
+     *   The session tracks the full running transcript and only emits the new portion.
      * @param {function(): void} [opts.onError] - Called on recognition error.
      * @param {function(): void} [opts.onStop] - Called after stop/cleanup completes (DOM classes removed, etc.).
      * @param {function(): void} [opts.onStart] - Called after recognition starts successfully.
      * @param {number} [opts.maxRestarts=10] - Maximum auto-restart attempts before giving up.
      * @param {string} [opts.lang=''] - Language for recognition (empty = browser default).
-     * @param {function(): void} [opts.onInterimTranscript] - Called with interim (non-final) transcript.
+     * @param {function(string): void} [opts.onInterimTranscript] - Called with interim (non-final) transcript.
      * @returns {{ start: function, stop: function, cleanup: function }}
      */
     createSession(opts) {
@@ -50,43 +58,38 @@ const SpeechManager = {
         let isStopping = false;
         let restartCount = 0;
         let sessionCounter = 0;
-        let lastFinalIndex = -1;
-        let resultTranscripts = {};
+
+        // Tracks the full concatenation of all final transcripts delivered so far.
+        // Survives auto-restarts — only reset on explicit start(). This prevents
+        // Chrome from re-emitting buffered audio as "new" text after a session ends.
+        let accumulatedFullText = '';
 
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         function createRecognition() {
             const rec = new SR();
-            rec.continuous = true;
+            // Deliberately NOT continuous: Chrome handles discrete sessions more
+            // reliably and doesn't stitch utterances internally (which causes the
+            // duplicate-words bug). We achieve continuity via manual restart on `end`.
+            rec.continuous = false;
             rec.interimResults = true;
             rec.lang = lang;
             return rec;
         }
-
-        let currentOnResult, currentOnError, currentOnEnd;
 
         function buildOnResult(sessionId) {
             return (event) => {
                 if (sessionCounter !== sessionId) return;
 
                 let interimTranscript = '';
-                let newFinalText = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    if (event.results[i].isFinal) {
-                        const transcript = event.results[i][0].transcript;
-                        const prev = resultTranscripts[i];
+                let currentFullText = '';
 
-                        if (i <= lastFinalIndex && prev !== undefined) {
-                            if (transcript.length > prev.length && transcript.startsWith(prev)) {
-                                newFinalText += transcript.substring(prev.length);
-                            }
-                        } else {
-                            newFinalText += transcript;
-                        }
-                        resultTranscripts[i] = transcript;
-                        lastFinalIndex = Math.max(lastFinalIndex, i);
+                for (let i = 0; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        currentFullText += result[0].transcript;
                     } else {
-                        interimTranscript += event.results[i][0].transcript;
+                        interimTranscript += result[0].transcript;
                     }
                 }
 
@@ -94,10 +97,18 @@ const SpeechManager = {
                     onInterimTranscript(interimTranscript);
                 }
 
-                if (!newFinalText) return;
+                if (!currentFullText) return;
 
-                if (onResult) {
-                    onResult(newFinalText);
+                // Delta dedup: if the new full text starts with what we've already
+                // emitted, only emit the suffix. Otherwise Chrome has started a
+                // genuinely fresh utterance — emit it all.
+                if (accumulatedFullText && currentFullText.startsWith(accumulatedFullText)) {
+                    const delta = currentFullText.substring(accumulatedFullText.length);
+                    accumulatedFullText = currentFullText;
+                    if (delta && onResult) onResult(delta);
+                } else {
+                    accumulatedFullText = currentFullText;
+                    if (onResult) onResult(currentFullText);
                 }
             };
         }
@@ -113,8 +124,6 @@ const SpeechManager = {
                         return;
                     }
                     sessionCounter++;
-                    resultTranscripts = {};
-                    lastFinalIndex = -1;
                     const newSessionId = sessionCounter;
                     try {
                         if (recognition) {
@@ -150,8 +159,6 @@ const SpeechManager = {
 
         function cleanup() {
             recognition = null;
-            resultTranscripts = {};
-            lastFinalIndex = -1;
             if (onStop) onStop();
         }
 
@@ -161,24 +168,20 @@ const SpeechManager = {
             }
             restartCount = 0;
             isStopping = false;
-            resultTranscripts = {};
-            lastFinalIndex = -1;
+            accumulatedFullText = '';
             sessionCounter++;
             const sessionId = sessionCounter;
 
             recognition = createRecognition();
-            currentOnResult = buildOnResult(sessionId);
-            currentOnError = (event) => {
+
+            recognition.onresult = buildOnResult(sessionId);
+            recognition.onerror = (event) => {
                 if (sessionCounter !== sessionId) return;
                 console.warn('Speech recognition error:', event.error);
                 if (onError) onError();
                 stop();
             };
-            currentOnEnd = buildOnEnd(sessionId);
-
-            recognition.onresult = currentOnResult;
-            recognition.onerror = currentOnError;
-            recognition.onend = currentOnEnd;
+            recognition.onend = buildOnEnd(sessionId);
 
             try {
                 recognition.start();

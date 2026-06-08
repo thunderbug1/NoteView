@@ -54,14 +54,8 @@ const DocumentView = {
     _cmWidgets: null,
     /** @private Cached EditorTheme config */
     _editorTheme: null,
-    /** @private Active speech recognition instance */
-    _recognition: null,
     /** @private Block being dictated into */
     _recordingBlockId: null,
-    /** @private Flag during recognition stop */
-    _isStopping: false,
-    /** @private Restart counter (max 10) */
-    _recognitionRestartCount: 0,
     /** @private Max auto-restarts for speech recognition */
     _maxRecognitionRestarts: 10,
     /** @private Mobile toolbar DOM element */
