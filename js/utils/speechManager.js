@@ -81,7 +81,7 @@ const SpeechManager = {
             rec.continuous = useContinuousMode;
             rec.interimResults = true;
             rec.lang = lang;
-            console.log('[SpeechManager] Created recognition:', { continuous: useContinuousMode, lang, isMobile: this.isMobile() });
+            console.log('[SpeechManager] Created recognition:', { continuous: useContinuousMode, lang, isMobile: SpeechManager.isMobile() });
             return rec;
         }
 
