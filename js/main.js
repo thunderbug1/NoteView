@@ -318,7 +318,6 @@ const App = {
     async initializeInBackground() {
         // Prevent concurrent init calls (e.g., double DOMContentLoaded)
         if (this._initInProgress) return;
-        this._initInProgress = true;
 
         try {
             if (window.SyncManager) {
@@ -348,7 +347,7 @@ const App = {
                 throw err;
             }
         } finally {
-            this._initInProgress = false;
+            // _initInProgress managed by completeInitialization
         }
     },
 
