@@ -205,7 +205,7 @@ const GitStore = {
             
             return new TextDecoder().decode(blob);
         } catch (err) {
-            console.error('Failed to get file at commit:', err);
+            console.warn('Failed to get file at commit:', err.message);
             return null;
         }
     },
@@ -295,24 +295,26 @@ const GitStore = {
                     if (!filepath.endsWith('.md')) return;
                     if (filepath.includes('/')) return;
 
-                    const parentBlobOid = parentEntry ? await parentEntry.oid() : null;
-                    const childBlobOid = childEntry ? await childEntry.oid() : null;
+                    try {
+                        const parentBlobOid = parentEntry ? await parentEntry.oid() : null;
+                        const childBlobOid = childEntry ? await childEntry.oid() : null;
 
-                    // Same OID means file unchanged — skip
-                    if (parentBlobOid === childBlobOid) return;
+                        if (parentBlobOid === childBlobOid) return;
 
-                    // File added or modified — read content from child commit
-                    if (childEntry) {
-                        const type = await childEntry.type();
-                        if (type === 'blob') {
-                            const content = await childEntry.content();
-                            return [filepath, new TextDecoder().decode(content)];
+                        if (childEntry) {
+                            const type = await childEntry.type();
+                            if (type === 'blob') {
+                                const content = await childEntry.content();
+                                return [filepath, new TextDecoder().decode(content)];
+                            }
                         }
-                    }
 
-                    // File deleted — return null marker
-                    if (parentEntry && !childEntry) {
-                        return [filepath, null];
+                        if (parentEntry && !childEntry) {
+                            return [filepath, null];
+                        }
+                    } catch (entryErr) {
+                        console.warn('walk map entry error, skipping:', filepath, entryErr);
+                        return;
                     }
                 },
                 reduce: async (parent, children) => {
@@ -331,7 +333,7 @@ const GitStore = {
             }
             return result;
         } catch (err) {
-            console.warn('walk-based diff failed, falling back to full read:', err);
+            console.warn('walk-based diff failed, falling back to full read:', err.message);
             return null;
         }
     },
@@ -380,8 +382,8 @@ const GitStore = {
             }
             return files;
         } catch (err) {
-            console.error('Failed to get files at commit:', err);
-            return {};
+            console.warn('Failed to get files at commit:', err.message);
+            return null;
         }
     }
 };

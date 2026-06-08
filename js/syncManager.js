@@ -437,6 +437,33 @@ const SyncManager = {
         }
     },
 
+    async _hardResetToRemote() {
+        if (!GitStore.git || !GitStore.fs) throw new Error('Git not initialized');
+        if (!GitRemote.config) throw new Error('No remote configured');
+
+        const { git, fs, dir } = GitStore;
+        const ref = this._config.branch || 'main';
+        const remoteName = GitRemote.config.name;
+
+        await git.fetch({
+            fs, dir,
+            http: window.GitHttp,
+            remote: remoteName,
+            corsProxy: GitRemote._getCorsProxy(),
+            onAuth: () => GitRemote.config.auth
+        });
+        const remoteRef = `refs/remotes/${remoteName}/${ref}`;
+        const commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
+        await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
+        await git.checkout({ fs, dir, ref, force: true });
+
+        this._pendingCommits = 0;
+        this._lastError = null;
+        this._consecutiveErrors = 0;
+        await this._refreshPendingCount().catch(() => {});
+        await this._postSyncRender();
+    },
+
     async _handleMergeConflict() {
         this._setStatus('conflict', 'Analyzing conflicts...');
 
@@ -470,7 +497,22 @@ const SyncManager = {
             const conflictData = await this._detectConflicts();
 
             if (conflictData.files.length === 0) {
-                // No actual file conflicts — schedule retry instead of recursive sync
+                // Verify git store is readable — if all commits failed, recover via hard reset
+                const localVerify = await GitStore.getAllFilesAtCommit(conflictData.localOid);
+                const remoteVerify = await GitStore.getAllFilesAtCommit(conflictData.remoteOid);
+                if (!localVerify && !remoteVerify) {
+                    console.warn('[SyncManager] Git object store unreadable, falling back to hard reset');
+                    try {
+                        await this._hardResetToRemote();
+                        this._setStatus('idle', 'Synced (hard reset to remote)');
+                        showToast('Sync recovered: reset to remote branch due to unreadable git history.');
+                        return;
+                    } catch (resetErr) {
+                        console.error('[SyncManager] hard reset recovery failed:', resetErr);
+                        throw resetErr;
+                    }
+                }
+                // No actual file conflicts — schedule retry
                 this._setStatus('idle', 'No conflicts found');
                 this._scheduleIdleSync();
                 return;
@@ -567,26 +609,32 @@ const SyncManager = {
 
             // Fallback when TREE walker fails: read full file trees and diff manually
             if (!localChanges || !remoteChanges) {
-                console.warn('[SyncManager] getChangedFilesBetween failed, using full tree comparison');
                 const baseFiles = await GitStore.getAllFilesAtCommit(baseOid);
                 const localFiles = !localChanges ? await GitStore.getAllFilesAtCommit(localOid) : null;
                 const remoteFiles = !remoteChanges ? await GitStore.getAllFilesAtCommit(remoteOid) : null;
 
-                if (!localChanges) {
-                    localChanges = {};
-                    const lf = localFiles || {};
-                    for (const fp of new Set([...Object.keys(baseFiles), ...Object.keys(lf)])) {
-                        if (baseFiles[fp] !== lf[fp]) {
-                            localChanges[fp] = fp in lf ? lf[fp] : null;
+                // If base commit can't be read, fall back to no-common-ancestor comparison
+                if (!baseFiles) {
+                    console.warn('[SyncManager] base commit unreadable, treating as no common ancestor');
+                    localChanges = localFiles;
+                    remoteChanges = remoteFiles;
+                } else {
+                    if (!localChanges) {
+                        localChanges = {};
+                        const lf = localFiles || {};
+                        for (const fp of new Set([...Object.keys(baseFiles), ...Object.keys(lf)])) {
+                            if (baseFiles[fp] !== lf[fp]) {
+                                localChanges[fp] = fp in lf ? lf[fp] : null;
+                            }
                         }
                     }
-                }
-                if (!remoteChanges) {
-                    remoteChanges = {};
-                    const rf = remoteFiles || {};
-                    for (const fp of new Set([...Object.keys(baseFiles), ...Object.keys(rf)])) {
-                        if (baseFiles[fp] !== rf[fp]) {
-                            remoteChanges[fp] = fp in rf ? rf[fp] : null;
+                    if (!remoteChanges) {
+                        remoteChanges = {};
+                        const rf = remoteFiles || {};
+                        for (const fp of new Set([...Object.keys(baseFiles), ...Object.keys(rf)])) {
+                            if (baseFiles[fp] !== rf[fp]) {
+                                remoteChanges[fp] = fp in rf ? rf[fp] : null;
+                            }
                         }
                     }
                 }

@@ -243,8 +243,8 @@ const TimelineView = {
         if (!parentCommit) {
             // First commit in our window: read all files to establish baseline state
             const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
-            currAllTasks = this.extractAllTasks(filesContent);
-            currFileSet = this.extractFileSet(filesContent);
+            currAllTasks = this.extractAllTasks(filesContent || {});
+            currFileSet = this.extractFileSet(filesContent || {});
 
             // If this commit has parents (not the repo root), it's a window boundary.
             // We don't know the parent's state, so we can only establish the baseline
@@ -262,8 +262,8 @@ const TimelineView = {
             if (changedFiles === null) {
                 // walk() failed, fallback to reading all files
                 const filesContent = await GitStore.getAllFilesAtCommit(commit.oid);
-                currAllTasks = this.extractAllTasks(filesContent);
-                currFileSet = this.extractFileSet(filesContent);
+                currAllTasks = this.extractAllTasks(filesContent || {});
+                currFileSet = this.extractFileSet(filesContent || {});
             } else if (Object.keys(changedFiles).length === 0) {
                 // No file changes (e.g. merge commit) — carry forward previous state
                 currAllTasks = prevAllTasks;
