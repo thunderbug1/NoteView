@@ -2,7 +2,6 @@
     padding: 2.5rem;
     max-width: 900px;
     margin: 0 auto;
-    animation: settingsFadeIn 0.4s ease-out;
 }
 
 @media (max-width: 1024px) {
