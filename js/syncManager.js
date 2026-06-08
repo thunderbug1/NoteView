@@ -333,10 +333,8 @@ const SyncManager = {
     },
 
     _isEditing() {
-        return Store.currentView === 'document' &&
-            window.DocumentView &&
-            DocumentView.getFocusedEditor() &&
-            DocumentView.getFocusedEditor().hasFocus;
+        if (Store.currentView !== 'document' || !window.DocumentView) return false;
+        return document.activeElement && !!document.activeElement.closest('.cm-editor');
     },
 
     async _postSyncRender(withLoading = false) {
