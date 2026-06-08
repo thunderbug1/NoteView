@@ -518,6 +518,7 @@ const App = {
             document.body.classList.remove('sidebar-open');
         }
         function openSidebarRight() {
+            sidebarRight.classList.remove('collapsed');
             sidebarRight.classList.add('sidebar-open');
             sidebarEdgeRight?.classList.add('hidden');
             overlay.classList.add('active');
