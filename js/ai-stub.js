@@ -3,6 +3,9 @@
  */
 const AIAssistant = {
     enabled: false,
+    profiles: [],
+    presets: [],
+    _apiKeys: {},
     _moduleLoaded: false,
     _moduleLoading: null,
 
