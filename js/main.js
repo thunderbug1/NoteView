@@ -3,7 +3,7 @@
  */
 
 const App = {
-    VERSION: '0.1',
+    VERSION: '52',
     isInitialized: false,
 
 

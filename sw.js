@@ -97,6 +97,12 @@ function shouldUseCacheFirst(request) {
   return destination === 'script' || destination === 'style';
 }
 
+self.addEventListener('message', (event) => {
+  if (event.data === 'get-version') {
+    event.ports[0].postMessage(CACHE_NAME);
+  }
+});
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))

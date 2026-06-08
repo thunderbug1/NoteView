@@ -348,6 +348,13 @@ const SettingsView = {
                     </div>
                     <div class="settings-item">
                         <div class="settings-item-info">
+                            <label>Installed PWA</label>
+                            <p class="settings-item-hint">Service worker cache name shows which build is actually installed.</p>
+                        </div>
+                        <span class="settings-item-value" id="sw-version">Checking...</span>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
                             <label>Updates</label>
                             <p id="update-status" class="settings-item-hint"></p>
                         </div>
@@ -359,6 +366,7 @@ const SettingsView = {
 
         this.attachEventListeners();
         this._checkForUpdates();
+        this._showSWVersion();
     },
 
     async _checkForUpdates() {
@@ -388,6 +396,29 @@ const SettingsView = {
 
         btn.disabled = false;
         btn.textContent = 'Check for Updates';
+    },
+
+    async _showSWVersion() {
+        const el = document.getElementById('sw-version');
+        if (!el) return;
+
+        if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+            el.textContent = 'No PWA installed';
+            return;
+        }
+
+        try {
+            const cacheName = await new Promise((resolve, reject) => {
+                const channel = new MessageChannel();
+                channel.port1.onmessage = (e) => resolve(e.data);
+                channel.port1.onmessageerror = () => reject(new Error('messageerror'));
+                navigator.serviceWorker.controller.postMessage('get-version', [channel.port2]);
+                setTimeout(() => reject(new Error('timeout')), 3000);
+            });
+            el.textContent = cacheName;
+        } catch {
+            el.textContent = 'Unknown';
+        }
     },
 
     attachEventListeners() {

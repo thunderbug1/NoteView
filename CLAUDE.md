@@ -14,7 +14,7 @@ never use the find command with the -exec flag in bash commands, use fdfind inst
 - **Sanitize markdown-to-HTML output.** When rendering `marked.parse()` output into the DOM, pass it through `sanitizeHtml()` (strips `<script>`, `on*` attributes, `javascript:` URLs). Never insert raw `marked.parse()` output directly.
 - **Clean up document-level event listeners.** Any `document.addEventListener('click', handler)` added for menus or popovers must be removed with `removeEventListener` in the close/dismiss handler. Otherwise listeners accumulate on every open.
 - **Mutate in-memory state only after file operations succeed.** Don't `splice` arrays or modify block state before `removeEntry`/`createWritable` completes. If a file write fails, in-memory state should still reflect what's on disk.
-- **When adding new `<script>` or `<link>` tags to `index.html`, also add them to `sw.js` `PRECACHE_URLS`.** The service worker precache must mirror all app resources for offline support. Bump `CACHE_NAME` and the `?v=` param together.
+- **When adding new `<script>` or `<link>` tags to `index.html`, also add them to `sw.js` `PRECACHE_URLS`.** The service worker precache must mirror all app resources for offline support. Bump `CACHE_NAME`, `App.VERSION`, and the `?v=` param together.
 - **When rendering into the right sidebar (`#sidebarRight .sidebar-scroll`), coexist with other panels.** Use `insertAdjacentHTML` or targeted `outerHTML` replacement on your own container element. Never replace the entire `container.innerHTML` — it destroys other panels (backlinks, deadlines).
 - **Don't export regex literals with the `g` flag on window globals.** The `lastIndex` property is mutable and shared across all callers. Use a getter that returns a fresh regex instead: `get MY_REGEX() { return /pattern/g; }`.
 - **Don't use `setTimeout` to avoid race conditions.** Timeouts are fragile — they break under CPU throttling, busy event loops, and vary across devices. Use deterministic alternatives instead:
@@ -46,7 +46,7 @@ npx serve .
 
 **No build step, no package manager needed for dev.** Dependencies are vendored locally in `vendor/` to ensure offline capability. To update vendored dependencies, run `scripts/vendor.sh` (this will create an ephemeral `node_modules/` to run esbuild, bundle CodeMirror, and download CDN scripts directly). CSS and JS are loaded directly via `<link>` and `<script>` tags.
 
-**Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-v47` to `noteview-v48`) and the `?v=` param on the `sw.js` registration line in `js/sw-register.js`. This is only two places to update, regardless of how many files changed.
+**Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-v47` to `noteview-v48`), the `?v=` param on the `sw.js` registration line in `js/sw-register.js`, and `App.VERSION` in `js/main.js` (e.g., `'47'` to `'48'`). These three values must stay in sync.
 
 **IndexedDB migrations:** When adding new IndexedDB object stores or changing the schema, increment `DB_VERSION` in `js/store.js` and handle the upgrade in `initDB()`. The `onupgradeneeded` event will trigger automatically for users with older versions.
 
