@@ -16,6 +16,7 @@ const CaptureView = {
         switch (this.currentPage) {
             case 'write': this.renderWritePage(container); break;
             case 'dictate': this.renderDictatePage(container); break;
+            case 'aidictate': this.renderAIDictatePage(container); break;
             case 'task': this.renderTaskPage(container); break;
             case 'template': this.renderTemplatePicker(container); break;
             default: this.renderGrid(container); break;
@@ -179,6 +180,7 @@ const CaptureView = {
 
     renderGrid(container) {
         const speechSupported = DocumentView.isSpeechRecognitionSupported();
+        const aiConfigured = AIAssistant.isConfigured();
 
         const typeIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
         const micIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
@@ -190,6 +192,10 @@ const CaptureView = {
         methods += `<button class="capture-card" data-method="write">${typeIcon}<span class="capture-card-label">Write</span></button>`;
         if (speechSupported) {
             methods += `<button class="capture-card" data-method="dictate">${micIcon}<span class="capture-card-label">Dictate</span></button>`;
+            if (aiConfigured) {
+                const aiSparkle = '<span class="ai-sparkle" style="font-size:0.7rem">✨</span>';
+                methods += `<button class="capture-card" data-method="aidictate">${micIcon}${aiSparkle}<span class="capture-card-label">AI Dictate</span></button>`;
+            }
         }
         methods += `<button class="capture-card" data-method="task">${taskIcon}<span class="capture-card-label">Task</span></button>`;
         methods += `<button class="capture-card" data-method="template">${templateIcon}<span class="capture-card-label">Template</span></button>`;
@@ -475,15 +481,161 @@ const CaptureView = {
         startRecording();
     },
 
+    renderAIDictatePage(container) {
+        const micIcon = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>';
+        const aiSparkle = '<span class="ai-sparkle">✨</span>';
+
+        const processBtnHtml = `
+            <div class="capture-ai-btns" style="display:none">
+                <button class="capture-ai-process-btn" data-action="ai-format">Format with AI</button>
+                <button class="capture-ai-process-btn" data-action="ai-interpret">Interpret with AI</button>
+            </div>`;
+
+        container.innerHTML = `
+            <div class="capture-page">
+                ${this._headerHtml()}
+                <div class="capture-dictate-body">
+                    <div class="capture-ai-dictate-label">${aiSparkle} AI Dictate</div>
+                    <button class="capture-mic-btn recording" data-action="mic">${micIcon}</button>
+                    <span class="capture-mic-status" data-role="status">Listening...</span>
+                    <textarea class="capture-dictate-edit" data-role="dictate-edit" placeholder="Speak your note — AI will structure it..." rows="6"></textarea>
+                    ${processBtnHtml}
+                </div>
+                ${this._saveBarHtml()}
+            </div>`;
+
+        this._wireHeader(container);
+        this._wireSave(container, () => {
+            const ta = container.querySelector('[data-role="dictate-edit"]');
+            return ta ? ta.value : '';
+        });
+
+        const micBtn = container.querySelector('[data-action="mic"]');
+        const statusEl = container.querySelector('[data-role="status"]');
+        const editArea = container.querySelector('[data-role="dictate-edit"]');
+        const aiBtns = container.querySelector('.capture-ai-btns');
+        const formatBtn = container.querySelector('[data-action="ai-format"]');
+        const interpretBtn = container.querySelector('[data-action="ai-interpret"]');
+        let isRecording = true;
+
+        if (micBtn) this._addTouchFeedback(micBtn);
+        if (formatBtn) this._addTouchFeedback(formatBtn);
+        if (interpretBtn) this._addTouchFeedback(interpretBtn);
+
+        const showAiBtns = () => {
+            if (aiBtns && editArea.value.trim()) aiBtns.style.display = '';
+        };
+
+        const hideAiBtns = () => {
+            if (aiBtns) aiBtns.style.display = 'none';
+        };
+
+        const updateSaveState = () => {
+            this._setSaveEnabled(container, (editArea.value || '').trim().length > 0);
+        };
+
+        editArea.addEventListener('input', () => { updateSaveState(); showAiBtns(); });
+
+        const startRecording = () => {
+            const self = this;
+            this._speechSession = SpeechManager.createSession({
+                onResult: (textToInsert) => {
+                    if (textToInsert.trim()) {
+                        const existing = editArea.value;
+                        editArea.value = existing + (existing && !existing.endsWith(' ') ? ' ' : '') + textToInsert.trim();
+                        updateSaveState();
+                        showAiBtns();
+                    }
+                },
+                onError: () => {
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                    statusEl.textContent = 'Stopped';
+                    showAiBtns();
+                },
+                onStop: () => {
+                    self._cleanup();
+                },
+                onStart: () => {
+                    isRecording = true;
+                    micBtn.classList.add('recording');
+                    statusEl.textContent = 'Listening...';
+                    hideAiBtns();
+                }
+            });
+            this._speechSession.start();
+        };
+
+        const stopRecording = () => {
+            if (this._speechSession) {
+                this._speechSession.stop();
+                this._speechSession = null;
+            }
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            statusEl.textContent = 'Paused';
+            showAiBtns();
+        };
+
+        micBtn.addEventListener('click', () => {
+            if (isRecording) stopRecording();
+            else startRecording();
+        });
+
+        const handleAiAction = async (btn, mode) => {
+            const raw = editArea.value.trim();
+            if (!raw) return;
+            if (isRecording) stopRecording();
+            const label = btn.textContent;
+            btn.textContent = 'Processing...';
+            btn.disabled = true;
+            try {
+                const result = await this._processWithAI(raw, mode);
+                editArea.value = result;
+                statusEl.textContent = mode === 'format' ? 'AI formatted' : 'AI interpreted';
+                updateSaveState();
+                hideAiBtns();
+            } catch (err) {
+                const isNetwork = !err.message || /fetch|network|network_changed/i.test(err.message);
+                Common.showToast(isNetwork ? 'Network error — check connection' : 'AI failed, keeping raw text');
+                statusEl.textContent = 'AI failed — retry';
+                btn.textContent = label;
+                btn.disabled = false;
+                showAiBtns();
+            }
+        };
+
+        if (formatBtn) formatBtn.addEventListener('click', () => handleAiAction(formatBtn, 'format'));
+        if (interpretBtn) interpretBtn.addEventListener('click', () => handleAiAction(interpretBtn, 'interpret'));
+
+        startRecording();
+    },
+
     async _processWithAI(transcript, mode = 'format') {
         const profile = AIAssistant.profiles[0];
         if (!profile) throw new Error('No AI profile');
         const apiKey = AIAssistant._apiKeys[profile.id];
         if (!apiKey) throw new Error('No API key');
 
+        const noteFormatRules = `
+Use this markdown format:
+- Start with "# Title" as the note title.
+- Use YAML frontmatter when the note benefits from tags:
+  ---
+  tags: ["namespace.tag"]
+  ---
+- For tasks, use checkboxes with inline metadata:
+  - [ ] task description [due:: YYYY-MM-DD] [priority:: high|medium|low] [assignee:: @name]
+- Task states: [ ] todo, [/] in progress, [x] done, [b] blocked, [-] cancelled.
+- Reference other notes with [[wikilinks]].
+- Mention people with @username.
+- Use bulleted lists, numbered lists, and headings for structure.
+- Preserve all original meaning — do not fabricate facts.
+- Output only the note content, no commentary or code fences.`;
+
         const prompts = {
-            format: 'You are a note-taking assistant. Format the following spoken text into well-structured markdown. Use headings, lists, task checkboxes where appropriate. Preserve all the original meaning — do not add, remove, or reinterpret content. Output only the note content, no commentary or code fences.',
-            interpret: 'You are a note-taking assistant. The following is raw spoken text that may be disorganized, incomplete, or rambling. Interpret what the speaker means, organize their thoughts into a clear and coherent note, and fill in implied context. Use headings, lists, task checkboxes where appropriate. Output only the note content, no commentary or code fences.'
+            format: `You are a note-taking assistant. Format the following spoken text into well-structured markdown. Preserve all the original meaning — do not add, remove, or reinterpret content.${noteFormatRules}`,
+            interpret: `You are a note-taking assistant. The following is raw spoken text that may be disorganized, incomplete, or rambling. Interpret what the speaker means, organize their thoughts into a clear and coherent note, and fill in implied context.${noteFormatRules}`
         };
 
         const url = profile.endpointUrl.replace(/[\\/]+$/, '') + '/chat/completions';

@@ -308,6 +308,17 @@
     border-color: var(--accent);
 }
 
+.capture-ai-dictate-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
 /* ─── AI Process Buttons ─────────────────────── */
 
 .capture-ai-btns {
