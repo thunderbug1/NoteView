@@ -99,6 +99,7 @@ const DocumentSpeechRecognition = {
 
         console.log('[SpeechRecognition] Starting speech session');
         this._speechSession.start();
+        console.log('[SpeechRecognition] Speech session start() called');
     },
 
     /** @public Stop dictation */
@@ -112,6 +113,7 @@ const DocumentSpeechRecognition = {
 
     /** @public Clean up speech recognition DOM state */
     cleanupRecognition() {
+        console.log('[SpeechRecognition] cleanupRecognition called');
         const blockId = this._recordingBlockId;
         const btn = this._recordingBtn;
         this._speechSession = null;
@@ -119,14 +121,17 @@ const DocumentSpeechRecognition = {
         this._recordingBtn = null;
 
         if (btn) {
+            console.log('[SpeechRecognition] Removing recording class from button');
             btn.classList.remove('recording');
             btn.title = 'Dictate text';
         }
         if (blockId) {
             const block = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
             if (block) {
+                console.log('[SpeechRecognition] Removing block-recording class');
                 block.classList.remove('block-recording');
             }
         }
+        console.log('[SpeechRecognition] cleanupRecognition complete');
     },
 };
