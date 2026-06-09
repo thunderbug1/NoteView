@@ -790,6 +790,8 @@ const Store = {
                 const vaultList = await this.getVaultList();
                 const vaultEntry = vaultList.find(v => v.name === savedHandle.name);
 
+                const vaultType = vaultEntry?.type || null;
+
                 // Check permission — skip for OPFS vaults
                 let permission = 'granted';
                 if (!this.isOPFSVault(vaultEntry)) {
@@ -801,7 +803,7 @@ const Store = {
                 }
                 if (permission === 'granted') {
                     this.directoryHandle = savedHandle;
-                    await this._activateVault(savedHandle);
+                    await this._activateVault(savedHandle, { vaultType });
                     return true;
                 } else {
                     const error = new Error('Permission required to access saved folder');
