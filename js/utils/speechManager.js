@@ -1,16 +1,13 @@
 /**
  * SpeechManager - Shared Web Speech API session manager.
- * Deduplicates the SpeechRecognition boilerplate (constructor, continuous/interim,
- * auto-restart with session tracking, transcript dedup) that was duplicated across
+ * Deduplicates the SpeechRecognition boilerplate (constructor, interim results,
+ * auto-restart with session tracking) that was duplicated across
  * DocumentView (speechRecognition.js), capture.js, and newNoteModal.js.
  *
- * Uses full-transcript delta tracking to prevent Chrome's infamous continuous-mode
- * duplicate words bug. Instead of tracking per-result-index, we accumulate the
- * running full transcript and only emit the suffix on each result event. The
- * accumulator survives auto-restarts so Chrome can't re-emit buffered audio as "new".
- *
- * Continuous mode is deliberately OFF — Chrome handles discrete sessions more
- * reliably. We manually restart on each `end` event to maintain continuity.
+ * Uses discrete recognition sessions on all platforms — Chrome's continuous
+ * mode often delays or never emits final results (only interim), causing
+ * `onResult` to never fire and dictation to appear broken. Discrete sessions
+ * trigger final results promptly and we auto-restart for continuity.
  *
  * Usage:
  *   if (!SpeechManager.isSupported()) return;
@@ -35,7 +32,6 @@ const SpeechManager = {
 
     /**
      * @returns {boolean} Whether running on a mobile device.
-     * Mobile browsers handle continuous recognition poorly, so we use discrete sessions.
      */
     isMobile() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -43,9 +39,8 @@ const SpeechManager = {
     },
 
     /**
-     * Create a speech recognition session. Handles discrete recognition sessions
-     * (non-continuous), interim results, full-transcript delta deduplication,
-     * error handling, and automatic reconnection (up to maxRestarts).
+     * Create a speech recognition session. Uses discrete (non-continuous) sessions
+     * with automatic restart on `end` for continuity across all platforms.
      *
      * @param {Object} opts
      * @param {function(string): void} opts.onResult - Called with deduplicated transcript text ready to insert.
@@ -68,13 +63,10 @@ const SpeechManager = {
         let restartCount = 0;
         let sessionCounter = 0;
 
-        // Tracks the full concatenation of all final transcripts delivered so far.
-        // Survives auto-restarts — only reset on explicit start(). This prevents
-        // Chrome from re-emitting buffered audio as "new" text after a session ends.
-        let accumulatedFullText = '';
-
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const useContinuousMode = !this.isMobile();
+        // Discrete sessions produce final results promptly across all Chrome versions.
+        // Continuous mode often delays/never emits final results, breaking dictation.
+        const useContinuousMode = false;
 
         function createRecognition() {
             const rec = new SR();
@@ -110,23 +102,9 @@ const SpeechManager = {
 
                 if (!currentFullText) return;
 
-                console.log('[SpeechManager] Final text:', currentFullText, 'Use continuous:', useContinuousMode);
+                console.log('[SpeechManager] Final text:', currentFullText);
 
-                if (useContinuousMode) {
-                    if (accumulatedFullText && currentFullText.startsWith(accumulatedFullText)) {
-                        const delta = currentFullText.substring(accumulatedFullText.length);
-                        accumulatedFullText = currentFullText;
-                        console.log('[SpeechManager] Delta to insert:', delta);
-                        if (delta && onResult) onResult(delta);
-                    } else {
-                        accumulatedFullText = currentFullText;
-                        console.log('[SpeechManager] Full text to insert:', currentFullText);
-                        if (onResult) onResult(currentFullText);
-                    }
-                } else {
-                    console.log('[SpeechManager] Mobile mode - inserting text:', currentFullText);
-                    if (onResult) onResult(currentFullText);
-                }
+                if (onResult) onResult(currentFullText);
             };
         }
 
@@ -135,10 +113,6 @@ const SpeechManager = {
                 console.log('[SpeechManager] onEnd called, sessionId:', sessionId, 'current:', sessionCounter, 'isStopping:', isStopping, 'useContinuousMode:', useContinuousMode);
                 if (sessionCounter !== sessionId) return;
                 if (!isStopping) {
-                    if (useContinuousMode) {
-                        console.log('[SpeechManager] Continuous mode ended but not explicitly stopped - this might be browser ending session, keeping cleanup from being called');
-                        return;
-                    }
                     restartCount++;
                     if (restartCount > maxRestarts) {
                         console.warn('Speech recognition restart limit reached');
@@ -146,7 +120,6 @@ const SpeechManager = {
                         return;
                     }
                     sessionCounter++;
-                    accumulatedFullText = '';
                     const newSessionId = sessionCounter;
                     try {
                         if (recognition) {
@@ -195,7 +168,6 @@ const SpeechManager = {
             }
             restartCount = 0;
             isStopping = false;
-            accumulatedFullText = '';
             sessionCounter++;
             const sessionId = sessionCounter;
 

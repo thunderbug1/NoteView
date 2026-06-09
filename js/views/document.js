@@ -56,6 +56,8 @@ const DocumentView = {
     _editorTheme: null,
     /** @private Block being dictated into */
     _recordingBlockId: null,
+    /** @private Counter to prevent async cleanup races between speech sessions */
+    _speechSessionToken: 0,
     /** @private Max auto-restarts for speech recognition */
     _maxRecognitionRestarts: 10,
     /** @private Mobile toolbar DOM element */

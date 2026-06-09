@@ -144,7 +144,8 @@ const DocumentPasteHandler = {
      * Insert text at the current cursor position in a CodeMirror editor.
      * @param {EditorView} view - CodeMirror view
      * @param {string} text - Text to insert
-     * @param {Annotation[]} [annotations] - Optional CM6 annotations (e.g. for undo grouping)
+     * @param {Annotation<any>|Annotation<any>[]} [annotations] - Optional CM6 annotations (e.g. for undo grouping).
+     *   Single values are automatically wrapped in an array.
      */
     insertTextAtSelection(view, text, annotations) {
         const selection = view.state.selection.main;
@@ -154,7 +155,7 @@ const DocumentPasteHandler = {
             selection: { anchor, head: anchor },
             scrollIntoView: true
         };
-        if (annotations) dispatch.annotations = annotations;
+        if (annotations) dispatch.annotations = Array.isArray(annotations) ? annotations : [annotations];
         view.dispatch(dispatch);
         view.focus();
     },

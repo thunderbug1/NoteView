@@ -53,7 +53,13 @@ const DocumentSpeechRecognition = {
 
         const { Annotation } = window.CodeMirror;
         const dictationGroup = Annotation.define();
-        const groupAnnotation = dictationGroup.of(Date.now());
+        const groupAnnotation = [dictationGroup.of(Date.now())];
+
+        // Capture the session token to prevent async cleanup races.
+        // When a new session is started before the old one's onStop fires
+        // (e.g. toggling dictation quickly), the old cleanup must not clobber
+        // the new session's state.
+        const sessionToken = ++this._speechSessionToken;
 
         this._recordingBlockId = blockId;
         this._recordingBtn = btnElement;
@@ -72,13 +78,13 @@ const DocumentSpeechRecognition = {
         this._speechSession = SpeechManager.createSession({
             onResult: (textToInsert) => {
                 console.log('[SpeechRecognition] onResult called with text:', textToInsert);
-                const currentView = DocumentView.editors.get(blockId);
-                console.log('[SpeechRecognition] Current view found:', !!currentView);
-                if (currentView) {
+                // Use the captured view reference directly — survives block ID
+                // reassignment when the new-note modal auto-promotes the temp block.
+                if (view.dom) {
                     console.log('[SpeechRecognition] Calling insertTextAtSelection');
-                    DocumentView.insertTextAtSelection(currentView, textToInsert, groupAnnotation);
+                    DocumentView.insertTextAtSelection(view, textToInsert, groupAnnotation);
                 } else {
-                    console.error('[SpeechRecognition] No view found for block:', blockId);
+                    console.error('[SpeechRecognition] View destroyed for block:', blockId);
                 }
             },
             onInterimTranscript: (interimText) => {
@@ -91,8 +97,10 @@ const DocumentSpeechRecognition = {
                 self.stopSpeechRecognition();
             },
             onStop: () => {
-                console.log('[SpeechRecognition] onStop called');
-                self.cleanupRecognition();
+                console.log('[SpeechRecognition] onStop called, sessionToken:', sessionToken, 'current:', self._speechSessionToken);
+                if (self._speechSessionToken === sessionToken) {
+                    self.cleanupRecognition();
+                }
             },
             maxRestarts: this._maxRecognitionRestarts
         });
