@@ -299,6 +299,11 @@
     border-color: var(--ai-accent);
 }
 
+.ai-model-select option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
 .ai-mode-toggle {
     display: flex;
     background: var(--bg-secondary);
@@ -1666,6 +1671,11 @@
 [data-theme="dark"] .ai-model-select,
 [data-theme="dark"] .ai-input-row textarea {
     background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .ai-model-select option {
+    background: #1e293b;
+    color: #e2e8f0;
 }
 
 [data-theme="dark"] .ai-msg-user-text {
