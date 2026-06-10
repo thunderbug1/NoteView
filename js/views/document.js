@@ -460,8 +460,9 @@ const DocumentView = {
         });
 
         // Clean up orphaned editors (blocks no longer in the DOM)
+        // Skip modal editors whose DOM lives outside #viewContainer
         for (const [id, editor] of this.editors) {
-            if (!activeBlockIds.has(id)) {
+            if (!activeBlockIds.has(id) && id !== 'new-modal') {
                 editor.destroy();
                 this.editors.delete(id);
                 this.originalContents.delete(id);

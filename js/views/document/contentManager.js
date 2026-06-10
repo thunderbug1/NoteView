@@ -382,10 +382,14 @@ const DocumentContentManager = {
 
         // Flush and commit pending saves before destroying editors to prevent stale writes and data loss
         await this.flushAllPendingSaves();
+
+        const modalEditor = this.editors.get('new-modal');
+
         for (const editor of this.editors.values()) {
-            editor.destroy();
+            if (editor !== modalEditor) editor.destroy();
         }
         this.editors.clear();
+        if (modalEditor) this.editors.set('new-modal', modalEditor);
 
         SelectionManager.updateTagCounts();
         await App.render();

@@ -162,7 +162,7 @@ const SpeechManager = {
         }
 
         function start() {
-            console.log('[SpeechManager] start called, isMobile:', this.isMobile(), 'useContinuousMode:', useContinuousMode);
+            console.log('[SpeechManager] start called, isMobile:', SpeechManager.isMobile(), 'useContinuousMode:', useContinuousMode);
             if (recognition) {
                 stop();
             }
