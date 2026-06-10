@@ -66,6 +66,12 @@ const AIAssistant = {
         await this._ensureLoaded();
         const result = await window.AIAssistantReal?.init();
         if (window.AIAssistantReal) {
+            this.enabled = window.AIAssistantReal.enabled;
+            this.profiles = window.AIAssistantReal.profiles;
+            this.presets = window.AIAssistantReal.presets;
+            this._apiKeys = window.AIAssistantReal._apiKeys;
+            this._lastProfileId = window.AIAssistantReal._lastProfileId;
+            this._lastInstruction = window.AIAssistantReal._lastInstruction;
             this._panelElement = window.AIAssistantReal._panelElement;
         }
         return result;
