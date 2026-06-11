@@ -470,9 +470,9 @@ const QRTransfer = {
                 try {
                     await Store.createOPFSVault(name);
                     await this.importSettings(data);
-                    await this._pullIfAvailable(data);
                     VaultModal.updateVaultSwitcherName();
                     await App.completeInitialization();
+                    await this._pullIfAvailable(data);
                     showToast('Vault created and settings imported.');
                 } catch (e) {
                     showToast('Failed to create browser vault.');
