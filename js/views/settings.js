@@ -241,6 +241,24 @@ const SettingsView = {
                 </div>
 
                 <div class="settings-section">
+                    <h3>Bulk Vault Management</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Import All Vaults</label>
+                            <p class="settings-item-hint">Import multiple vaults with their configurations from a single JSON file.</p>
+                        </div>
+                        <button id="bulkImportBtn" class="settings-btn secondary">Import JSON</button>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Export All Vaults</label>
+                            <p class="settings-item-hint">Export all vaults with their configurations to a single JSON file for backup or transfer.</p>
+                        </div>
+                        <button id="bulkExportBtn" class="settings-btn secondary">Export JSON</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Tag Management</h3>
                     <div class="settings-item">
                         <div class="settings-item-info">
@@ -445,6 +463,16 @@ const SettingsView = {
         const scanQRBtn = document.getElementById('scanQRBtn');
         if (scanQRBtn) {
             scanQRBtn.addEventListener('click', () => QRTransfer.showImportModal());
+        }
+
+        const bulkImportBtn = document.getElementById('bulkImportBtn');
+        if (bulkImportBtn) {
+            bulkImportBtn.addEventListener('click', () => BulkImport.showImportModal());
+        }
+
+        const bulkExportBtn = document.getElementById('bulkExportBtn');
+        if (bulkExportBtn) {
+            bulkExportBtn.addEventListener('click', () => BulkImport.showExportModal());
         }
 
         const rebuildTagIndexBtn = document.getElementById('rebuildTagIndexBtn');

@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "vaults": [
+    {
+      "name": "work-notes",
+      "type": "opfs",
+      "addedAt": "2024-01-15T10:30:00.000Z",
+      "git": {
+        "url": "https://github.com/username/work-notes.git",
+        "name": "origin",
+        "branch": "main",
+        "corsProxy": "https://cors.isomorphic-git.org",
+        "auth": {
+          "username": "github-username",
+          "password": "ghp_xxxxxxxxxxxxxxxxxxxx"
+        }
+      },
+      "sync": {
+        "autoSync": true,
+        "syncInterval": 5,
+        "commitThreshold": 5
+      },
+      "ai": {
+        "enabled": true,
+        "profiles": [
+          {
+            "id": "profile-1",
+            "name": "GPT-4",
+            "endpointUrl": "https://api.openai.com/v1",
+            "model": "gpt-4"
+          }
+        ],
+        "presets": [
+          {
+            "id": "preset-1",
+            "title": "Summarize",
+            "instruction": "Summarize the following note in 3 bullet points."
+          }
+        ],
+        "lastProfileId": "profile-1",
+        "lastInstruction": "",
+        "hasApiKeys": true,
+        "apiKeys": {
+          "profile-1": "sk-xxxxxxxxxxxxxxxxxxxx"
+        }
+      }
+    },
+    {
+      "name": "personal-notes",
+      "type": "local",
+      "addedAt": "2024-02-01T14:20:00.000Z",
+      "git": {
+        "url": "https://github.com/username/personal-notes.git",
+        "name": "origin",
+        "branch": "main"
+      },
+      "sync": {
+        "autoSync": false,
+        "syncInterval": 0,
+        "commitThreshold": 5
+      },
+      "ai": {
+        "enabled": true,
+        "profiles": [
+          {
+            "id": "profile-2",
+            "name": "Claude",
+            "endpointUrl": "https://api.anthropic.com/v1",
+            "model": "claude-3-sonnet-20240229"
+          }
+        ],
+        "presets": [],
+        "lastProfileId": null,
+        "lastInstruction": "",
+        "hasApiKeys": true,
+        "apiKeys": {
+          "profile-2": "sk-ant-xxxxxxxxxxxxxxxxxxxx"
+        }
+      }
+    }
+  ],
+  "exportedAt": "2024-06-11T12:00:00.000Z"
+}
