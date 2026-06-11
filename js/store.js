@@ -903,6 +903,10 @@ const Store = {
                 GitStore.fs = adapter.promises;
                 GitStore.git = window.git;
             }
+            // Load git remote config for existing vaults
+            if (window.GitRemote) {
+                await GitRemote.init();
+            }
         }
         
         await this.loadBlocks();
