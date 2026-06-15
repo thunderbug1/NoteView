@@ -4,6 +4,20 @@
 
 const SettingsView = {
 
+    _compareVersions(v1, v2) {
+        const parts1 = v1.split('.').map(Number);
+        const parts2 = v2.split('.').map(Number);
+        const maxLength = Math.max(parts1.length, parts2.length);
+
+        for (let i = 0; i < maxLength; i++) {
+            const num1 = parts1[i] || 0;
+            const num2 = parts2[i] || 0;
+            if (num1 > num2) return 1;
+            if (num1 < num2) return -1;
+        }
+        return 0;
+    },
+
     _shortcutDefs: [
         { key: 'newNote', label: 'New Note', hint: 'Quickly add a new note from anywhere.' },
         { key: 'aiAssistant', label: 'AI Assistant', hint: 'Open AI assistant for the focused note.' },
@@ -367,7 +381,7 @@ const SettingsView = {
                     <div class="settings-item">
                         <div class="settings-item-info">
                             <label>Installed PWA</label>
-                            <p class="settings-item-hint">Service worker cache name shows which build is actually installed.</p>
+                            <p class="settings-item-hint">Service worker cache version.</p>
                         </div>
                         <span class="settings-item-value" id="sw-version">Checking...</span>
                     </div>
@@ -403,8 +417,11 @@ const SettingsView = {
             const latestTag = (data.tag_name || '').replace(/^v/, '');
             if (!latestTag) throw new Error('No tag found');
 
-            if (latestTag === App.VERSION) {
+            const comparison = this._compareVersions(App.VERSION, latestTag);
+            if (comparison === 0) {
                 statusEl.textContent = 'You\'re up to date.';
+            } else if (comparison > 0) {
+                statusEl.textContent = `You're ahead of latest release (v${latestTag}). Development version.`;
             } else {
                 statusEl.innerHTML = `<a href="https://github.com/thunderbug1/NoteView/releases/latest" target="_blank" rel="noopener" style="color:var(--accent)">v${escapeHtml(latestTag)} is available</a>`;
             }

@@ -883,10 +883,10 @@ const Store = {
             await this.setLastActiveVault(handle.name);
         }
         
-        // Clear block cache once to fix frontmatter display bug (v48 upgrade)
-        if (!localStorage.getItem('noteview-cache-cleared-v48')) {
+        // Clear block cache once to fix frontmatter display bug (v0.4.0 upgrade)
+        if (!localStorage.getItem('noteview-cache-cleared-v0.4.0')) {
             await this._clearVaultBlockCache();
-            localStorage.setItem('noteview-cache-cleared-v48', 'true');
+            localStorage.setItem('noteview-cache-cleared-v0.4.0', 'true');
         }
         
         // Skip git init if vault was already initialized (check IndexedDB)

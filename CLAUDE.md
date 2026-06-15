@@ -46,7 +46,7 @@ npx serve .
 
 **No build step, no package manager needed for dev.** Dependencies are vendored locally in `vendor/` to ensure offline capability. To update vendored dependencies, run `scripts/vendor.sh` (this will create an ephemeral `node_modules/` to run esbuild, bundle CodeMirror, and download CDN scripts directly). CSS and JS are loaded directly via `<link>` and `<script>` tags.
 
-**Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-v47` to `noteview-v48`), the `?v=` param on the `sw.js` registration line in `js/sw-register.js`, and `App.VERSION` in `js/main.js` (e.g., `'47'` to `'48'`). These three values must stay in sync.
+**Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-0.4.0` to `noteview-0.5.0`), the `?v=` param on the `sw.js` registration line in `js/sw-register.js`, and `App.VERSION` in `js/main.js` (e.g., `'0.4.0'` to `'0.5.0'`). Use semantic versioning (major.minor.patch). These three values must stay in sync.
 
 **IndexedDB migrations:** When adding new IndexedDB object stores or changing the schema, increment `DB_VERSION` in `js/store.js` and handle the upgrade in `initDB()`. The `onupgradeneeded` event will trigger automatically for users with older versions.
 

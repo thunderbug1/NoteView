@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-v53';
+const CACHE_NAME = 'noteview-0.5.0';
 
 const PRECACHE_URLS = [
   './',
