@@ -12,6 +12,24 @@ const GitRemote = {
         if (this.config) {
             window.GitHttp.setCredentials(this.config.auth);
             Logger.log('GitRemote initialized with config:', this.config.name);
+            await this._ensureRemoteInGitConfig();
+        }
+    },
+
+    async _ensureRemoteInGitConfig() {
+        if (!this.config || !this.config.name || !this.config.url) return;
+        if (!GitStore.git || !GitStore.fs) return;
+        const { git, fs, dir } = GitStore;
+        try {
+            let configContent = '';
+            try {
+                configContent = await fs.readFile('.git/config', { encoding: 'utf8' });
+            } catch (e) { /* config may not exist yet */ }
+            if (configContent.includes(`[remote "${this.config.name}"]`)) return;
+            Logger.log('[GitRemote] Remote missing from .git/config, adding:', this.config.name);
+            await git.addRemote({ fs, dir, remote: this.config.name, url: this.config.url, force: true });
+        } catch (e) {
+            console.warn('[GitRemote] Could not reconcile remote in .git/config:', e);
         }
     },
 

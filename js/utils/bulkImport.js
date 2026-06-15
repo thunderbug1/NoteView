@@ -361,10 +361,18 @@ const BulkImport = {
     async createOPFSVault(name) {
         const opfsRoot = await navigator.storage.getDirectory();
         const vaultHandle = await opfsRoot.getDirectoryHandle(name, { create: true });
-        
+
         await Store.saveVault(vaultHandle, 'opfs');
         await Store.setLastActiveVault(name);
-        
+
+        await GitStore._loadGitLibs();
+        if (window.git) {
+            const adapter = new window.GitFSAdapter(vaultHandle);
+            try {
+                await window.git.init({ fs: adapter.promises, dir: '/', defaultBranch: 'main' });
+            } catch (e) { /* may already exist */ }
+        }
+
         return vaultHandle;
     },
 
@@ -385,7 +393,15 @@ const BulkImport = {
             remoteConfig.corsProxy = gitConfig.corsProxy;
         }
 
+        const prevHandle = Store.directoryHandle;
+        try {
+            const handle = await Store.getVaultHandle(vaultName);
+            if (handle) Store.directoryHandle = handle;
+        } catch (e) { /* keep prevHandle */ }
+
         await Store.saveRemoteConfig(remoteConfig);
+        Store.directoryHandle = prevHandle;
+
         console.log('[BulkImport] Git config applied for vault:', vaultName);
     },
 

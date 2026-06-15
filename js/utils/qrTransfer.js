@@ -106,11 +106,14 @@ const QRTransfer = {
 
             if (GitStore.git && GitStore.fs && remoteConfig.url) {
                 try {
-                    await GitRemote.setRemote(
+                    const ok = await GitRemote.setRemote(
                         remoteConfig.name,
                         remoteConfig.url,
                         remoteConfig.auth
                     );
+                    if (!ok) {
+                        console.warn('[QRTransfer] setRemote returned false — remote not fully configured');
+                    }
                 } catch (err) {
                     console.warn('[QRTransfer] Failed to add remote:', err);
                 }

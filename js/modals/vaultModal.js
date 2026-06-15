@@ -895,6 +895,18 @@ const VaultModal = {
 
                         await Store.saveRemoteConfig(remoteConfig);
                         GitRemote.config = remoteConfig;
+                        if (window.GitHttp) window.GitHttp.setCredentials(auth);
+
+                        if (GitStore.git && GitStore.fs) {
+                            try {
+                                await GitStore.git.addRemote({
+                                    fs: GitStore.fs, dir: GitStore.dir,
+                                    remote: 'origin', url: gitUrl, force: true
+                                });
+                            } catch (err) {
+                                console.warn('[Wizard] Failed to add remote:', err);
+                            }
+                        }
 
                         await App.completeInitialization();
                         VaultModal.updateVaultSwitcherName();
