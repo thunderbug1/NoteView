@@ -205,10 +205,12 @@ When `SyncManager.sync()` detects a non-fast-forward error (diverged histories),
 
 1. **Detection** (`_detectConflicts()`): Finds merge base via `GitStore.getMergeBase()`, diffs base→local and base→remote using `GitStore.getChangedFilesBetween()`, categorizes each changed file
 2. **Auto-resolve**: Files changed on only one side are resolved automatically (local-only → keep local, remote-only → take remote)
-3. **Manual resolution** (`_showConflictResolutionModal()`): For files changed on both sides, shows per-file cards with diff previews and "Keep Local" / "Take Remote" buttons
+3. **Manual resolution** (`_showConflictResolutionModal()`): For files changed on both sides, shows per-file cards with diff previews and "Keep Local" / "Take Remote" buttons. Each card has a **"View full file"** toggle that expands a read-only CodeMirror `unifiedMergeView` (via the shared `DiffEditor` factory) showing the complete file content with markdown syntax highlighting. A three-way tab control switches the comparison: **Local vs Remote** (default), **Base → Local**, **Base → Remote**. Base tabs are hidden when no common ancestor exists (`baseContent` is null). Editor views are tracked and destroyed on modal close.
 4. **Application** (`_applyMergeResolution()`): Writes resolved files to working directory, stages all, creates a merge commit with `parent: [localOid, remoteOid]`, pushes normally
 
 This avoids writing `<<<<<<<` conflict markers into note files. The merge commit preserves both histories.
+
+The same full-file viewer is used by `_showOverwriteHelp()` (the `CheckoutConflictError` / "Local Changes Detected" modal). There, the base version is fetched on the fly via `GitStore.getMergeBase()` + `GitStore.getFileAtCommit()` (local/remote content comes from the working tree and the remote tree respectively), and the base tabs are omitted if the merge base cannot be resolved. The shared rendering and event wiring live in `SyncManager._fullFileViewerHtml()` and `SyncManager._wireFullFileViewer()`.
 
 ---
 

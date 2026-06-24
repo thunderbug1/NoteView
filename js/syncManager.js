@@ -843,6 +843,103 @@ const SyncManager = {
         await this._postSyncRender(true);
     },
 
+    // --- Shared full-file merge viewer (used by both conflict modals) ---
+
+    // Returns HTML for a "View full file" toggle + tabbed CodeMirror merge viewer.
+    // fileData: { localContent, remoteContent, baseContent } (any side may be null/undefined)
+    _fullFileViewerHtml(index, fileData) {
+        const hasBase = fileData.baseContent != null;
+        const tabStyle = (active) => `
+            flex:1;padding:0.4rem 0.5rem;background:${active ? 'var(--bg-secondary)' : 'var(--bg-primary)'};
+            border:none;border-bottom:2px solid ${active ? 'var(--color-accent,#3b82f6)' : 'transparent'};
+            cursor:pointer;font-size:0.78rem;color:${active ? 'var(--text-primary)' : 'var(--text-muted)'};
+            font-family:inherit;min-height:36px
+        `;
+        const tabs = [
+            `<button class="merge-fullfile-tab" data-index="${index}" data-pair="lr" style="${tabStyle(true)}">Local vs Remote</button>`,
+            ...(hasBase ? [
+                `<button class="merge-fullfile-tab" data-index="${index}" data-pair="bl" style="${tabStyle(false)}">Base &rarr; Local</button>`,
+                `<button class="merge-fullfile-tab" data-index="${index}" data-pair="br" style="${tabStyle(false)}">Base &rarr; Remote</button>`,
+            ] : [])
+        ].join('');
+        return `
+            <button class="merge-fullfile-toggle" data-index="${index}" style="
+                display:block;width:100%;padding:0.45rem 0.75rem;background:none;border:none;border-top:1px solid var(--border);
+                cursor:pointer;font-size:0.8rem;color:var(--text-secondary);text-align:left;font-family:inherit
+            ">View full file</button>
+            <div class="merge-fullfile-body" data-index="${index}" style="display:none">
+                <div class="merge-fullfile-tabs" data-index="${index}" style="display:flex;gap:0;border-top:1px solid var(--border)">${tabs}</div>
+                <div class="merge-fullfile-editor" data-index="${index}" style="height:50vh;max-height:520px;overflow:hidden"></div>
+            </div>`;
+    },
+
+    // Wires up the toggle + tab handlers. items[index] must expose localContent/remoteContent/baseContent.
+    // viewerContainers is populated with editor containers so the caller can destroy views on close.
+    _wireFullFileViewer(modal, items, viewerContainers) {
+        const activePairs = {};
+        const buildViewer = (index, pairKey) => {
+            const fileData = items[index];
+            if (!fileData) return;
+            const editorContainer = modal.querySelector(`.merge-fullfile-editor[data-index="${index}"]`);
+            if (!editorContainer) return;
+            editorContainer.innerHTML = '';
+            const local = fileData.localContent ?? '';
+            const remote = fileData.remoteContent ?? '';
+            const base = fileData.baseContent ?? '';
+            let original, modified;
+            if (pairKey === 'bl') { original = base; modified = local; }
+            else if (pairKey === 'br') { original = base; modified = remote; }
+            else { original = local; modified = remote; }
+            if (!original && !modified) {
+                editorContainer.innerHTML = '<div style="padding:1rem;color:var(--text-muted);font-size:0.85rem">No content to display.</div>';
+                return;
+            }
+            if (!window.DiffEditor || !window.CodeMirror?.EditorView) {
+                editorContainer.innerHTML = '<div style="padding:1rem;color:var(--text-muted);font-size:0.85rem">Editor not available.</div>';
+                return;
+            }
+            DiffEditor.createMergeViewWhenReady(editorContainer, original, modified, {
+                markdown: true, fontSize: '13px',
+                colors: { deleted: 'rgba(239,68,68,0.15)', inserted: 'rgba(34,197,94,0.15)' }
+            });
+            if (!viewerContainers.includes(editorContainer)) viewerContainers.push(editorContainer);
+            activePairs[index] = pairKey;
+        };
+
+        modal.querySelectorAll('.merge-fullfile-toggle').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.dataset.index);
+                const body = modal.querySelector(`.merge-fullfile-body[data-index="${index}"]`);
+                if (!body) return;
+                const showing = body.style.display !== 'none';
+                if (showing) {
+                    body.style.display = 'none';
+                    btn.textContent = 'View full file';
+                } else {
+                    body.style.display = 'block';
+                    btn.textContent = 'Hide full file';
+                    if (!activePairs[index]) buildViewer(index, 'lr');
+                }
+            });
+        });
+
+        modal.querySelectorAll('.merge-fullfile-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.dataset.index);
+                const pairKey = btn.dataset.pair;
+                modal.querySelectorAll(`.merge-fullfile-tab[data-index="${index}"]`).forEach(b => {
+                    b.style.background = 'var(--bg-primary)';
+                    b.style.color = 'var(--text-muted)';
+                    b.style.borderBottom = '2px solid transparent';
+                });
+                btn.style.background = 'var(--bg-secondary)';
+                btn.style.color = 'var(--text-primary)';
+                btn.style.borderBottom = '2px solid var(--color-accent,#3b82f6)';
+                buildViewer(index, pairKey);
+            });
+        });
+    },
+
     async _showConflictResolutionModal(conflictData) {
         const { files, localOid, remoteOid } = conflictData;
         const autoResolved = files.filter(f => f.resolution);
@@ -937,6 +1034,7 @@ const SyncManager = {
                     <span style="font-size:0.75rem;color:var(--color-danger,#f44)">conflict</span>
                 </div>
                 ${diffPreviewHtml}
+                ${this._fullFileViewerHtml(i, f)}
                 <div style="display:flex;gap:0;border-top:1px solid var(--border)">
                     <button class="conflict-choice-btn" data-filepath="${escapeHtml(f.filepath)}" data-choice="local" data-card-index="${i}" style="
                         flex:1;padding:0.65rem;border:none;background:var(--bg-primary);cursor:pointer;
@@ -958,6 +1056,7 @@ const SyncManager = {
             </div>`;
         }).join('');
 
+        const viewerContainers = [];
         const modal = Modal.create({
             title: 'Merge Conflict',
             content: `
@@ -975,11 +1074,17 @@ const SyncManager = {
                     <div style="max-height:400px;overflow-y:auto">${conflictCardsHtml}</div>
                     <div style="margin-top:1rem;display:flex;gap:0.5rem;justify-content:flex-end">
                         <button id="conflictCancelBtn" class="settings-btn secondary">Cancel</button>
-                        <button id="conflictResolveBtn" class="settings-btn" style="opacity:0.5;pointer-events:none">Resolve &amp; Sync</button>
+                        <button id="conflictResolveBtn" class="settings-btn primary" style="opacity:0.5;pointer-events:none">Resolve &amp; Sync</button>
                     </div>
                 </div>
             `,
-            width: '520px'
+            width: '520px',
+            onClose: () => {
+                for (const c of viewerContainers) {
+                    const v = c._diffEditorView;
+                    if (v) { try { v.destroy(); } catch (_) { /* cleanup */ } }
+                }
+            }
         });
 
         // Track resolutions
@@ -1051,6 +1156,9 @@ const SyncManager = {
                 if (list) list.style.display = list.style.display === 'none' ? 'block' : 'none';
             });
         }
+
+        // Full-file merge viewer (toggle + three-way tabs)
+        this._wireFullFileViewer(modal, needsResolution, viewerContainers);
 
         // Diff toggles (show/hide compact diff)
         modal.querySelectorAll('.merge-diff-toggle').forEach(btn => {
@@ -1181,6 +1289,14 @@ const SyncManager = {
             const remoteCommit = await git.readCommit({ fs, dir, oid: remoteOid });
             const tree = await git.readTree({ fs, dir, oid: remoteCommit.commit.tree });
 
+            // Resolve local HEAD and merge base so we can show the base version too
+            let localOid = null;
+            try { localOid = await git.resolveRef({ fs, dir, ref: `refs/heads/${ref}` }); } catch (_) { /* no local ref */ }
+            let baseOid = null;
+            if (localOid && remoteOid) {
+                baseOid = await GitStore.getMergeBase(localOid, remoteOid);
+            }
+
             for (const filepath of filepaths) {
                 if (!filepath.endsWith('.md')) continue;
                 // Local content
@@ -1195,7 +1311,12 @@ const SyncManager = {
                         remoteContent = new TextDecoder().decode(blob);
                     } catch (e) { /* not in remote */ }
                 }
-                diffs.push({ filepath, localContent, remoteContent });
+                // Base content (common ancestor), if available
+                let baseContent = null;
+                if (baseOid) {
+                    try { baseContent = await GitStore.getFileAtCommit(filepath, baseOid); } catch (_) { /* not in base */ }
+                }
+                diffs.push({ filepath, localContent, remoteContent, baseContent });
             }
         } catch (e) {
             fetchError = e;
@@ -1213,7 +1334,7 @@ const SyncManager = {
                 Conflicting files: ${escapeHtml(filepaths.join(', '))}.
             </div>`;
         } else {
-            filesHtml = diffs.map(({ filepath, localContent, remoteContent }) => {
+            filesHtml = diffs.map(({ filepath, localContent, remoteContent }, idx) => {
                 const diffLines = this._computeLineDiff(localContent, remoteContent);
                 const changedCount = diffLines.filter(l => l.type === 'added' || l.type === 'removed').length;
                 const diffBodyId = 'diffBody_' + filepath.replace(/[^a-zA-Z0-9]/g, '_');
@@ -1238,10 +1359,12 @@ const SyncManager = {
                     <div id="${diffBodyId}" style="display:none;max-height:200px;overflow-y:auto;border-top:1px solid var(--border);padding:0.25rem 0">
                         ${diffLinesHtml}
                     </div>
+                    ${this._fullFileViewerHtml(idx, diffs[idx])}
                 </div>`;
             }).join('');
         }
 
+        const viewerContainers = [];
         const modal = Modal.create({
             title: 'Local Changes Detected',
             content: `
@@ -1278,7 +1401,13 @@ const SyncManager = {
                     </div>
                 </div>
             `,
-            width: '420px'
+            width: '420px',
+            onClose: () => {
+                for (const c of viewerContainers) {
+                    const v = c._diffEditorView;
+                    if (v) { try { v.destroy(); } catch (_) { /* cleanup */ } }
+                }
+            }
         });
 
         // Toggle diff body on file header click
@@ -1288,6 +1417,9 @@ const SyncManager = {
                 if (body) body.style.display = body.style.display === 'none' ? 'block' : 'none';
             });
         });
+
+        // Full-file merge viewer (toggle + three-way tabs)
+        this._wireFullFileViewer(modal, diffs, viewerContainers);
 
         modal.querySelector('#overwriteDismissBtn').addEventListener('click', () => modal.close());
 
