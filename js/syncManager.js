@@ -910,12 +910,16 @@ const SyncManager = {
                 }).join('');
 
                 diffPreviewHtml = `
-                    <button class="merge-diff-toggle" data-target="${diffBodyId}" style="
+                    <button class="merge-diff-toggle" data-target="${diffBodyId}" data-index="${i}" style="
                         display:block;width:100%;padding:0.4rem 0.75rem;background:none;border:none;
                         cursor:pointer;font-size:0.8rem;color:var(--text-muted);text-align:left;font-family:inherit
                     ">Show diff (${changedCount} line${changedCount !== 1 ? 's' : ''} changed)</button>
-                    <div id="${diffBodyId}" style="display:none;max-height:200px;overflow-y:auto;border-top:1px solid var(--border);padding:0.25rem 0">
-                        ${diffLinesHtml}
+                    <div id="${diffBodyId}" data-index="${i}" style="display:none;max-height:200px;overflow-y:auto;border-top:1px solid var(--border);padding:0.25rem 0">
+                        <div class="merge-diff-content">${diffLinesHtml}</div>
+                        <button class="merge-diff-expand" data-index="${i}" style="
+                            display:block;width:100%;padding:0.35rem;background:none;border:none;border-top:1px solid var(--border);
+                            cursor:pointer;font-size:0.78rem;color:var(--text-muted);font-family:inherit
+                        ">&#9660; Show all lines</button>
                     </div>`;
             } else if (f.localContent === null || f.localContent === undefined) {
                 diffPreviewHtml = `<div style="padding:0.4rem 0.75rem;font-size:0.8rem;color:var(--text-muted)">Deleted locally, edited remotely</div>`;
@@ -934,7 +938,7 @@ const SyncManager = {
                 </div>
                 ${diffPreviewHtml}
                 <div style="display:flex;gap:0;border-top:1px solid var(--border)">
-                    <button class="conflict-choice-btn" data-filepath="${escapeHtml(f.filepath)}" data-choice="local" style="
+                    <button class="conflict-choice-btn" data-filepath="${escapeHtml(f.filepath)}" data-choice="local" data-card-index="${i}" style="
                         flex:1;padding:0.65rem;border:none;background:var(--bg-primary);cursor:pointer;
                         font-size:0.85rem;color:var(--text-primary);font-family:inherit;
                         border-right:1px solid var(--border);min-height:44px;text-align:center
@@ -942,7 +946,7 @@ const SyncManager = {
                         <div style="font-weight:500">${escapeHtml(localLabel)}</div>
                         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;max-height:2.4em;overflow:hidden;line-height:1.2">${localSnippet}</div>
                     </button>
-                    <button class="conflict-choice-btn" data-filepath="${escapeHtml(f.filepath)}" data-choice="remote" style="
+                    <button class="conflict-choice-btn" data-filepath="${escapeHtml(f.filepath)}" data-choice="remote" data-card-index="${i}" style="
                         flex:1;padding:0.65rem;border:none;background:var(--bg-primary);cursor:pointer;
                         font-size:0.85rem;color:var(--text-primary);font-family:inherit;min-height:44px;text-align:center
                     ">
@@ -961,7 +965,13 @@ const SyncManager = {
                     <p>Your local changes and remote changes diverged. Resolve each conflicting file below.</p>
                     <p style="margin-top:0.25rem;font-size:0.85rem;color:var(--text-secondary)"><strong>Nothing has been changed yet.</strong></p>
                     <div style="margin-top:0.75rem">${autoHtml}</div>
-                    ${needsResolution.length > 0 ? `<div style="margin-bottom:0.5rem;font-size:0.85rem;font-weight:500;color:var(--text-primary)">Needs resolution (${needsResolution.length}):</div>` : ''}
+                    ${needsResolution.length > 0 ? `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap">
+                        <span style="font-size:0.85rem;font-weight:500;color:var(--text-primary)">Needs resolution (${needsResolution.length}):</span>
+                        <div style="margin-left:auto;display:flex;gap:0.4rem">
+                            <button id="conflictAllLocal" class="settings-btn secondary" style="font-size:0.8rem;padding:0.35rem 0.7rem">Keep all local</button>
+                            <button id="conflictAllRemote" class="settings-btn secondary" style="font-size:0.8rem;padding:0.35rem 0.7rem">Take all remote</button>
+                        </div>
+                    </div>` : ''}
                     <div style="max-height:400px;overflow-y:auto">${conflictCardsHtml}</div>
                     <div style="margin-top:1rem;display:flex;gap:0.5rem;justify-content:flex-end">
                         <button id="conflictCancelBtn" class="settings-btn secondary">Cancel</button>
@@ -988,6 +998,51 @@ const SyncManager = {
             }
         };
 
+        // Helper: render diff lines to HTML
+        const renderDiffLinesHtml = (diffLines) => {
+            return diffLines.map(l => {
+                const escaped = escapeHtml(l.text);
+                if (l.type === 'removed') return `<div style="background:rgba(244,63,94,0.15);color:var(--color-danger,#f44);padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all">- ${escaped}</div>`;
+                if (l.type === 'added') return `<div style="background:rgba(16,185,129,0.15);color:var(--color-success,#10b981);padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all">+ ${escaped}</div>`;
+                return `<div style="padding:0.1rem 0.5rem;font-size:0.8rem;font-family:monospace;white-space:pre-wrap;word-break:break-all;color:var(--text-secondary)">&nbsp; ${escaped}</div>`;
+            }).join('');
+        };
+
+        // Helper: select a choice for a conflict card (by index)
+        const selectChoice = (index, choice) => {
+            const fileData = needsResolution[index];
+            if (!fileData) return;
+            resolutions[fileData.filepath] = choice;
+
+            // Update visual state of both buttons in this card
+            const card = modal.querySelector('#conflictCard_' + index);
+            if (!card) return;
+            card.querySelectorAll('.conflict-choice-btn').forEach(b => {
+                if (b.dataset.choice === choice) {
+                    b.style.background = 'var(--color-success,#10b981)';
+                    b.style.color = '#fff';
+                    b.style.fontWeight = '600';
+                } else {
+                    b.style.background = 'var(--bg-primary)';
+                    b.style.color = 'var(--text-primary)';
+                    b.style.fontWeight = '400';
+                }
+            });
+
+            // Show result preview
+            const resultDiv = card.querySelector('.merge-result-preview');
+            if (resultDiv) {
+                const chosenContent = choice === 'local' ? fileData.localContent : fileData.remoteContent;
+                if (chosenContent) {
+                    const preview = Common.contentPreview(chosenContent);
+                    resultDiv.innerHTML = `<span style="font-size:0.75rem;color:var(--text-muted)">Will use:</span><br><span style="font-size:0.8rem;color:var(--text-primary);font-family:monospace">${preview}</span>`;
+                } else {
+                    resultDiv.innerHTML = `<span style="font-size:0.8rem;color:var(--text-muted)"><em>File will be deleted</em></span>`;
+                }
+                resultDiv.style.display = 'block';
+            }
+        };
+
         // Auto-resolved toggle
         const autoToggle = modal.querySelector('#autoResolvedToggle');
         if (autoToggle) {
@@ -997,7 +1052,7 @@ const SyncManager = {
             });
         }
 
-        // Diff toggles
+        // Diff toggles (show/hide compact diff)
         modal.querySelectorAll('.merge-diff-toggle').forEach(btn => {
             btn.addEventListener('click', () => {
                 const body = modal.querySelector('#' + btn.dataset.target);
@@ -1011,44 +1066,60 @@ const SyncManager = {
             });
         });
 
+        // Diff expand toggles (compact <-> full context)
+        modal.querySelectorAll('.merge-diff-expand').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.dataset.index);
+                const fileData = needsResolution[index];
+                if (!fileData) return;
+                const body = btn.closest('[id^="mergeDiff_"]');
+                if (!body) return;
+                const contentDiv = body.querySelector('.merge-diff-content');
+                const isFull = body.dataset.fullMode === 'true';
+
+                if (isFull) {
+                    const compactDiff = this._computeLineDiff(fileData.localContent, fileData.remoteContent);
+                    contentDiv.innerHTML = renderDiffLinesHtml(compactDiff);
+                    body.style.maxHeight = '200px';
+                    body.dataset.fullMode = 'false';
+                    btn.innerHTML = '&#9660; Show all lines';
+                } else {
+                    const fullDiff = this._computeLineDiff(fileData.localContent, fileData.remoteContent, { noCollapse: true });
+                    contentDiv.innerHTML = renderDiffLinesHtml(fullDiff);
+                    body.style.maxHeight = '60vh';
+                    body.dataset.fullMode = 'true';
+                    btn.innerHTML = '&#9650; Collapse';
+                }
+            });
+        });
+
         // Choice buttons
         modal.querySelectorAll('.conflict-choice-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const filepath = btn.dataset.filepath;
+                const index = parseInt(btn.dataset.cardIndex);
                 const choice = btn.dataset.choice;
-                resolutions[filepath] = choice;
-
-                // Update visual state of both buttons in this card
-                const card = btn.closest('.merge-conflict-card');
-                card.querySelectorAll('.conflict-choice-btn').forEach(b => {
-                    if (b.dataset.choice === choice) {
-                        b.style.background = 'var(--color-success,#10b981)';
-                        b.style.color = '#fff';
-                        b.style.fontWeight = '600';
-                    } else {
-                        b.style.background = 'var(--bg-primary)';
-                        b.style.color = 'var(--text-primary)';
-                        b.style.fontWeight = '400';
-                    }
-                });
-
-                // Show result preview
-                const fileData = needsResolution.find(f => f.filepath === filepath);
-                const resultDiv = card.querySelector('.merge-result-preview');
-                if (resultDiv && fileData) {
-                    const chosenContent = choice === 'local' ? fileData.localContent : fileData.remoteContent;
-                    if (chosenContent) {
-                        const preview = Common.contentPreview(chosenContent);
-                        resultDiv.innerHTML = `<span style="font-size:0.75rem;color:var(--text-muted)">Will use:</span><br><span style="font-size:0.8rem;color:var(--text-primary);font-family:monospace">${preview}</span>`;
-                    } else {
-                        resultDiv.innerHTML = `<span style="font-size:0.8rem;color:var(--text-muted)"><em>File will be deleted</em></span>`;
-                    }
-                    resultDiv.style.display = 'block';
-                }
-
+                selectChoice(index, choice);
                 updateResolveButton();
             });
         });
+
+        // Bulk: keep all local
+        const allLocalBtn = modal.querySelector('#conflictAllLocal');
+        if (allLocalBtn) {
+            allLocalBtn.addEventListener('click', () => {
+                for (let i = 0; i < needsResolution.length; i++) selectChoice(i, 'local');
+                updateResolveButton();
+            });
+        }
+
+        // Bulk: take all remote
+        const allRemoteBtn = modal.querySelector('#conflictAllRemote');
+        if (allRemoteBtn) {
+            allRemoteBtn.addEventListener('click', () => {
+                for (let i = 0; i < needsResolution.length; i++) selectChoice(i, 'remote');
+                updateResolveButton();
+            });
+        }
 
         // Cancel
         modal.querySelector('#conflictCancelBtn').addEventListener('click', () => modal.close());
@@ -1322,7 +1393,7 @@ const SyncManager = {
         });
     },
 
-    _computeLineDiff(localContent, remoteContent) {
+    _computeLineDiff(localContent, remoteContent, options = {}) {
         const localLines = localContent.split('\n');
         const remoteLines = remoteContent.split('\n');
         const result = [];
@@ -1366,6 +1437,11 @@ const SyncManager = {
             }
         }
         actions.reverse();
+
+        // Skip collapsing unchanged lines when full context is requested
+        if (options.noCollapse) {
+            return actions;
+        }
 
         // Collapse consecutive unchanged lines for readability
         let unchangedBuffer = [];
