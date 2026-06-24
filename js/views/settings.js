@@ -266,9 +266,27 @@ const SettingsView = {
                     <div class="settings-item">
                         <div class="settings-item-info">
                             <label>Export All Vaults</label>
-                            <p class="settings-item-hint">Export all vaults with their configurations to a single JSON file for backup or transfer.</p>
+                            <p class="settings-item-hint">Export all vaults with their configurations to a single JSON file for backup or transfer. A downloaded file is the only backup that survives total browser storage loss.</p>
                         </div>
                         <button id="bulkExportBtn" class="settings-btn secondary">Export JSON</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Diagnostics & Recovery</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Recover Vaults</label>
+                            <p class="settings-item-hint">Restore vaults from the automatic backup if they were removed by a browser data cleanup.</p>
+                        </div>
+                        <button id="recoverVaultsBtn" class="settings-btn secondary">Recover...</button>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <label>Diagnostics Log</label>
+                            <p class="settings-item-hint">Recent boot and recovery events, used to diagnose why vaults may disappear.</p>
+                        </div>
+                        <button id="viewDiagnosticsBtn" class="settings-btn secondary">View Log...</button>
                     </div>
                 </div>
 
@@ -490,6 +508,24 @@ const SettingsView = {
         const bulkExportBtn = document.getElementById('bulkExportBtn');
         if (bulkExportBtn) {
             bulkExportBtn.addEventListener('click', () => BulkImport.showExportModal());
+        }
+
+        const recoverVaultsBtn = document.getElementById('recoverVaultsBtn');
+        if (recoverVaultsBtn) {
+            recoverVaultsBtn.addEventListener('click', async () => {
+                const recovered = await App.offerVaultRecovery();
+                if (recovered) {
+                    await App.completeInitialization();
+                    if (window.Common) Common.showToast('Vault recovered');
+                } else if (window.Common) {
+                    Common.showToast('No recoverable vaults found');
+                }
+            });
+        }
+
+        const viewDiagnosticsBtn = document.getElementById('viewDiagnosticsBtn');
+        if (viewDiagnosticsBtn) {
+            viewDiagnosticsBtn.addEventListener('click', () => this._showDiagnosticsModal());
         }
 
         const rebuildTagIndexBtn = document.getElementById('rebuildTagIndexBtn');
@@ -1235,6 +1271,37 @@ const SettingsView = {
             await AppSettings.saveTemplates(templates);
             modal.close();
             this._openTemplateModal();
+        });
+    },
+
+    // --- Diagnostics ---
+
+    _showDiagnosticsModal() {
+        const modal = Modal.create({
+            title: 'Diagnostics Log',
+            modalClass: 'vault-modal',
+            content: `
+                <p style="color:var(--text-muted);margin-bottom:0.75rem;font-size:0.85rem">
+                    Recent boot and recovery events. Copy this if asked to share it for diagnosing vault loss.
+                </p>
+                <pre id="diagPre" style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.75rem;max-height:50vh;overflow:auto;font-size:0.78rem;line-height:1.4;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
+                <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem">
+                    <button class="modal-cancel-btn diag-clear">Clear</button>
+                    <button class="modal-confirm-btn diag-copy">Copy</button>
+                </div>
+            `
+        });
+        const pre = modal.querySelector('#diagPre');
+        if (pre) pre.textContent = window.Diagnostics ? Diagnostics.formatForCopy() : '(no diagnostics available)';
+
+        modal.querySelector('.diag-copy').addEventListener('click', async () => {
+            const ok = await Diagnostics.copyToClipboard();
+            if (window.Common) Common.showToast(ok ? 'Copied to clipboard' : 'Copy failed — select and copy manually');
+        });
+        modal.querySelector('.diag-clear').addEventListener('click', () => {
+            if (window.Diagnostics) Diagnostics.clear();
+            if (pre) pre.textContent = '(log cleared)';
+            if (window.Common) Common.showToast('Diagnostics cleared');
         });
     },
 

@@ -87,6 +87,7 @@ const Store = {
                     console.error('IndexedDB open timed out after 5 seconds');
                     // Ensure db is null so other code knows it failed
                     this.db = null;
+                    if (window.Diagnostics) Diagnostics.log('db_open', { result: 'timeout' });
                     reject(new Error('IndexedDB open timed out'));
                 }
             }, 5000);
@@ -97,6 +98,7 @@ const Store = {
                     clearTimeout(timeout);
                     console.error('IndexedDB open error:', request.error);
                     this.db = null;
+                    if (window.Diagnostics) Diagnostics.log('db_open', { result: 'error', err: request.error?.name });
                     reject(request.error);
                 }
             };
@@ -107,6 +109,7 @@ const Store = {
                     clearTimeout(timeout);
                     this.db = request.result;
                     Logger.log('IndexedDB opened successfully, version:', this.db.version);
+                    if (window.Diagnostics) Diagnostics.log('db_open', { result: 'ok', version: this.db.version });
                     resolve();
                 }
             };
@@ -1098,6 +1101,9 @@ const Store = {
 
             // Keep lastDirectory in sync for backward compat
             await this.saveDirectoryHandle(handle, resolvedType);
+
+            // Mirror to localStorage so vaults can be recovered if IndexedDB is wiped
+            this._backupVaultList(list);
         } finally {
             this._savingVault = false;
         }
@@ -1204,6 +1210,69 @@ const Store = {
                 req.onerror = () => reject(req.error);
             } catch (e) { reject(e); }
         });
+
+        // Keep localStorage backup in sync
+        this._backupVaultList(filtered);
+    },
+
+    // --- Vault list localStorage backup (survives IndexedDB wipes) ---
+
+    _backupVaultList(list) {
+        try {
+            if (!Array.isArray(list)) return;
+            const payload = {
+                ts: Date.now(),
+                lastActive: this.directoryHandle ? this.directoryHandle.name : null,
+                vaults: list.map(v => ({ name: v.name, type: v.type, addedAt: v.addedAt }))
+            };
+            localStorage.setItem('noteview-vault-backup', JSON.stringify(payload));
+        } catch (e) { /* never break on backup failure */ }
+    },
+
+    _readVaultBackup() {
+        try {
+            const raw = localStorage.getItem('noteview-vault-backup');
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) { return null; }
+    },
+
+    /**
+     * If IndexedDB has no vaults but a localStorage backup exists, return the
+     * backed-up vault metadata so the caller (App) can offer recovery.
+     * Returns null when there is nothing to recover.
+     */
+    async checkVaultRecovery() {
+        try {
+            const list = await this.getVaultList();
+            if (list && list.length > 0) return null; // nothing to recover
+
+            const backup = this._readVaultBackup();
+            if (!backup || !Array.isArray(backup.vaults) || backup.vaults.length === 0) {
+                if (window.Diagnostics) Diagnostics.log('vaultlist_empty_no_backup');
+                return null;
+            }
+
+            if (window.Diagnostics) {
+                Diagnostics.log('vaultlist_empty_but_backup_exists', {
+                    backupNames: backup.vaults.map(v => v.name)
+                });
+            }
+            return backup;
+        } catch (e) {
+            if (window.Diagnostics) Diagnostics.log('recovery_check_error', { err: e?.name });
+            return null;
+        }
+    },
+
+    /**
+     * Re-save a recovered vault into IndexedDB. For OPFS vaults the handle is
+     * reconstructed by name; returns the handle (or null).
+     */
+    async recoverVault(entry) {
+        const opfsRoot = await navigator.storage.getDirectory();
+        const handle = await opfsRoot.getDirectoryHandle(entry.name, { create: false });
+        await this.saveVault(handle, 'opfs');
+        return handle;
     },
 
     async setLastActiveVault(name) {

@@ -3,7 +3,7 @@
  */
 
 const App = {
-    VERSION: '0.5.0',
+    VERSION: '0.5.1',
     isInitialized: false,
 
 
@@ -159,7 +159,12 @@ const App = {
             if (initialized) {
                 await this.completeInitialization();
             } else {
-                this.showManageVaultsModal();
+                const recovered = await this.offerVaultRecovery();
+                if (recovered) {
+                    await this.completeInitialization();
+                } else {
+                    this.showManageVaultsModal();
+                }
             }
         } catch (err) {
             // If permission needed, show reopen button for the last vault
@@ -274,6 +279,7 @@ const App = {
                 context: Array.from(SelectionManager.selections.context)
             });
             this.isInitialized = true;
+            if (window.Diagnostics) await Diagnostics.captureBootSummary({ phase: 'first' });
         } finally {
             this._initInProgress = false;
         }
@@ -338,7 +344,15 @@ const App = {
 
                 this._updateCaptureSyncStatus();
             } else {
-                this.showManageVaultsModal();
+                const recovered = await this.offerVaultRecovery();
+                if (recovered) {
+                    this.updateCaptureWithVaultName();
+                    if (window.SyncManager) window.SyncManager._setStatus('syncing', 'Initializing sync...');
+                    await this.completeInitialization(true);
+                    this._updateCaptureSyncStatus();
+                } else {
+                    this.showManageVaultsModal();
+                }
             }
         } catch (err) {
             if (err.needsPermission && err.handle) {
@@ -1866,6 +1880,139 @@ const App = {
 
     async switchVault(name) {
         VaultModal.switchVault(name);
+    },
+
+    /**
+     * Offer to recover vaults when IndexedDB has none but a localStorage backup
+     * exists. Activates the recovered vault and returns true if one was restored.
+     */
+    async offerVaultRecovery() {
+        let backup;
+        try {
+            backup = await Store.checkVaultRecovery();
+        } catch (e) {
+            if (window.Diagnostics) Diagnostics.log('recovery_check_error', { err: e?.name });
+            return false;
+        }
+        if (!backup || !backup.vaults || backup.vaults.length === 0) return false;
+
+        return new Promise((resolve) => {
+            const lastActive = backup.lastActive || null;
+
+            // Pre-flight: check which OPFS vaults are still reconstructable
+            const preflight = backup.vaults.map(async (v) => {
+                if (v.type !== 'opfs') return { ...v, recoverable: null };
+                try {
+                    const root = await navigator.storage.getDirectory();
+                    await root.getDirectoryHandle(v.name, { create: false });
+                    return { ...v, recoverable: true };
+                } catch (e) {
+                    return { ...v, recoverable: false };
+                }
+            });
+
+            Promise.all(preflight).then((entries) => {
+                const opfsEntries = entries.filter(v => v.type === 'opfs');
+
+                const rowHtml = (v) => {
+                    const name = escapeHtml(v.name);
+                    if (v.type === 'opfs') {
+                        const checked = v.recoverable ? 'checked' : '';
+                        const disabled = v.recoverable === false ? 'disabled' : '';
+                        const status = v.recoverable === false
+                            ? '<span class="recov-status" style="color:var(--warning-color);font-size:0.8rem">not found in browser storage</span>'
+                            : '<span class="recov-status" style="color:var(--text-muted);font-size:0.8rem">browser vault</span>';
+                        return `<label class="recov-row" style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0;border-bottom:1px solid var(--border)">
+                            <input type="checkbox" class="recov-check" data-name="${name}" data-type="opfs" ${checked} ${disabled}>
+                            <span style="font-weight:500">${name}</span>${status}
+                        </label>`;
+                    }
+                    return `<div class="recov-row" style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0;border-bottom:1px solid var(--border)">
+                        <span style="font-weight:500">${name}</span>
+                        <span style="color:var(--text-muted);font-size:0.8rem">folder vault</span>
+                        <button class="settings-btn secondary recov-reconnect" data-name="${name}" style="margin-left:auto">Reconnect folder</button>
+                    </div>`;
+                };
+
+                const modal = Modal.create({
+                    title: 'Recover your vaults',
+                    modalClass: 'vault-modal',
+                    content: `
+                        <p style="color:var(--text-muted);margin-bottom:1rem">
+                            A browser data cleanup removed your saved vaults. Your notes are safe —
+                            reconnect the vaults below to continue.
+                        </p>
+                        <div class="recov-list">${entries.map(rowHtml).join('')}</div>
+                        <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.25rem">
+                            <button class="modal-cancel-btn recov-skip">Skip</button>
+                            <button class="modal-confirm-btn recov-recover">Recover selected</button>
+                        </div>
+                    `
+                });
+
+                const finish = async (handle) => {
+                    try {
+                        if (handle) {
+                            await Store.openDirectory(handle);
+                            if (window.Diagnostics) Diagnostics.log('recovery_succeeded', { name: handle.name });
+                            modal.close();
+                            resolve(true);
+                        } else {
+                            modal.close();
+                            resolve(false);
+                        }
+                    } catch (e) {
+                        if (window.Diagnostics) Diagnostics.log('recovery_activate_error', { err: e?.name, msg: e?.message });
+                        if (window.Common) Common.showToast('Recovery failed: ' + (e.message || 'Unknown error'));
+                        modal.close();
+                        resolve(false);
+                    }
+                };
+
+                // Local folder reconnect (each button recovers + activates that vault)
+                modal.querySelectorAll('.recov-reconnect').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        try {
+                            const handle = await window.showDirectoryPicker();
+                            await Store.saveVault(handle, 'local');
+                            await finish(handle);
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                if (window.Common) Common.showToast('Reconnect failed: ' + (e.message || e.name));
+                            }
+                        }
+                    });
+                });
+
+                // Recover selected OPFS vaults
+                modal.querySelector('.recov-recover').addEventListener('click', async () => {
+                    const selected = Array.from(modal.querySelectorAll('.recov-check:checked'))
+                        .map(c => c.dataset.name);
+                    if (selected.length === 0) {
+                        if (window.Common) Common.showToast('Select at least one browser vault, or reconnect a folder vault');
+                        return;
+                    }
+                    try {
+                        let chosen = null;
+                        for (const name of selected) {
+                            const entry = opfsEntries.find(v => v.name === name);
+                            if (!entry) continue;
+                            const handle = await Store.recoverVault(entry);
+                            if (!chosen || name === lastActive) chosen = handle;
+                        }
+                        await finish(chosen);
+                    } catch (e) {
+                        if (window.Diagnostics) Diagnostics.log('recovery_opfs_error', { err: e?.name, msg: e?.message });
+                        if (window.Common) Common.showToast('Recovery failed: ' + (e.message || 'Unknown error'));
+                    }
+                });
+
+                modal.querySelector('.recov-skip').addEventListener('click', () => {
+                    if (window.Diagnostics) Diagnostics.log('recovery_skipped', { offered: entries.length });
+                    finish(null);
+                });
+            });
+        });
     },
 
     async showManageVaultsModal() {

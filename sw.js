@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-0.5.0';
+const CACHE_NAME = 'noteview-0.5.1';
 
 const PRECACHE_URLS = [
   './',
@@ -57,6 +57,7 @@ const PRECACHE_URLS = [
   './js/utils/appSettings.js',
   './js/utils/qrTransfer.js',
   './js/utils/sendToVault.js',
+  './js/utils/diagnostics.js',
   './js/utils/speechManager.js',
   './js/utils/deadlinePanel.js',
   './js/utils/diffEditor.js',
