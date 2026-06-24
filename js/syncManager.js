@@ -579,6 +579,21 @@ const SyncManager = {
             return false;
         };
 
+        // Normalize body text so that invisible differences (line endings,
+        // trailing whitespace, trailing newlines) don't block auto-resolution
+        // of conflicts where only `lastUpdated` actually differs.
+        const normalizeForCompare = (text) => {
+            if (typeof text !== 'string') return text;
+            return text
+                .replace(/\r\n/g, '\n')
+                .replace(/\r/g, '\n')
+                .split('\n')
+                .map(line => line.replace(/[ \t]+$/, ''))
+                .join('\n')
+                .replace(/\n+$/, '')
+                .trim();
+        };
+
         // Resolve local and remote HEAD
         const localOid = await git.resolveRef({ fs, dir, ref: 'HEAD' });
         let remoteOid;
@@ -697,6 +712,11 @@ const SyncManager = {
                     const localParsed = parseFM(localContent);
                     const remoteParsed = parseFM(remoteContent);
                     
+                    // Normalize body content so invisible differences (line endings,
+                    // trailing whitespace, trailing newlines) don't block auto-resolution.
+                    const localNorm = { ...localParsed, content: normalizeForCompare(localParsed.content) };
+                    const remoteNorm = { ...remoteParsed, content: normalizeForCompare(remoteParsed.content) };
+                    
                     const keys = new Set([
                         ...Object.keys(localParsed),
                         ...Object.keys(remoteParsed)
@@ -705,8 +725,14 @@ const SyncManager = {
                     
                     let onlyLastUpdatedDiffers = true;
                     for (const key of keys) {
-                        if (!isEqual(localParsed[key], remoteParsed[key])) {
+                        if (!isEqual(localNorm[key], remoteNorm[key])) {
                             onlyLastUpdatedDiffers = false;
+                            Logger.log('[SyncManager] merge conflict NOT auto-resolvable:', {
+                                filepath,
+                                key,
+                                localVal: JSON.stringify(localNorm[key])?.slice(0, 100),
+                                remoteVal: JSON.stringify(remoteNorm[key])?.slice(0, 100)
+                            });
                             break;
                         }
                     }
