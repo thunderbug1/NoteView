@@ -220,6 +220,13 @@ const VaultModal = {
                             </div>
                             <button class="vault-manager-action-btn secondary" id="scanQrVaultBtn">Scan</button>
                         </div>
+                        <div class="vault-manager-action">
+                            <div class="vault-manager-action-text">
+                                <h4>Bulk Import</h4>
+                                <p>Import multiple vaults from a JSON backup</p>
+                            </div>
+                            <button class="vault-manager-action-btn secondary" id="bulkImportVaultsBtn">Import</button>
+                        </div>
                     </div>
                 </div>
             `,
@@ -376,6 +383,14 @@ const VaultModal = {
             scanQrBtn.addEventListener('click', () => {
                 modal.close();
                 VaultModal.openQrScanner();
+            });
+        }
+
+        const bulkImportBtn = modal.querySelector('#bulkImportVaultsBtn');
+        if (bulkImportBtn) {
+            bulkImportBtn.addEventListener('click', async () => {
+                await BulkImport.showImportModal();
+                await refreshList();
             });
         }
     },
