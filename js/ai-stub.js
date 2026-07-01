@@ -9,6 +9,24 @@ const AIAssistant = {
     _moduleLoaded: false,
     _moduleLoading: null,
 
+    // Copy only function members from the real module onto this stub. State
+    // (enabled/profiles/etc.) is synced explicitly via init()'s copy-back so the
+    // real module's initial defaults can't transiently clobber live stub state.
+    _importMethods(src) {
+        if (!src) return;
+        for (const key of Object.keys(src)) {
+            if (typeof src[key] === 'function') {
+                this[key] = src[key];
+            }
+        }
+    },
+
+    // Re-sync every rendered .ai-btn to the live enabled/loaded flags.
+    refreshButtonStates() {
+        if (!this._moduleLoaded) return;
+        window.AIAssistantReal?.refreshButtonStates?.();
+    },
+
     async _ensureLoaded() {
         if (this._moduleLoaded) {
             return;
@@ -22,7 +40,7 @@ const AIAssistant = {
             try {
                 await this._loadScript('js/ai.js');
                 if (window.AIAssistantReal && !this._moduleLoaded) {
-                    Object.assign(this, window.AIAssistantReal);
+                    this._importMethods(window.AIAssistantReal);
                 }
                 this._moduleLoaded = true;
                 this._moduleLoading = null;
@@ -74,6 +92,8 @@ const AIAssistant = {
             this._lastInstruction = window.AIAssistantReal._lastInstruction;
             this._panelElement = window.AIAssistantReal._panelElement;
         }
+        // AI readiness just changed — update any already-rendered buttons.
+        this.refreshButtonStates();
         return result;
     },
 
@@ -173,8 +193,9 @@ const AIAssistant = {
 window.addEventListener('AIAssistantLoaded', () => {
     const realAI = window.AIAssistantReal;
     if (realAI) {
-        // Replace stub with real implementation
-        Object.assign(AIAssistant, realAI);
+        // Replace stub methods with the real implementation (state stays synced via init)
+        AIAssistant._importMethods(realAI);
         AIAssistant._moduleLoaded = true;
+        AIAssistant.refreshButtonStates();
     }
 });

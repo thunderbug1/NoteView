@@ -108,6 +108,20 @@ const AIAssistantReal = {
         return this.enabled && this.profiles.length > 0;
     },
 
+    // Re-sync every rendered .ai-btn to the live enabled/loaded flags. Block HTML
+    // is generated at render time from AIAssistant.enabled; if a render happened
+    // before this module finished loading (lazy load), buttons stay stale until
+    // this is called when readiness changes.
+    refreshButtonStates() {
+        const ai = window.AIAssistant;
+        const enabled = !!(ai && ai._moduleLoaded && ai.enabled);
+        const btns = document.querySelectorAll('.ai-btn');
+        btns.forEach(btn => {
+            btn.classList.toggle('ai-btn-disabled', !enabled);
+            btn.title = enabled ? 'AI Assistant (Ctrl+Shift+A)' : 'Enable AI in Settings to use';
+        });
+    },
+
     async _persist() {
         const settings = await AppSettings.load();
         settings.ai = {
@@ -125,6 +139,7 @@ const AIAssistantReal = {
     async toggleEnabled(bool) {
         this.enabled = bool;
         await this._persist();
+        this.refreshButtonStates();
         if (typeof App !== 'undefined' && App.render) App.render();
     },
 
