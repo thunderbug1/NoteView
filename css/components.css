@@ -542,6 +542,19 @@
     flex-direction: column;
 }
 
+/* Wider variant for vault/diagnostics modals that need more room. */
+.vault-modal {
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    width: 460px;
+    max-width: 92vw;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
 .tag-modal-header {
     display: flex;
     justify-content: space-between;
