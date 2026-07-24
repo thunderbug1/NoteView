@@ -997,7 +997,7 @@ const KanbanView = {
         const block = Store.blocks.find(b => b.id === card.dataset.blockId);
         if (!block) return;
 
-        const allTasks = TaskParser.parseTasksFromContent(block.content);
+        const allTasks = TaskParser.parseTasksFromBlock(block);
         const task = allTasks.find(t => t.id === card.dataset.id);
         if (!task) return;
 
