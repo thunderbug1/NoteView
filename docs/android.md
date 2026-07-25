@@ -229,7 +229,7 @@ Verify `capacitor.config.json` contains `"webDir": "../NoteView"` and that the s
 - **Storage lives in the app-private location.** IndexedDB and OPFS inside the WebView are written to `/data/data/ai.noteview.app/app_webview/` — app-private, not subject to Chrome's site-data eviction.
 - **File System Access API calls are gated out** because `Platform.supportsFileSystemPicker` returns `false` inside Capacitor. The service worker is also skipped (`js/sw-register.js` short-circuits when Capacitor is detected).
 
-For the broader storage and state model, see [data-flow.md](data-flow.md); for git behavior inside the app (commit-on-save), see [git-integration.md](git-integration.md).
+For the broader storage and state model, see [data-flow.md](data-flow.md); for git behavior inside the app (commit-on-save), see [git-integration.md](git-integration.md). To set up off-device backup via git remote sync, see [git-sync-setup.md](git-sync-setup.md) — strongly recommended on mobile as defence against device loss or factory reset.
 
 ---
 
