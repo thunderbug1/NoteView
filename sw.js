@@ -1,4 +1,4 @@
-const CACHE_NAME = 'noteview-0.5.1';
+const CACHE_NAME = 'noteview-0.6.0';
 
 const PRECACHE_URLS = [
   './',
@@ -87,6 +87,7 @@ const PRECACHE_URLS = [
   './js/main.js',
   './js/sw-register.js',
   './js/utils/logger.js',
+  './js/utils/platform.js',
 ];
 
 function shouldUseCacheFirst(request) {

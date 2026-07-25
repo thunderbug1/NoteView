@@ -3,13 +3,13 @@
  */
 
 const App = {
-    VERSION: '0.5.1',
+    VERSION: '0.6.0',
     isInitialized: false,
 
 
 
     showDirectoryPicker() {
-        const hasLocalPicker = 'showDirectoryPicker' in window;
+        const hasLocalPicker = window.Platform?.supportsFileSystemPicker ?? false;
         const container = document.getElementById('viewContainer');
         const folderBtn = hasLocalPicker ? `
                     <button id="selectFolderBtn" class="select-folder-btn">
@@ -73,7 +73,7 @@ const App = {
             const initialized = await Store.init();
             if (initialized) {
                 await this.completeInitialization();
-            } else if (window.showDirectoryPicker) {
+            } else if (window.Platform?.supportsFileSystemPicker && window.showDirectoryPicker) {
                 const handle = await window.showDirectoryPicker();
                 await Store.openDirectory(handle);
                 await this.completeInitialization();
@@ -91,8 +91,10 @@ const App = {
     },
 
     async init() {
-        // Request persistent storage if supported (prevents data eviction on mobile)
-        if (navigator.storage && navigator.storage.persist) {
+        // Request persistent storage if supported (prevents data eviction on mobile).
+        // Inside Capacitor the call is a no-op (storage already lives in app-private
+        // location), and may reject on some WebViews — skip it there.
+        if (!window.Platform?.isCapacitor && navigator.storage && navigator.storage.persist) {
             navigator.storage.persist().catch(err => console.warn('[App] Persistence request error:', err));
         }
 
@@ -2030,6 +2032,10 @@ const App = {
             modal.querySelectorAll('.recov-reconnect').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     try {
+                        if (!window.Platform?.supportsFileSystemPicker || !window.showDirectoryPicker) {
+                            if (window.Common) Common.showToast('Folder picker unavailable in this environment.');
+                            return;
+                        }
                         const handle = await window.showDirectoryPicker();
                         await Store.saveVault(handle, 'local');
                         await Store.openDirectory(handle);

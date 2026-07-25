@@ -58,6 +58,8 @@ const Store = {
 
     // Check browser support
     isSupported() {
+        // Capacitor WebView supports OPFS — treat as supported even without showDirectoryPicker
+        if (window.Platform?.isCapacitor) return true;
         return 'showDirectoryPicker' in window || ('storage' in navigator && 'getDirectory' in navigator.storage);
     },
 
@@ -1038,7 +1040,7 @@ const Store = {
     },
 
     async changeDirectory() {
-        if (!window.showDirectoryPicker) return false;
+        if (!(window.Platform?.supportsFileSystemPicker ?? false) || !window.showDirectoryPicker) return false;
         try {
             const newHandle = await window.showDirectoryPicker();
             this.directoryHandle = newHandle;

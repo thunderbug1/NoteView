@@ -378,7 +378,7 @@ const QRTransfer = {
 
         const items = this._describePayloadWithIcons(data);
         const hasVault = !!Store.directoryHandle;
-        const hasLocalPicker = 'showDirectoryPicker' in window;
+        const hasLocalPicker = window.Platform?.supportsFileSystemPicker ?? false;
 
         let vaultActions = '';
         if (!hasVault) {

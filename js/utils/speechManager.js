@@ -25,6 +25,11 @@
 const SpeechManager = {
     /**
      * @returns {boolean} Whether the Web Speech API is available.
+     *
+     * Verified working in Capacitor Android WebView on Pixel 6 / Android 17 /
+     * Chrome 150 WebView via OPFS probe. Other devices may vary — if a user
+     * reports dictation failures on a specific OEM ROM, we can add an opt-out
+     * or platform-specific guard here.
      */
     isSupported() {
         return !!(window.SpeechRecognition || window.webkitSpeechRecognition);

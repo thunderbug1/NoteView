@@ -48,6 +48,8 @@ npx serve .
 
 **Cache busting:** The service worker uses a network-first strategy for scripts and styles, so individual `?v=` params are not needed on app files. When deploying changes, bump the `CACHE_NAME` in `sw.js` (e.g., `noteview-0.4.0` to `noteview-0.5.0`), the `?v=` param on the `sw.js` registration line in `js/sw-register.js`, and `App.VERSION` in `js/main.js` (e.g., `'0.4.0'` to `'0.5.0'`). Use semantic versioning (major.minor.patch). These three values must stay in sync.
 
+**Android build (Capacitor):** The PWA can also be packaged as a sideloadable Android APK via a sibling Capacitor project at `../NoteView-Android/`. The Android build wraps the WebView so storage lives in app-private location (`/data/data/ai.noteview.app/app_webview/`), avoiding Chrome's site-data eviction. Inside the Android shell, `window.Platform.isCapacitor` is `true`; File System Access API pickers are gated off (OPFS-only vaults), the service worker is intentionally not registered, and `SpeechManager.isSupported()` returns `false` pending native-plugin work. Build steps and acceptance tests are documented in `docs/android.md`.
+
 **IndexedDB migrations:** When adding new IndexedDB object stores or changing the schema, increment `DB_VERSION` in `js/store.js` and handle the upgrade in `initDB()`. The `onupgradeneeded` event will trigger automatically for users with older versions.
 
 ### Single File Release Packaging
