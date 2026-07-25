@@ -98,6 +98,10 @@ const App = {
             navigator.storage.persist().catch(err => console.warn('[App] Persistence request error:', err));
         }
 
+        // Inside the Capacitor Android shell, wire the hardware back button through
+        // NoteView's view router instead of letting WebView close the app immediately.
+        this._setupHardwareBackButton();
+
         ThemeManager.init();
         // Hide sidebars and FAB until a vault is opened
         document.getElementById('app')?.classList.add('no-vault');
@@ -1044,6 +1048,58 @@ const App = {
         }
 
         this.setupKeyboardShortcuts();
+    },
+
+    /**
+     * Wire the Android hardware back button through NoteView's view/modal
+     * system instead of letting Capacitor's default close the app instantly.
+     * Priority: open modal/overlay → close it; non-home view → go home;
+     * home view → default (minimise app). Only active inside Capacitor.
+     */
+    _setupHardwareBackButton() {
+        if (!window.Platform?.isCapacitor) return;
+        const CapacitorApp = window.Capacitor?.Plugins?.App;
+        if (!CapacitorApp?.addListener) return;
+
+        CapacitorApp.addListener('backButton', () => {
+            // 1) Close any open modal/overlay first (Escape triggers Modal.create's
+            //    existing close handler, floating menus, popovers, etc.)
+            const openOverlay =
+                document.querySelector('.tag-modal-overlay')
+                || document.querySelector('[data-floating-menu="open"]')
+                || document.querySelector('.date-popover.expanded');
+            if (openOverlay) {
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+                return;
+            }
+
+            // 2) Exit multi-select / block selector if active
+            if (typeof BlockSelector !== 'undefined' && BlockSelector.active) {
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+                return;
+            }
+
+            // 3) If AI panel is open on mobile, close it
+            const aiPanel = document.getElementById('aiPanel');
+            if (aiPanel && aiPanel.classList.contains('open')) {
+                aiPanel.classList.remove('open');
+                return;
+            }
+
+            // 4) If we're not on the home view (capture on mobile, document on
+            //    desktop), navigate there. This mirrors Android's "back = up"
+            //    convention.
+            const isMobile = window.matchMedia('(max-width: 768px)').matches
+                || ('ontouchstart' in window && window.innerWidth <= 900);
+            const homeView = isMobile ? 'capture' : 'document';
+            if (Store.currentView && Store.currentView !== homeView) {
+                this.setView(homeView);
+                return;
+            }
+
+            // 5) We're at the home view — let the app minimise (default Android back).
+            CapacitorApp.exitApp?.();
+        });
     },
 
     setView(view) {
