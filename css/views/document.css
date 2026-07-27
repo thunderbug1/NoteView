@@ -1559,6 +1559,13 @@ body.is-dragging-wikilink * {
     scrollbar-width: none; /* Hide scrollbar on Firefox */
 }
 
+/* Capacitor: clear side cutouts in landscape and the nav bar / keyboard seam. */
+.capacitor .mobile-toolbar {
+    padding-left: calc(0.6rem + var(--sa-left));
+    padding-right: calc(0.6rem + var(--sa-right));
+    padding-bottom: calc(0.35rem + var(--sa-bottom));
+}
+
 .mobile-toolbar::-webkit-scrollbar {
     display: none; /* Hide scrollbar on Chrome/Safari/Edge */
 }

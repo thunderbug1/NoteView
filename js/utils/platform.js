@@ -52,3 +52,14 @@ window.Platform = {
         return this.isBrowser && typeof window.showDirectoryPicker === 'function';
     }
 };
+
+/*
+ * Mark the document root so CSS can apply platform-specific adjustments
+ * (notably safe-area insets under the status / navigation bars inside the
+ * Capacitor shell, where Android 15+ enforces edge-to-edge layout). Done at
+ * load time so the class is present before first paint — Capacitor injects
+ * window.Capacitor synchronously, before web scripts run.
+ */
+if (window.Platform.isCapacitor) {
+    document.documentElement.classList.add('capacitor');
+}

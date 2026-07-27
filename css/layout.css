@@ -86,6 +86,11 @@
     background: var(--bg-secondary);
 }
 
+/* Capacitor: keep the logo / theme toggle clear of the status bar. */
+.capacitor .app-header {
+    padding-top: calc(1.25rem + var(--sa-top));
+}
+
 .app-logo-icon {
     width: 28px;
     height: 28px;
@@ -158,6 +163,11 @@
     overflow-y: auto;
 }
 
+/* Capacitor: push the right-sidebar panels (backlinks, deadlines) below the status bar. */
+.capacitor #sidebarRight .sidebar-scroll {
+    padding-top: var(--sa-top);
+}
+
 .sidebar-footer {
     padding: 0.75rem 1rem;
     border-top: 1px solid var(--border);
@@ -165,6 +175,11 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+/* Capacitor: keep the vault switcher / settings clear of the navigation bar. */
+.capacitor .sidebar-footer {
+    padding-bottom: calc(0.75rem + var(--sa-bottom));
 }
 
 .vault-switcher {
@@ -353,6 +368,13 @@
     background: var(--bg-secondary);
     flex: 0 0 auto;
     min-height: 38px;
+}
+
+/* Capacitor: the toolbar background fills under the status bar; push the
+   buttons below it. Applies whether the toolbar is in-flow (tablet) or
+   sticky (phone). */
+.capacitor .content-toolbar {
+    padding-top: calc(0.35rem + var(--sa-top));
 }
 
 .content-toolbar-left,
@@ -584,6 +606,16 @@
         position: sticky;
         top: 38px;
         z-index: 54;
+    }
+
+    /* Capacitor: toolbar buttons clear of the status bar; filter bar sticks
+       below the (now taller) toolbar. */
+    .capacitor .content-toolbar {
+        padding-top: calc(0.25rem + var(--sa-top));
+    }
+
+    .capacitor .filter-bar {
+        top: calc(38px + var(--sa-top));
     }
 }
 

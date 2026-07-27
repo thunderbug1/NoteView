@@ -22,6 +22,9 @@
         max-width: 400px;
         margin: 0 auto;
     }
+    .capacitor .capture-view {
+        padding-top: calc(1.5rem + var(--sa-top));
+    }
 }
 
 .capture-top-bar {
@@ -162,6 +165,11 @@
     padding: 0.5rem 0.75rem;
     flex-shrink: 0;
     border-bottom: 1px solid var(--border);
+}
+
+/* Capacitor: push the capture-page header below the status bar. */
+.capacitor .capture-header {
+    padding-top: calc(0.5rem + var(--sa-top));
 }
 
 .capture-header-back {

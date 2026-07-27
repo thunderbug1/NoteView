@@ -20,6 +20,22 @@
     border: 0;
 }
 
+/*
+ * Safe-area insets for the Capacitor native shell. Android 15+ (targetSdk 35+)
+ * enforces edge-to-edge: the WebView draws under the status bar, navigation
+ * bar, and display cutout. `viewport-fit=cover` (index.html) makes the values
+ * below resolve to the actual system-bar / cutout insets; they evaluate to 0
+ * in a desktop browser, so these variables are harmless there. The `.capacitor`
+ * class is added to <html> by js/utils/platform.js. Scope inset-dependent
+ * overrides under `.capacitor` so the browser PWA layout is never disturbed.
+ */
+.capacitor {
+    --sa-top: env(safe-area-inset-top, 0px);
+    --sa-bottom: env(safe-area-inset-bottom, 0px);
+    --sa-left: env(safe-area-inset-left, 0px);
+    --sa-right: env(safe-area-inset-right, 0px);
+}
+
 :root {
     /* Colors - Light Theme */
     --bg-primary: #ffffff;

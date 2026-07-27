@@ -127,6 +127,7 @@ The app has a solid design foundation — clean visual hierarchy, consistent spa
 - **Severity:** Minor
 - `bottom: 2rem` with no `env(safe-area-inset-bottom)`. On notched phones the FAB overlaps the home indicator.
 - **Suggested fix:** `bottom: calc(2rem + env(safe-area-inset-bottom, 0px))`.
+- **Status (Capacitor):** Addressed for the Android build via `.capacitor .fab { bottom: calc(2rem/1.5rem + var(--sa-bottom)); }` in `css/components.css`. The browser-PWA gap on notched phones remains open (scoped to `.capacitor` per the safe-area strategy in `docs/android.md` §10).
 
 ### 16. Mobile toolbar has no safe-area handling
 
@@ -134,6 +135,7 @@ The app has a solid design foundation — clean visual hierarchy, consistent spa
 - **Severity:** Minor
 - Fixed full-width toolbar with no `safe-area-inset-left`/`right`/`bottom` padding.
 - **Suggested fix:** Add `padding-left: env(safe-area-inset-left, 0); padding-right: env(safe-area-inset-right, 0); padding-bottom: env(safe-area-inset-bottom, 0);`.
+- **Status (Capacitor):** Addressed for the Android build via `.capacitor .mobile-toolbar` in `css/views/document.css` (side insets + bottom pad). Browser-PWA gap remains open.
 
 ### 17. Multiple undersized touch targets
 

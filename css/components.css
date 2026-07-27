@@ -1269,6 +1269,11 @@
     outline: none;
 }
 
+/* Capacitor: lift the FAB above the navigation bar / home indicator. */
+.capacitor .fab {
+    bottom: calc(2rem + var(--sa-bottom));
+}
+
 .fab:hover {
     transform: translateY(-4px) scale(1.05);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
@@ -1295,6 +1300,9 @@
         position: fixed;
         bottom: 1.5rem;
         right: 1.5rem;
+    }
+    .capacitor .fab {
+        bottom: calc(1.5rem + var(--sa-bottom));
     }
 }
 
