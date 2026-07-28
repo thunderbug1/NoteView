@@ -970,7 +970,7 @@ const KanbanView = {
      * Returns the modified content string (does not save).
      */
     applyCompletedBadge(content, matchIndex, matchLength, targetState) {
-        let nextNewline = content.indexOf('\n', matchIndex);
+        let nextNewline = content.indexOf('\n', matchIndex + matchLength);
         if (nextNewline === -1) nextNewline = content.length;
         let taskLine = content.substring(matchIndex, nextNewline);
         const completedRegex = /\s*\[completed::\s*[^\]]+\]/;
@@ -1017,7 +1017,7 @@ const KanbanView = {
 
         const content = block.content;
         const beforeTask = content.substring(0, task.matchIndex);
-        let nextNewline = content.indexOf('\n', task.matchIndex);
+        let nextNewline = content.indexOf('\n', task.matchIndex + task.matchLength);
         if (nextNewline === -1) nextNewline = content.length;
 
         const newLine = task.prefix + '[' + task.state + '] ' + newText.trim();
