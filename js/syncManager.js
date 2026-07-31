@@ -869,6 +869,10 @@ const SyncManager = {
             ">View full file</button>
             <div class="merge-fullfile-body" data-index="${index}" style="display:none">
                 <div class="merge-fullfile-tabs" data-index="${index}" style="display:flex;gap:0;border-top:1px solid var(--border)">${tabs}</div>
+                <div class="merge-fullfile-labels" data-index="${index}" style="display:flex;border-top:1px solid var(--border)">
+                    <span class="merge-pane-label left" data-index="${index}" style="flex:1;padding:0.3rem 0.6rem;font-size:0.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Local</span>
+                    <span class="merge-pane-label right" data-index="${index}" style="flex:1;padding:0.3rem 0.6rem;font-size:0.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;border-left:1px solid var(--border)">Remote</span>
+                </div>
                 <div class="merge-fullfile-editor" data-index="${index}" style="height:50vh;max-height:520px;overflow:hidden"></div>
             </div>`;
     },
@@ -890,6 +894,14 @@ const SyncManager = {
             if (pairKey === 'bl') { original = base; modified = local; }
             else if (pairKey === 'br') { original = base; modified = remote; }
             else { original = local; modified = remote; }
+
+            // Update pane labels to match the active pair (left=original, right=modified)
+            const labelMap = { lr: ['Local', 'Remote'], bl: ['Base', 'Local'], br: ['Base', 'Remote'] };
+            const [leftLabel, rightLabel] = labelMap[pairKey] || labelMap.lr;
+            const leftLabelEl = modal.querySelector(`.merge-pane-label.left[data-index="${index}"]`);
+            const rightLabelEl = modal.querySelector(`.merge-pane-label.right[data-index="${index}"]`);
+            if (leftLabelEl) leftLabelEl.textContent = leftLabel;
+            if (rightLabelEl) rightLabelEl.textContent = rightLabel;
             if (!original && !modified) {
                 editorContainer.innerHTML = '<div style="padding:1rem;color:var(--text-muted);font-size:0.85rem">No content to display.</div>';
                 return;
@@ -1012,6 +1024,10 @@ const SyncManager = {
                         cursor:pointer;font-size:0.8rem;color:var(--text-muted);text-align:left;font-family:inherit
                     ">Show diff (${changedCount} line${changedCount !== 1 ? 's' : ''} changed)</button>
                     <div id="${diffBodyId}" data-index="${i}" style="display:none;max-height:200px;overflow-y:auto;border-top:1px solid var(--border);padding:0.25rem 0">
+                        <div class="merge-diff-legend" style="display:flex;gap:1rem;padding:0.3rem 0.6rem;font-size:0.7rem;border-bottom:1px solid var(--border);background:var(--bg-primary)">
+                            <span style="color:var(--color-danger,#f44)">&minus; Local</span>
+                            <span style="color:var(--color-success,#10b981)">+ Remote</span>
+                        </div>
                         <div class="merge-diff-content">${diffLinesHtml}</div>
                         <button class="merge-diff-expand" data-index="${i}" style="
                             display:block;width:100%;padding:0.35rem;background:none;border:none;border-top:1px solid var(--border);
@@ -1357,6 +1373,10 @@ const SyncManager = {
                         <span style="font-size:0.75rem;color:var(--text-muted)">${changedCount} line${changedCount !== 1 ? 's' : ''} changed</span>
                     </button>
                     <div id="${diffBodyId}" style="display:none;max-height:200px;overflow-y:auto;border-top:1px solid var(--border);padding:0.25rem 0">
+                        <div class="merge-diff-legend" style="display:flex;gap:1rem;padding:0.3rem 0.6rem;font-size:0.7rem;border-bottom:1px solid var(--border);background:var(--bg-primary)">
+                            <span style="color:var(--color-danger,#f44)">&minus; Local</span>
+                            <span style="color:var(--color-success,#10b981)">+ Remote</span>
+                        </div>
                         ${diffLinesHtml}
                     </div>
                     ${this._fullFileViewerHtml(idx, diffs[idx])}
