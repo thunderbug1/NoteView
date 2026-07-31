@@ -54,13 +54,25 @@
 }
 
 .tl-date-header {
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary);
     margin-bottom: 0.75rem;
     margin-left: -2.5rem;
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
     padding-left: 2rem;
     display: flex;
     align-items: center;
     gap: 0.4rem;
+}
+
+/* Mobile: scroll container is #main; clear the sticky toolbar (and Capacitor status bar). */
+@media (max-width: 768px) {
+    .tl-date-header {
+        top: calc(38px + var(--sa-top));
+    }
 }
 
 .tl-date-header span {
