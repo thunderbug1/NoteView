@@ -561,7 +561,15 @@ const DocumentEditorSetup = {
                         return true;
                     }
 
-                    return false;
+                    // Preserve leading whitespace from the current line
+                    const leadingWs = lineText.match(/^[ \t]*/)[0];
+                    view.dispatch({
+                        changes: { from: pos, insert: '\n' + leadingWs },
+                        selection: { anchor: pos + 1 + leadingWs.length },
+                        userEvent: 'input',
+                        scrollIntoView: true
+                    });
+                    return true;
                 }
             },
             {
