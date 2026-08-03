@@ -9,6 +9,9 @@ const SelectionManager = {
     // Render generation counter to cancel stale long-press timers
     _renderGen: 0,
 
+    // Pending deferred view render flag (dedupes rapid tag toggles)
+    _renderScheduled: false,
+
     // Selection state
     selections: {
         context: new Set(),
@@ -1034,8 +1037,8 @@ const SelectionManager = {
                     const tag = option.dataset.tag;
                     const wasExcluded = this.selections.excluded.has(tag);
                     this.toggleExcludedTag(tag, wasExcluded);
-                    this.renderContextSidebar();
-                    App.render();
+                    this.updateSelectionUI();
+                    this._scheduleFilteredRender();
                 }, this.LONG_PRESS_MS);
             });
 
@@ -1063,8 +1066,8 @@ const SelectionManager = {
                 if (e.shiftKey) {
                     const wasExcluded = this.selections.excluded.has(tag);
                     this.toggleExcludedTag(tag, wasExcluded);
-                    this.renderContextSidebar();
-                    App.render();
+                    this.updateSelectionUI();
+                    this._scheduleFilteredRender();
                     return;
                 }
 
@@ -1081,13 +1084,10 @@ const SelectionManager = {
                     this.saveSelectionState();
                 }
 
-                if (this.isComputedContextTag(tag)) {
-                    option.classList.toggle('selected', this.selections.context.has(tag));
-                    App.render();
-                } else {
-                    this.renderContextSidebar();
-                    App.render();
-                }
+                // Reflect the new selection on existing DOM (no sidebar rebuild), then
+                // defer the view render two frames so the selection paints first.
+                this.updateSelectionUI();
+                this._scheduleFilteredRender();
             });
         });
 
@@ -1139,15 +1139,17 @@ const SelectionManager = {
                     }
 
                     this.saveSelectionState();
-                    this.renderContextSidebar();
-                    App.render();
+                    this.updateSelectionUI();
+                    this._scheduleFilteredRender();
                 });
             }
         });
     },
 
     /**
-     * Update the UI to reflect current selections
+     * Update the UI to reflect current selections without rebuilding the sidebar DOM.
+     * Toggles only the selected/excluded classes on existing tag options and the
+     * group-selected class on group wrappers — much cheaper than renderContextSidebar().
      */
     updateSelectionUI() {
         document.querySelectorAll('.tag-radio-option').forEach(option => {
@@ -1155,7 +1157,6 @@ const SelectionManager = {
             const tag = option.dataset.tag;
 
             let isSelected = false;
-            let isGroupMatch = false;
             let isExcluded = false;
 
             if (group === 'context') {
@@ -1172,6 +1173,13 @@ const SelectionManager = {
             option.classList.toggle('excluded', isExcluded);
         });
 
+        // Reflect path-group (e.g. project namespace) selection on group wrappers
+        // without a full rebuild.
+        document.querySelectorAll('.tag-group-hierarchy[data-group-path]').forEach(groupEl => {
+            const pathKey = 'path:' + groupEl.dataset.groupPath;
+            groupEl.classList.toggle('group-selected', this.selections.context.has(pathKey));
+        });
+
         const clearBtn = document.getElementById('clearContextBtn');
         if (clearBtn) {
             clearBtn.disabled = this.selections.context.size === 0;
@@ -1181,6 +1189,22 @@ const SelectionManager = {
         const forwardBtn = document.getElementById('contextForwardBtn');
         if (backBtn) backBtn.disabled = !this.canGoBack();
         if (forwardBtn) forwardBtn.disabled = !this.canGoForward();
+    },
+
+    /**
+     * Defer the view re-render by two animation frames so the browser can paint the
+     * just-toggled tag selection first (instant feedback) before the heavier view
+     * rebuild runs. Rapid toggles coalesce into a single render.
+     */
+    _scheduleFilteredRender() {
+        if (this._renderScheduled) return;
+        this._renderScheduled = true;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this._renderScheduled = false;
+                App.render();
+            });
+        });
     },
 
     /**
@@ -1341,7 +1365,7 @@ const SelectionManager = {
                 } else {
                     this.setContactSelection(tag);
                 }
-                App.render();
+                this._scheduleFilteredRender();
             });
         });
     }

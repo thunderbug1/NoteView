@@ -33,8 +33,24 @@ const Store = {
     _vaultReady: false, // Flag indicating vault is ready for saves
     _pendingNotesStore: 'queuedNotes', // IndexedDB store for queued notes
 
+    // Cached blocks-id hash for the filter cache key (avoids rebuilding a joined string of
+    // all block ids on every cache lookup). Lazily computed; dirtied whenever the blocks
+    // cache is invalidated (see _hookBlockCacheInvalidate below).
+    _blocksIdHash: null,
+    _hashHooked: false,
+
     // Cache for filtered blocks
     _filteredBlocksCache: CacheManager.createCache(() => {
+        // Lazily hook invalidate() once so any invalidation (from any call site) dirties the
+        // cached blocks-id hash — this covers every mutation path without editing each one.
+        if (!Store._hashHooked) {
+            Store._hashHooked = true;
+            const origInvalidate = Store._filteredBlocksCache.invalidate.bind(Store._filteredBlocksCache);
+            Store._filteredBlocksCache.invalidate = function () {
+                origInvalidate();
+                Store._blocksIdHash = null;
+            };
+        }
         const contextSelection = window.SelectionManager?.selections?.context
             ? Array.from(window.SelectionManager.selections.context).sort().join(',')
             : '';
@@ -44,9 +60,16 @@ const Store = {
         const contactSelection = window.SelectionManager?.selections?.contact || '';
         const searchQuery = Store.searchQuery || '';
         const timeProperty = Store.timeProperty || 'lastUpdated';
-        const blocksHash = Store.blocks?.map(b => b.id).join(',') || '';
+        const blocksHash = Store._getBlocksIdHash();
         return `${contextSelection}|${excludedSelection}|${contactSelection}|${searchQuery}|${timeProperty}|${blocksHash}`;
     }),
+
+    /** Return the joined block-id string used in the filter cache key, recomputing only when dirty. */
+    _getBlocksIdHash() {
+        if (Store._blocksIdHash != null) return Store._blocksIdHash;
+        Store._blocksIdHash = (Store.blocks?.map(b => b.id).join(',')) || '';
+        return Store._blocksIdHash;
+    },
 
     // IndexedDB for persistence
     db: null,

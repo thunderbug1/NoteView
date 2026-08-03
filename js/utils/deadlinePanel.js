@@ -31,11 +31,17 @@ const DeadlinePanel = {
                 }
 
                 if (Store.currentView === 'document') {
-                    const editor = DocumentView.editors.get(blockId);
-                    if (editor) {
-                        DocumentView.highlightAndScrollTo(blockId, editor, matchIndex);
-                        editor.focus();
-                        return;
+                    const blockEl = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
+                    if (blockEl) {
+                        blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const editor = DocumentView.ensureEditorMounted(blockId);
+                        if (editor) {
+                            if (matchIndex != null) {
+                                DocumentView.highlightAndScrollTo(blockId, editor, matchIndex);
+                            }
+                            editor.focus();
+                            return;
+                        }
                     }
                 }
 

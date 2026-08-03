@@ -70,6 +70,18 @@ const DocumentView = {
     _dragMoveHandler: null,
     /** @private Bound mouseup handler for drag */
     _dragEndHandler: null,
+    /** @private Single IntersectionObserver for lazy editor mounting (lazy-init) */
+    _io: null,
+    /** @private Block ids currently intersecting the viewport margin (never evicted) */
+    _visibleIds: new Set(),
+    /** @private Block ids with mounted editors, in LRU order (oldest insertion first) */
+    _mountedLru: new Set(),
+    /** @private Containers currently observed by the IO (cleared each render to avoid leaks) */
+    _observedContainers: new Set(),
+    /** @private Max number of simultaneously-mounted real-block editors */
+    EDITOR_LRU_CAP: 60,
+    /** @private Bound capture handler that force-mounts a placeholder on click */
+    _editorActivateHandler: null,
 
     /**
      * Get or initialize task menus
@@ -141,6 +153,11 @@ const DocumentView = {
         this._mobileToolbar?.remove();
         this._mobileToolbar = null;
         this.cleanupMobileKeyboardHandler();
+        // Lazy-mount bookkeeping
+        if (this._io) { this._io.disconnect(); this._io = null; }
+        this._visibleIds.clear();
+        this._mountedLru.clear();
+        this._observedContainers.clear();
     },
 
     /** @public Main entry point. Renders document view with optional grouping.
@@ -294,6 +311,14 @@ const DocumentView = {
         this._dragStartHandler = this.handleDragStart.bind(this);
         container.addEventListener('mousedown', this._dragStartHandler);
 
+        // Lazy-editor activation: force-mount a placeholder on pointerdown (capture) so the
+        // editor is ready before focus is decided. Covers fast scrolls past the IO margin.
+        if (this._editorActivateHandler) {
+            container.removeEventListener('pointerdown', this._editorActivateHandler, true);
+        }
+        this._editorActivateHandler = this._handleEditorActivate.bind(this);
+        container.addEventListener('pointerdown', this._editorActivateHandler, true);
+
         this.attachEventListeners();
 
         // Restore collapsed state after DOM rebuild
@@ -304,7 +329,8 @@ const DocumentView = {
             this._restoreScrollFromAnchor(scrollAnchor);
             
             if (activeBlockId) {
-                const editor = this.editors.get(activeBlockId);
+                // The focused block's editor may be a lazy placeholder — force-mount before focusing.
+                const editor = this.ensureEditorMounted(activeBlockId);
                 if (editor && !editor.hasFocus) {
                     editor.focus();
                 }
@@ -408,16 +434,131 @@ const DocumentView = {
         });
     },
 
+    // ── Lazy editor mounting ─────────────────────────────────────────────────
+
+    /** @private Lazy-init the IntersectionObserver used for lazy editor mounting. */
+    _getIntersectionObserver() {
+        if (this._io) return this._io;
+        const root = document.getElementById('viewContainer');
+        const self = this;
+        this._io = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const container = entry.target;
+                const blockId = container.dataset && container.dataset.id;
+                if (!blockId || blockId === 'new') continue;
+                if (entry.isIntersecting) {
+                    self._visibleIds.add(blockId);
+                    if (!self.editors.has(blockId)) {
+                        self._mountEditor(container, blockId);
+                    }
+                } else {
+                    self._visibleIds.delete(blockId);
+                }
+            }
+            self._evictToCap();
+        }, { root, rootMargin: '1200px 0px', threshold: 0 });
+        return this._io;
+    },
+
+    /** @private Mount a CodeMirror editor into a placeholder container. */
+    _mountEditor(container, blockId) {
+        const block = Store.blocks.find(b => b.id === blockId);
+        const initialContent = block ? (block.content || '') : (container.textContent || '');
+        container.textContent = '';
+        this.createEditor(container, blockId, initialContent);
+        // Track in LRU (re-add moves to end = most-recently-mounted)
+        this._mountedLru.delete(blockId);
+        this._mountedLru.add(blockId);
+    },
+
+    /** @private Destroy an editor by block id, restoring its placeholder if still in the DOM. */
+    _destroyEditor(blockId) {
+        const editor = this.editors.get(blockId);
+        if (!editor) return;
+        const container = (editor.dom && editor.dom.parentElement) || null;
+        const currentContent = editor.state.doc.toString();
+
+        // Preserve unsaved edits across eviction: if a debounced save is still pending,
+        // sync the latest content into Store in-memory so a later re-mount shows it. The
+        // pending timer (left running) persists it to disk; re-editing cancels that timer.
+        if (this.saveTimeouts.has(blockId)) {
+            const block = Store.blocks.find(b => b.id === blockId);
+            if (block && block.content !== currentContent) {
+                block.content = currentContent;
+            }
+        }
+
+        this.editors.delete(blockId);
+        this.originalContents.delete(blockId);
+        this._mountedLru.delete(blockId);
+        if (this._focusedEditor === editor) this._focusedEditor = null;
+        editor.destroy();
+        if (container && container.isConnected) {
+            // Restore the text placeholder with the editor's latest content (covers the
+            // window before the pending save lands in Store / on disk).
+            container.textContent = currentContent;
+        }
+    },
+
+    /** @private Evict oldest off-screen editors down to EDITOR_LRU_CAP. Visible and focused editors are never evicted. */
+    _evictToCap() {
+        while (this._mountedLru.size > this.EDITOR_LRU_CAP) {
+            let victimId = null;
+            // Set iteration is insertion order = oldest-mounted first
+            for (const id of this._mountedLru) {
+                if (this._visibleIds.has(id)) continue;            // on-screen — keep
+                if (this.editors.get(id) === this._focusedEditor) continue; // focused — keep
+                victimId = id;
+                break;
+            }
+            if (victimId == null) break; // every mounted editor is visible or focused
+            this._destroyEditor(victimId);
+        }
+    },
+
+    /** @public Force-mount the editor for a block (used before scroll/focus). Returns the editor or null. */
+    ensureEditorMounted(blockId) {
+        if (this.editors.has(blockId)) return this.editors.get(blockId);
+        const container = document.querySelector(`.codemirror-container[data-id="${CSS.escape(blockId)}"]`);
+        if (!container) return null;
+        this._mountEditor(container, blockId);
+        this._visibleIds.add(blockId);
+        return this.editors.get(blockId) || null;
+    },
+
+    /** @private Capture-phase handler that force-mounts a placeholder container on pointerdown
+     *      so the editor is ready before focus is decided. */
+    _handleEditorActivate(e) {
+        const container = e.target.closest && e.target.closest('.codemirror-container');
+        if (!container) return;
+        const blockId = container.dataset.id;
+        if (!blockId || blockId === 'new') return;
+        if (this.editors.has(blockId)) return;
+        this._mountEditor(container, blockId);
+        this._visibleIds.add(blockId);
+        const ed = this.editors.get(blockId);
+        if (ed) ed.focus();
+    },
+
     attachEventListeners() {
         const container = document.getElementById('viewContainer');
 
-        // Initialize CodeMirror editors for each block
+        // Initialize CodeMirror editors for each block.
+        // Editors are mounted lazily via IntersectionObserver: only blocks near the
+        // viewport get a real editor; the rest stay as cheap text placeholders. This keeps
+        // project switches (which swap nearly the entire block set) from creating hundreds
+        // of CodeMirror instances at once.
         const activeBlockIds = new Set();
+        const io = this._getIntersectionObserver();
+        // Clear previous observations so detached containers from the last render don't leak.
+        for (const c of this._observedContainers) io.unobserve(c);
+        this._observedContainers.clear();
+
         container.querySelectorAll('.codemirror-container').forEach(cmContainer => {
             const blockId = cmContainer.dataset.id;
             activeBlockIds.add(blockId);
 
-            // Reuse existing editor if available
+            // Reuse existing editor if available (e.g. same-set re-render)
             const existingEditor = this.editors.get(blockId);
             if (existingEditor) {
                 cmContainer.textContent = '';
@@ -440,12 +581,20 @@ const DocumentView = {
                 // Force hidden-line StateField to rebuild for the current filter state
                 const effect = getFilterChangedEffect();
                 if (effect) existingEditor.dispatch({ effects: effect.of(undefined) });
-                return;
+            } else if (blockId === 'new') {
+                // The new-note block is always visible and editable — mount eagerly.
+                const initialContent = cmContainer.textContent;
+                cmContainer.textContent = '';
+                this.createEditor(cmContainer, blockId, initialContent);
             }
+            // else: placeholder — left as text; the observer below mounts it when visible.
 
-            const initialContent = cmContainer.textContent;
-            cmContainer.textContent = '';
-            this.createEditor(cmContainer, blockId, initialContent);
+            // Observe real blocks (both placeholders and survivors) so visibility tracking
+            // stays accurate for LRU eviction and placeholders get mounted on entry.
+            if (blockId !== 'new') {
+                io.observe(cmContainer);
+                this._observedContainers.add(cmContainer);
+            }
         });
 
         // Initialize inline diff editors for blocks with pending AI changes
@@ -461,15 +610,13 @@ const DocumentView = {
 
         // Clean up orphaned editors (blocks no longer in the DOM)
         // Skip modal editors whose DOM lives outside #viewContainer
-        for (const [id, editor] of this.editors) {
+        for (const id of [...this.editors.keys()]) {
             if (!activeBlockIds.has(id) && id !== 'new-modal') {
-                editor.destroy();
-                this.editors.delete(id);
-                this.originalContents.delete(id);
+                this._destroyEditor(id);
             }
         }
 
-        // Clear _focusedEditor if it was destroyed
+        // Clear _focusedEditor if it was destroyed (_destroyEditor also nulls it; this is a safety net)
         if (this._focusedEditor) {
             let stillExists = false;
             for (const editor of this.editors.values()) {
@@ -1099,7 +1246,7 @@ const DocumentView = {
 
     /** @public Focus the CodeMirror editor for a block. Called by main.js. */
     focusEditor(blockId) {
-        const editor = this.editors.get(blockId);
+        const editor = this.ensureEditorMounted(blockId);
         if (editor) {
             editor.focus();
         }
@@ -1253,7 +1400,8 @@ const DocumentView = {
         const blockEl = document.querySelector(`.block[data-id="${CSS.escape(block.id)}"]`);
         if (blockEl) {
             blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            const editor = this.editors.get(block.id);
+            // The target block's editor may be a lazy placeholder — force-mount before focusing.
+            const editor = this.ensureEditorMounted(block.id);
             if (editor) editor.focus();
         } else {
             this.openNoteModal(targetId);

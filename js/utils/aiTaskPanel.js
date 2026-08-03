@@ -65,11 +65,14 @@ const AITaskPanel = {
                 this.dismissNotification(blockId);
 
                 if (Store.currentView === 'document') {
-                    const editor = DocumentView.editors.get(blockId);
-                    if (editor) {
-                        DocumentView.highlightAndScrollTo(blockId, editor);
-                        editor.focus();
-                        return;
+                    const blockEl = document.querySelector(`.block[data-id="${CSS.escape(blockId)}"]`);
+                    if (blockEl) {
+                        blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const editor = DocumentView.ensureEditorMounted(blockId);
+                        if (editor) {
+                            editor.focus();
+                            return;
+                        }
                     }
                 }
 

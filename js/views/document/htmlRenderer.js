@@ -317,7 +317,8 @@ const DocumentHtmlRenderer = {
             if (blockId && blockId !== 'new') {
                 this.expandBlock(blockId);
                 this._autoCollapseOnBlur.add(blockId);
-                const editor = this.editors.get(blockId);
+                // The expanded block's editor may be a lazy placeholder — force-mount before focusing.
+                const editor = this.ensureEditorMounted(blockId);
                 if (editor) editor.focus();
             }
         }
