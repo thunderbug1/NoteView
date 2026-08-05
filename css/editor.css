@@ -10,10 +10,16 @@
     margin-bottom: 1rem;
     transition: all 0.15s ease;
     overflow: hidden;
-    /* Skip layout/paint for off-screen blocks. Essential for large vaults: keeps
-       hundreds of placeholder articles cheap so project switches stay snappy.
-       `auto` remembers each block's real height after first render to keep the
-       scrollbar stable; 160px is the estimate for never-yet-rendered blocks. */
+}
+
+/* Skip layout/paint for off-screen editors. Essential for large vaults: keeps
+   hundreds of placeholder articles cheap so project switches stay snappy.
+   Applied to .block-editor (not .block) so .block can still overflow visibly
+   to render the floating metadata bar, collapse button, and split marker,
+   which are positioned outside .block's box.
+   `auto` remembers each block's real height after first render to keep the
+   scrollbar stable; 160px is the estimate for never-yet-rendered blocks. */
+.block-editor {
     content-visibility: auto;
     contain-intrinsic-size: auto 160px;
 }
