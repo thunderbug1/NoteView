@@ -58,7 +58,7 @@ const VaultModal = {
         vaultList.forEach(v => {
             if (Store.isOPFSVault(v)) return;
             Store.getVaultHandle(v.name).then(handle => {
-                if (!handle) return;
+                if (!handle || typeof handle.queryPermission !== 'function') return;
                 handle.queryPermission({ mode: 'readwrite' }).then(perm => {
                     if (perm !== 'granted') {
                         handle.requestPermission({ mode: 'readwrite' }).catch(() => {});
@@ -127,12 +127,30 @@ const VaultModal = {
         if (container) container.innerHTML = '<div class="loading">Loading notes...</div>';
 
         try {
-            const handle = await Store.getVaultHandle(name);
+            let handle = await Store.getVaultHandle(name);
             if (!handle) {
-                // Vault handle was removed — clean up
-                await Store.deleteVault(name);
-                VaultModal.updateVaultSwitcherName();
-                return;
+                // Registered local vault without a stored handle — the folder needs to be opened once
+                const vaultList = await Store.getVaultList();
+                const entry = vaultList.find(v => v.name === name);
+                if (entry && !Store.isOPFSVault(entry)) {
+                    if (window.Platform?.supportsFileSystemPicker ?? 'showDirectoryPicker' in window) {
+                        const picked = await window.showDirectoryPicker({ mode: 'readwrite' });
+                        if (picked.name !== name) {
+                            showToast(`Selected folder "${picked.name}" does not match vault "${name}".`);
+                            return;
+                        }
+                        await Store.saveVault(picked, 'local');
+                        handle = picked;
+                    } else {
+                        showToast(`Vault "${name}" needs its folder opened on the original device.`);
+                        return;
+                    }
+                } else {
+                    // Vault handle was removed — clean up
+                    await Store.deleteVault(name);
+                    VaultModal.updateVaultSwitcherName();
+                    return;
+                }
             }
 
             await Store.switchToVault(handle);

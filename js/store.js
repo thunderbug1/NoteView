@@ -823,10 +823,19 @@ const Store = {
                 // Check permission — skip for OPFS vaults
                 let permission = 'granted';
                 if (!this.isOPFSVault(vaultEntry)) {
-                    permission = await savedHandle.queryPermission({ mode: 'readwrite' });
-                    if (permission !== 'granted') {
-                        // Chrome auto-grants for installed PWAs even without user gesture
-                        permission = await savedHandle.requestPermission({ mode: 'readwrite' });
+                    if (typeof savedHandle.queryPermission === 'function') {
+                        permission = await savedHandle.queryPermission({ mode: 'readwrite' });
+                        if (permission !== 'granted') {
+                            // Chrome auto-grants for installed PWAs even without user gesture
+                            permission = await savedHandle.requestPermission({ mode: 'readwrite' });
+                        }
+                    } else {
+                        // Not a real handle (e.g. vault known by name only) — needs re-open
+                        const error = new Error('Folder for this vault is not accessible. Please open it again.');
+                        error.name = 'NotAllowedError';
+                        error.needsPermission = true;
+                        error.handle = savedHandle;
+                        throw error;
                     }
                 }
                 if (permission === 'granted') {
@@ -1134,6 +1143,38 @@ const Store = {
         }
     },
 
+    /**
+     * Register a vault in the vault list without storing a directory handle.
+     * Used for local vaults known by name only (e.g. bulk import) — the handle
+     * is stored when the user actually opens the folder.
+     */
+    async registerVaultEntry(name, type = 'local') {
+        if (!this.db) {
+            await this.initDB();
+            if (!this.db) return;
+        }
+
+        const list = await this.getVaultList();
+        const existing = list.find(v => v.name === name);
+        if (!existing) {
+            list.push({ name, type, addedAt: new Date().toISOString() });
+        } else {
+            existing.type = type;
+        }
+
+        await new Promise((resolve, reject) => {
+            try {
+                const tx = this.db.transaction([this.STORE_NAME], 'readwrite');
+                const store = tx.objectStore(this.STORE_NAME);
+                const req = store.put(list, 'vaultList');
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            } catch (e) { reject(e); }
+        });
+
+        this._backupVaultList(list);
+    },
+
     async getVaultList() {
         if (!this.db) {
             await this.initDB();
@@ -1357,6 +1398,9 @@ const Store = {
         const vaultEntry = vaultList.find(v => v.name === handle.name);
 
         if (!this.isOPFSVault(vaultEntry)) {
+            if (typeof handle.queryPermission !== 'function') {
+                throw new Error('Folder for this vault is not accessible. Please open it again via Manage Vaults.');
+            }
             const perm = await handle.queryPermission({ mode: 'readwrite' });
             if (perm !== 'granted') {
                 const requested = await handle.requestPermission({ mode: 'readwrite' });
@@ -1497,6 +1541,9 @@ const Store = {
         const vaultList = await this.getVaultList();
         const entry = vaultList.find(v => v.name === targetVaultName);
         if (!this.isOPFSVault(entry)) {
+            if (typeof handle.queryPermission !== 'function') {
+                throw new Error('Folder for ' + targetVaultName + ' is not accessible. Open it first via Manage Vaults.');
+            }
             const perm = await handle.queryPermission({ mode: 'readwrite' });
             if (perm !== 'granted') {
                 const requested = await handle.requestPermission({ mode: 'readwrite' });

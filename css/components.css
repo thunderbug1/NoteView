@@ -537,6 +537,7 @@
     box-shadow: var(--shadow-lg);
     width: 300px;
     max-width: 90vw;
+    max-height: 90vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -611,6 +612,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .tag-modal-input-row {

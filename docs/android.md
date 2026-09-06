@@ -131,6 +131,48 @@ Full release-signing details (including Play App Signing) are covered in the [An
 
 ### Method A: adb from dev machine (recommended)
 
+If the dev machine has no Android SDK installed, a minimal setup is enough for sideloading — two pieces: an `adb` binary and an SDK for gradle.
+
+**One-time setup (Linux, no root, no Android Studio):**
+
+1. **Install standalone platform-tools** (provides `adb`):
+   ```bash
+   curl -sLo /tmp/platform-tools.zip \
+     https://dl.google.com/android/repository/platform-tools-latest-linux.zip
+   unzip -qo /tmp/platform-tools.zip -d ~/Android/
+   adb=~/Android/platform-tools/adb
+   ```
+2. **Prepare a build SDK** for gradle (only needed when rebuilding; plain `adb install` of an existing APK needs only step 1). Download the command-line tools and install the required packages:
+   ```bash
+   mkdir -p /tmp/android-sdk/cmdline-tools
+   curl -sLo /tmp/clt.zip \
+     https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+   unzip -qo /tmp/clt.zip -d /tmp/android-sdk/cmdline-tools
+   mv /tmp/android-sdk/cmdline-tools/cmdline-tools /tmp/android-sdk/cmdline-tools/latest
+   export ANDROID_HOME=/tmp/android-sdk
+   yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+   $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
+   ```
+   Then make sure `android/local.properties` points at it:
+   ```
+   sdk.dir=/tmp/android-sdk
+   ```
+   > Note: a `/tmp` SDK is ephemeral — it disappears on reboot. Point `sdk.dir` at a persistent location (e.g. `~/Android/sdk`) if you build regularly, or rerun this step after a reboot. On this machine, the SDK path `/tmp/opencode/android-sdk` was found wiped this way; recreating it and rebuilding took ~2 minutes.
+
+**Install and launch:**
+
+```bash
+adb devices                        # device must show as "device", not "unauthorized"
+npx cap sync android               # pick up latest web code (from NoteView-Android/)
+cd android && ./gradlew assembleDebug
+cd ..
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb shell monkey -p ai.noteview.app -c android.intent.category.LAUNCHER 1   # launch
+adb shell pidof ai.noteview.app    # verify the process is running
+```
+
+**If the device doesn't appear in `adb devices`:** the phone may be in MTP mode without debugging. On the phone enable **Settings → System → Developer options → USB debugging** (tap "Build number" 7 times in About phone first if Developer options is hidden), replug the cable, and accept the "Allow USB debugging?" prompt. A working connection shows `18d1:4ee7` in `lsusb` (MTP-only shows `18d1:4ee1` and adb lists nothing). Poll with `adb devices` until the serial shows state `device`.
+
 ```bash
 adb install -r NoteView-Android/android/app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -228,6 +270,7 @@ Verify `capacitor.config.json` contains `"webDir": "../NoteView"` and that the s
 - **The web code uses `window.Platform.isCapacitor`** (from `js/utils/platform.js`) to gate Capacitor-specific behavior at runtime. Other useful flags on the same object: `Platform.isAndroid`, `Platform.supportsFileSystemPicker`.
 - **Storage lives in the app-private location.** IndexedDB and OPFS inside the WebView are written to `/data/data/ai.noteview.app/app_webview/` — app-private, not subject to Chrome's site-data eviction.
 - **File System Access API calls are gated out** because `Platform.supportsFileSystemPicker` returns `false` inside Capacitor. The service worker is also skipped (`js/sw-register.js` short-circuits when Capacitor is detected).
+- **Bulk import converts local vaults to OPFS.** When importing a vault-export JSON on a picker-less platform (`js/utils/bulkImport.js`), `local`-type vault entries are created as OPFS (browser) vaults instead — a local folder cannot be backed by a real directory inside the WebView. Git/sync/AI configuration is applied unchanged; note content can be restored by pulling from the vault's git remote. On desktop (picker available), local vaults are registered by name only and no directory handle is stored until the user opens the folder once via the vault switcher — `queryPermission` calls are guarded so a handle-less vault never crashes (`js/store.js`, `js/modals/vaultModal.js`).
 - **System UI safe-area handling.** Android 15+ (the build targets API 36) enforces edge-to-edge: the WebView draws under the status bar, navigation bar, and display cutout. `index.html` sets `viewport-fit=cover`, so CSS `env(safe-area-inset-*)` resolves to the real insets inside the WebView. `js/utils/platform.js` adds a `capacitor` class to `<html>` at load time; `css/base.css` exposes these as `--sa-top` / `--sa-bottom` / `--sa-left` / `--sa-right`, and the clashing UI (app header, content/filter bars, sidebar footer, right-sidebar scroll, FAB, mobile toolbar, capture view/page headers, AI panel header and composer) apply `var(--sa-*)` padding **only under `.capacitor`**, so the browser PWA's spacing is untouched. To extend: add a `.capacitor <selector>` rule using the same variables. If `env()` ever returns 0 on a device (rare on modern WebView), escalate to a JS/native bridge that reads window insets and injects them as CSS variables.
 - **System chrome colors & icon contrast.** The status bar, navigation bar, recents header, and pre-WebView window/splash background are colored by the DayNight resources in `android/.../res/values/colors.xml` (light palette) and `values-night/colors.xml` (dark palette). `MainActivity` reads the device day/night mode and calls `WindowInsetsControllerCompat` to set status/nav bar icon contrast accordingly (dark icons on light bars, white icons on dark bars), re-applying on `onConfigurationChanged`. This follows the *system* theme, which `ThemeManager` mirrors by default; NoteView's in-app theme toggle does not drive the native chrome, so toggling against the system leaves the system chrome unchanged.
 

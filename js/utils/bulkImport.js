@@ -29,7 +29,7 @@ const BulkImport = {
                             <input type="file" id="bulkImportFileInput" accept=".json" style="display:none">
                         </div>
 
-                        <div id="bulkImportPreview" style="display:none;margin-top:1.5rem">
+                        <div id="bulkImportPreview" class="bulk-import-preview" style="display:none;margin-top:1.5rem">
                             <!-- Preview will be populated here -->
                         </div>
                     </div>
@@ -325,7 +325,14 @@ const BulkImport = {
     async processVault(vaultConfig, vaultName, includeApiKeys, overwrite) {
         console.log('[BulkImport] Processing vault:', vaultName, 'type:', vaultConfig.type);
 
-        const isOPFS = vaultConfig.type === 'opfs';
+        const hasLocalPicker = window.Platform?.supportsFileSystemPicker ?? 'showDirectoryPicker' in window;
+        // Local vaults cannot be backed by a real folder without the picker — convert to OPFS
+        const isOPFS = vaultConfig.type === 'opfs' || (!hasLocalPicker && vaultConfig.type === 'local');
+
+        if (vaultConfig.type === 'local' && !hasLocalPicker) {
+            console.log('[BulkImport] Picker unavailable — converting local vault to OPFS:', vaultName);
+        }
+
         let handle = null;
 
         if (isOPFS) {
@@ -335,9 +342,9 @@ const BulkImport = {
             const exists = vaultList.some(v => v.name === vaultName);
 
             if (!exists) {
-                await Store.saveVault({ name: vaultName, type: 'local', addedAt: new Date().toISOString() }, 'local');
+                // Register the vault entry only — no real handle exists until the user opens the folder
+                await Store.registerVaultEntry(vaultName, 'local');
             }
-            handle = { name: vaultName, type: 'local' };
         }
 
         if (vaultConfig.git) {
@@ -350,6 +357,10 @@ const BulkImport = {
 
         if (vaultConfig.ai) {
             await this.applyAISettings(handle, vaultConfig.ai, includeApiKeys, isOPFS);
+        }
+
+        if (vaultConfig.type === 'local' && !hasLocalPicker) {
+            showToast(`Vault "${vaultName}" imported as browser vault (local folders aren't supported on this device). Pull from its git remote to restore notes.`);
         }
 
         console.log('[BulkImport] Vault processed successfully:', vaultName);
@@ -464,10 +475,10 @@ const BulkImport = {
 
             if (includeApiKeys && aiConfig.apiKeys && typeof aiConfig.apiKeys === 'object') {
                 await AppSettings.saveKeys(aiConfig.apiKeys);
-                console.log('[BulkImport] API keys imported for vault:', vaultHandle.name);
+                console.log('[BulkImport] API keys imported for vault:', vaultHandle?.name);
             }
 
-            console.log('[BulkImport] AI settings applied for vault:', vaultHandle.name);
+            console.log('[BulkImport] AI settings applied for vault:', vaultHandle?.name);
 
         } finally {
             if (isOPFS && tempHandle) {
