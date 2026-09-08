@@ -2,3 +2,6 @@ node_modules/
 
 test-vault
 scripts/redate*
+
+# Generated single-file release build
+noteview.html
