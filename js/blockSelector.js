@@ -359,10 +359,11 @@ const BlockSelector = {
 
         if (this._isKanban()) {
             // Kanban: delete selected task lines from their parent blocks
-            const confirmed = await Modal.confirm(
-                `Delete ${ids.length} task${ids.length > 1 ? 's' : ''}?`,
-                'The task lines will be removed from their notes.'
-            );
+            const confirmed = await Modal.confirm({
+                title: `Delete ${ids.length} task${ids.length > 1 ? 's' : ''}?`,
+                message: 'The task lines will be removed from their notes.',
+                confirmText: 'Delete'
+            });
             if (!confirmed) return;
 
             this._hideActionBar();
@@ -404,10 +405,11 @@ const BlockSelector = {
             App.render();
         } else {
             // Document: delete entire blocks
-            const confirmed = await Modal.confirm(
-                `Delete ${ids.length} note${ids.length > 1 ? 's' : ''}?`,
-                'This cannot be undone from select mode.'
-            );
+            const confirmed = await Modal.confirm({
+                title: `Delete ${ids.length} note${ids.length > 1 ? 's' : ''}?`,
+                message: 'This cannot be undone from select mode.',
+                confirmText: 'Delete'
+            });
             if (!confirmed) return;
 
             this._hideActionBar();

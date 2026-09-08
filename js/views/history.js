@@ -17,9 +17,20 @@ const HistoryView = {
         this.currentFilename = block.filename;
         this.currentContent = block.content || '';
 
+        // Immediate feedback while git history loads (can be slow on large repos)
+        this._showLoadingModal();
+        // Safety cutoff: if getHistory neither resolves nor rejects (e.g. hung
+        // adapter), dismiss the modal instead of leaving it stuck open.
+        this._loadingCutoff = setTimeout(() => {
+            if (document.getElementById('historyModal')) {
+                console.error('HistoryView: history load timed out');
+                this.closeHistory();
+                Common.showToast('Version history took too long to load. Try again.');
+            }
+        }, 30000);
         try {
         const rawCommits = await GitStore.getHistory(this.currentFilename);
-        
+
         // Group commits together that occur within 10 minutes of each other
         // Since commits are returned newest first, we keep the newest of each edit session
         const GROUP_GAP_MS = 10 * 60 * 1000;
@@ -34,22 +45,47 @@ const HistoryView = {
                 }
             }
         }
-        
+
         this.renderModal();
         } catch (e) {
             console.error('Failed to load history:', e);
+            this.closeHistory();
             Common.showToast('Failed to load version history', 'error');
+        } finally {
+            clearTimeout(this._loadingCutoff);
+            this._loadingCutoff = null;
         }
     },
-    
-    renderModal() {
+
+    _showLoadingModal() {
         let existing = document.getElementById('historyModal');
         if (existing) existing.remove();
-        
+
         const modal = document.createElement('div');
         modal.id = 'historyModal';
         modal.className = 'history-modal-overlay';
-        
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-label', 'Version History');
+        modal.innerHTML = `
+            <div class="history-modal-container" style="align-items:center;justify-content:center;display:flex;min-height:200px">
+                <div style="color:var(--text-secondary);font-size:0.9rem">Loading version history…</div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    renderModal() {
+        let existing = document.getElementById('historyModal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'historyModal';
+        modal.className = 'history-modal-overlay';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-label', 'Version History');
+
         const commitsHtml = this.commits.map((c, i) => `
             <div class="history-commit-item ${i === 0 ? 'selected' : ''}" data-oid="${c.oid}">
                 <div class="commit-time">${Common.formatRelativeDate(new Date(c.timestamp))}</div>
@@ -63,7 +99,7 @@ const HistoryView = {
                 <div class="history-sidebar">
                     <div class="history-header">
                         <h2>Version History</h2>
-                        <button class="close-history-btn" title="Close History">&times;</button>
+                        <button class="close-history-btn" title="Close History" aria-label="Close History">&times;</button>
                     </div>
                     <div class="history-timeline">
                         ${commitsHtml || '<div class="no-history">No history found for this block yet. Make a save first!</div>'}
@@ -89,6 +125,28 @@ const HistoryView = {
         };
         document.addEventListener('keydown', escapeHandler);
         this._escapeHandler = escapeHandler;
+
+        // Simple focus trap: keep Tab cycling inside the modal
+        const trapHandler = (e) => {
+            if (e.key !== 'Tab') return;
+            const focusables = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (focusables.length === 0) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+        document.addEventListener('keydown', trapHandler);
+        this._trapHandler = trapHandler;
+
+        // Move focus into the dialog; restore it when it closes
+        this._previouslyFocused = document.activeElement;
+        modal.querySelector('.close-history-btn').focus();
 
         modal.querySelector('.close-history-btn').addEventListener('click', () => this.closeHistory());
         
@@ -181,6 +239,14 @@ const HistoryView = {
         if (this._escapeHandler) {
             document.removeEventListener('keydown', this._escapeHandler);
             this._escapeHandler = null;
+        }
+        if (this._trapHandler) {
+            document.removeEventListener('keydown', this._trapHandler);
+            this._trapHandler = null;
+        }
+        if (this._previouslyFocused && typeof this._previouslyFocused.focus === 'function') {
+            try { this._previouslyFocused.focus(); } catch { /* element may be gone */ }
+            this._previouslyFocused = null;
         }
         const modal = document.getElementById('historyModal');
         if (modal) modal.remove();

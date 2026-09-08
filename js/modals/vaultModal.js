@@ -54,19 +54,6 @@ const VaultModal = {
             });
         }
 
-        // Pre-warm permissions for local vaults while we have user gesture (skip OPFS — no permission needed)
-        vaultList.forEach(v => {
-            if (Store.isOPFSVault(v)) return;
-            Store.getVaultHandle(v.name).then(handle => {
-                if (!handle || typeof handle.queryPermission !== 'function') return;
-                handle.queryPermission({ mode: 'readwrite' }).then(perm => {
-                    if (perm !== 'granted') {
-                        handle.requestPermission({ mode: 'readwrite' }).catch(() => {});
-                    }
-                }).catch(err => console.warn('[VaultModal] queryPermission failed for', v.name, err));
-            }).catch(err => console.warn('[VaultModal] getVaultHandle failed for', v.name, err));
-        });
-
         // Divider
         const divider = document.createElement('div');
         divider.className = 'menu-divider';
@@ -142,13 +129,35 @@ const VaultModal = {
                         await Store.saveVault(picked, 'local');
                         handle = picked;
                     } else {
-                        showToast(`Vault "${name}" needs its folder opened on the original device.`);
+                        // No picker available (e.g. Capacitor): a folder vault can
+                        // never be re-opened here. Offer to remove it from the list
+                        // instead of a permanent dead end.
+                        const confirmed = await Modal.confirm({
+                            title: `Can't open "${name}" on this device`,
+                            message: 'This vault points to a folder on another device, and this device cannot open local folders. You can remove it from the vault list (files on the original device are not affected).',
+                            confirmText: 'Remove From List',
+                            cancelText: 'Keep'
+                        });
+                        if (confirmed) {
+                            await Store.deleteVault(name);
+                            VaultModal.updateVaultSwitcherName();
+                            showToast(`Removed vault "${name}" from the list.`);
+                        }
                         return;
                     }
                 } else {
-                    // Vault handle was removed — clean up
-                    await Store.deleteVault(name);
-                    VaultModal.updateVaultSwitcherName();
+                    // Vault entry exists but its stored handle is gone — confirm
+                    // before removing it from the list.
+                    const confirmed = await Modal.confirm({
+                        title: `Remove broken vault entry "${name}"?`,
+                        message: 'This vault is registered but its stored handle is missing, so it cannot be opened. Remove it from the vault list? Any files on disk are not deleted.',
+                        confirmText: 'Remove Entry',
+                        cancelText: 'Cancel'
+                    });
+                    if (confirmed) {
+                        await Store.deleteVault(name);
+                        VaultModal.updateVaultSwitcherName();
+                    }
                     return;
                 }
             }
@@ -193,17 +202,10 @@ const VaultModal = {
         const localActions = hasLocalPicker ? `
                         <div class="vault-manager-action">
                             <div class="vault-manager-action-text">
-                                <h4>Create new vault</h4>
-                                <p>Create a new folder for your notes</p>
+                                <h4>Add folder vault</h4>
+                                <p>Pick a folder (existing or new) to use as a vault</p>
                             </div>
-                            <button class="vault-manager-action-btn primary" id="createVaultBtn">Create</button>
-                        </div>
-                        <div class="vault-manager-action">
-                            <div class="vault-manager-action-text">
-                                <h4>Open folder as vault</h4>
-                                <p>Open an existing folder on your device</p>
-                            </div>
-                            <button class="vault-manager-action-btn secondary" id="openFolderAsVaultBtn">Open</button>
+                            <button class="vault-manager-action-btn primary" id="createVaultBtn">Pick Folder</button>
                         </div>` : '';
 
         const modal = Modal.create({
@@ -315,9 +317,21 @@ const VaultModal = {
 
             menu.querySelector('[data-action="remove"]').addEventListener('click', () => {
                 closeVaultMenu();
-                const confirmed = window.confirm(`Remove "${vaultName}" from your vault list?\n\nYour files are not deleted.`);
-                if (confirmed) {
-                    Store.deleteVault(vaultName).then(async () => {
+                Store.getVaultList().then(list => {
+                    const entry = list.find(v => v.name === vaultName);
+                    const isOPFS = entry && Store.isOPFSVault(entry);
+                    const message = isOPFS
+                        ? `This will permanently delete the browser vault "${vaultName}" and all notes stored in it. This cannot be undone.`
+                        : `Remove "${vaultName}" from your vault list?\n\nYour files on disk are not deleted.`;
+                    return Modal.confirm({
+                        title: isOPFS ? 'Delete vault permanently?' : 'Remove vault from list?',
+                        message,
+                        confirmText: isOPFS ? 'Delete Permanently' : 'Remove',
+                        cancelText: 'Cancel'
+                    });
+                }).then(confirmed => {
+                    if (!confirmed) return;
+                    return Store.deleteVault(vaultName).then(async () => {
                         await refreshList();
                         // If the removed vault was the active one, close it
                         if (vaultName === (Store.directoryHandle?.name || '')) {
@@ -334,7 +348,10 @@ const VaultModal = {
                         console.error('Failed to delete vault:', err);
                         showToast('Failed to remove vault: ' + (err.message || 'Unknown error'));
                     });
-                }
+                }).catch(err => {
+                    console.error('Failed to remove vault:', err);
+                    showToast('Failed to remove vault: ' + (err.message || 'Unknown error'));
+                });
             });
 
             const closeMenu = (e) => {
@@ -389,9 +406,6 @@ const VaultModal = {
 
         const browserVaultBtn = modal.querySelector('#createBrowserVaultBtn');
         if (browserVaultBtn) browserVaultBtn.addEventListener('click', openBrowserVaultWizard);
-
-        const openBtn = modal.querySelector('#openFolderAsVaultBtn');
-        if (openBtn) openBtn.addEventListener('click', openVaultFromPicker);
 
         const createBtn = modal.querySelector('#createVaultBtn');
         if (createBtn) createBtn.addEventListener('click', openVaultFromPicker);
@@ -526,11 +540,18 @@ const VaultModal = {
                 `,
                 width: '550px',
                 onClose: () => {
+                    // Flag any in-flight verification so it aborts instead of
+                    // mutating global state after the user has dismissed the wizard.
+                    if (!wizardCompleted) wizardAborted = true;
                     if (!Store.directoryHandle) {
                         App.showDirectoryPicker();
                     }
                 }
             });
+
+            // Abort/completion tracking for the in-flight verification below
+            let wizardAborted = false;
+            let wizardCompleted = false;
 
             // Handle panel switching
             const indicators = wizardModal.querySelectorAll('.wizard-step-indicator');
@@ -572,7 +593,7 @@ const VaultModal = {
                     if (nextNum === 2) {
                         const nameInput = wizardModal.querySelector('#wizardVaultName');
                         if (!nameInput.value.trim()) {
-                            alert('Please enter a vault name.');
+                            Common.showToast('Please enter a vault name.');
                             nameInput.focus();
                             return;
                         }
@@ -621,7 +642,7 @@ const VaultModal = {
                     const enableGit = wizardModal.querySelector('#wizardEnableGit').checked;
                     
                     if (!name) {
-                        alert('Please enter a vault name.');
+                        Common.showToast('Please enter a vault name.');
                         showPanel(1);
                         return;
                     }
@@ -649,8 +670,17 @@ const VaultModal = {
                     const gitProxy = wizardModal.querySelector('#wizardGitProxy').value.trim();
 
                     if (!gitUrl) {
-                        alert('Please enter a Git repository URL.');
+                        Common.showToast('Please enter a Git repository URL.');
                         wizardModal.querySelector('#wizardGitUrl').focus();
+                        return;
+                    }
+
+                    // Vault names are unique keys — fail fast before any state changes
+                    try {
+                        await Store.assertVaultNameAvailable(name);
+                    } catch (nameErr) {
+                        Common.showToast(nameErr.message);
+                        showPanel(1);
                         return;
                     }
 
@@ -675,10 +705,23 @@ const VaultModal = {
                     statusMsg.textContent = 'Initializing private directory...';
 
                     let tempHandle = null;
+
+                    // Snapshot globals we mutate mid-verification so they can be
+                    // fully restored on failure or if the user dismisses the wizard.
+                    const prevSyncConfig = { ...(window.SyncManager?._config || {}) };
+                    const checkAborted = () => {
+                        if (wizardAborted) {
+                            const e = new Error('Wizard dismissed during verification');
+                            e.isWizardAbort = true;
+                            throw e;
+                        }
+                    };
+
                     try {
                         // 1. Create OPFS directory locally
                         const opfsRoot = await navigator.storage.getDirectory();
                         tempHandle = await opfsRoot.getDirectoryHandle(name, { create: true });
+                        checkAborted();
 
                         // 2. Initialize Git locally inside this handle
                         statusMsg.textContent = 'Initializing Git repository...';
@@ -716,6 +759,7 @@ const VaultModal = {
 
                         // 4. Add remote and test connection via fetch
                         statusMsg.textContent = 'Adding remote repository...';
+                        checkAborted();
                         await GitStore.git.addRemote({
                             fs: GitStore.fs,
                             dir: GitStore.dir,
@@ -725,6 +769,7 @@ const VaultModal = {
                         });
 
                         statusMsg.textContent = 'Connecting to git remote repository...';
+                        checkAborted();
                         await GitStore.git.fetch({
                             fs: GitStore.fs,
                             dir: GitStore.dir,
@@ -739,6 +784,7 @@ const VaultModal = {
                         // 5. Connection works! Try to pull notes (if existing)
                         statusMsg.textContent = 'Connection successful! Fetching branch...';
 
+                        checkAborted();
                         try {
                             statusMsg.textContent = 'Downloading notes from remote repository...';
                             await GitRemote.pull();
@@ -754,6 +800,7 @@ const VaultModal = {
 
                         // 6. Complete and save vault!
                         statusMsg.textContent = 'Vault setup complete!';
+                        wizardCompleted = true;
                         spinner.style.display = 'none';
                         successIcon.style.display = 'block';
                         successDoneBtn.style.display = 'block';
@@ -773,7 +820,9 @@ const VaultModal = {
 
                     } catch (err) {
                         console.error('Verification wizard error:', err);
-                        
+
+                        const aborted = !!err.isWizardAbort;
+
                         // Clean up: delete the locally created directory so it's not a zombie directory
                         let cleanupFailed = false;
                         let cleanupMsg = '';
@@ -803,10 +852,22 @@ const VaultModal = {
                         // Restore previous directory handle
                         Store.directoryHandle = prevDirectoryHandle;
 
+                        // Restore previous sync config (corsProxy/branch were
+                        // overwritten for the candidate vault above)
+                        if (window.SyncManager) SyncManager._config = prevSyncConfig;
+
                         // Restore previous config to avoid breaking existing vaults
+                        // (GitRemote.init also re-applies the previous vault's GitHttp
+                        // credentials, which clearCredentials() wiped)
                         try {
                             await GitRemote.init();
                         } catch (e) {}
+
+                        if (aborted) {
+                            // Modal is gone — just leave the previous vault's state intact
+                            if (!prevDirectoryHandle) App.showDirectoryPicker();
+                            return;
+                        }
 
                         spinner.style.display = 'none';
                         errorIcon.style.display = 'block';
@@ -895,14 +956,23 @@ const VaultModal = {
                     const gitProxy = wizardModal.querySelector('#wizardGitProxy').value.trim();
 
                     if (!name) {
-                        alert('Please enter a vault name.');
+                        Common.showToast('Please enter a vault name.');
                         showPanel(1);
                         return;
                     }
 
                     if (!gitUrl) {
-                        alert('Please enter a Git repository URL.');
+                        Common.showToast('Please enter a Git repository URL.');
                         showPanel(2);
+                        return;
+                    }
+
+                    // Vault names are unique keys — fail fast before closing the wizard
+                    try {
+                        await Store.assertVaultNameAvailable(name);
+                    } catch (nameErr) {
+                        Common.showToast(nameErr.message);
+                        showPanel(1);
                         return;
                     }
 
@@ -943,6 +1013,17 @@ const VaultModal = {
 
                         await App.completeInitialization();
                         VaultModal.updateVaultSwitcherName();
+
+                        // Initial sync so the vault isn't silently empty: pulls any
+                        // existing remote notes, or uploads this fresh vault to the
+                        // empty remote on first push.
+                        Common.showToast('Vault created. Syncing with remote...', { duration: 6000 });
+                        try {
+                            await SyncManager.sync();
+                        } catch (syncErr) {
+                            console.warn('[Wizard] Initial sync failed:', syncErr);
+                            Common.showToast('Vault created, but the initial sync failed. Use Sync Now in Settings to retry.', { duration: 8000 });
+                        }
                     } catch (err) {
                         console.error('Skip verification error:', err);
                         App.showError(err.message || 'Failed to create browser vault');

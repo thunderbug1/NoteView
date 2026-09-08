@@ -671,6 +671,7 @@ const TimelineView = {
             await this.render(filteredBlocks, { groupBy });
         } catch (err) {
             console.error('[Timeline] loadMore error:', err);
+            Common.showToast('Failed to load more history: ' + (err.message || 'unknown error'));
         } finally {
             this._loadingMore = false;
         }

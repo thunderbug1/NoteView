@@ -73,6 +73,7 @@ const SelectionManager = {
             this.initArchiveToggle();
         }).catch(e => {
             console.error('[SelectionManager] Failed to load archived tags:', e);
+            Common.showToast('Could not load archived tags: ' + (e.message || 'unknown error'));
             this.renderContextSidebar();
         });
         Logger.log('[SelectionManager] init:complete', {

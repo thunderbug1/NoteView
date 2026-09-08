@@ -128,7 +128,11 @@ const KanbanView = {
 
         const { groupBy } = options;
 
-        if (groupBy) {
+        if (visibleTasks.length === 0) {
+            // Intentionally bypasses grouped rendering: with no tasks there is
+            // nothing to group, so show the flat "No tasks yet" empty state.
+            this.renderFlatKanban(container, visibleTasks, fullHierarchy, allTasksById, hiddenCount);
+        } else if (groupBy) {
             const blockMap = new Map(blocks.map(b => [b.id, b]));
             this.renderGroupedKanban(container, visibleTasks, fullHierarchy, allTasksById, groupBy, blockMap, hiddenCount);
         } else {
@@ -175,6 +179,16 @@ const KanbanView = {
     },
 
     renderFlatKanban(container, tasks, fullHierarchy, allTasksById, hiddenCount = 0) {
+        if (tasks.length === 0) {
+            container.innerHTML = `
+                <div class="kanban-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 1rem;text-align:center;color:var(--text-secondary)">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.5;margin-bottom:1rem"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                    <h3 style="margin:0 0 0.5rem;color:var(--text-primary)">No tasks yet</h3>
+                    <p style="margin:0;max-width:40ch">Tasks appear here automatically from checkbox lines in your notes (e.g. <code>- [ ] Todo</code>). Add one to get started.</p>
+                </div>
+            `;
+            return;
+        }
         let html = '';
         this.columns.forEach(col => {
             const colTasks = tasks.filter(t => t.state === col.state);
@@ -203,7 +217,7 @@ const KanbanView = {
                 : `(${colTasks.length})`;
 
             const filterBtn = col.state === 'x' ? `
-                <button class="kanban-column-filter-btn" data-action="done-lookback" title="Filter completed tasks">
+                <button class="kanban-column-filter-btn" data-action="done-lookback" title="Filter completed tasks" aria-label="Filter completed tasks">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                 </button>` : '';
 
@@ -217,7 +231,7 @@ const KanbanView = {
                     <div class="kanban-column-header">
                         <h4>${col.label} <span class="count">${countText}</span></h4>
                         ${filterBtn}
-                        <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task">
+                        <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task" aria-label="Add task">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
                     </div>
@@ -309,7 +323,7 @@ const KanbanView = {
                 : `(${colTasks.length})`;
 
             const filterBtn = col.state === 'x' ? `
-                <button class="kanban-column-filter-btn" data-action="done-lookback" title="Filter completed tasks">
+                <button class="kanban-column-filter-btn" data-action="done-lookback" title="Filter completed tasks" aria-label="Filter completed tasks">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                 </button>` : '';
 
@@ -323,7 +337,7 @@ const KanbanView = {
                     <div class="kanban-column-header">
                         <h4>${col.label} <span class="count">${countText}</span></h4>
                         ${filterBtn}
-                        <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task">
+                        <button class="kanban-add-task-btn" data-column-id="${col.id}" title="Add task" aria-label="Add task">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                         </button>
                     </div>

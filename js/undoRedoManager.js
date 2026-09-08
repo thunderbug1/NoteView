@@ -132,6 +132,7 @@ const UndoRedoManager = {
             this.undoStack.push(command);
             await this.saveState();
             console.error('UndoRedoManager: Undo failed, command restored to undo stack:', e);
+            Common.showToast('Undo failed: ' + (e.message || 'unknown error') + '. Try again.');
         } finally {
             this.isExecuting = false;
         }
@@ -195,6 +196,7 @@ const UndoRedoManager = {
             this.redoStack.push(command);
             await this.saveState();
             console.error('UndoRedoManager: Redo failed, command restored to redo stack:', e);
+            Common.showToast('Redo failed: ' + (e.message || 'unknown error') + '. Try again.');
         } finally {
             this.isExecuting = false;
         }
@@ -252,6 +254,7 @@ const UndoRedoManager = {
                 await GitStore.commitBlock(fileName, `Undo: remove ${fileName}`);
             } catch (e) {
                 console.error('Failed to commit after delete during undo:', e);
+                Common.showToast('Undone, but the change could not be recorded in version history.');
             }
 
             // Update contacts and cache
@@ -379,6 +382,7 @@ const UndoRedoManager = {
                 await GitStore.commitBlock(fileName, `Redo: remove ${fileName}`);
             } catch (e) {
                 console.error('Failed to commit after delete during redo:', e);
+                Common.showToast('Redone, but the change could not be recorded in version history.');
             }
 
             // Update contacts and cache

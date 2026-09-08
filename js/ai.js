@@ -367,11 +367,25 @@ const AIAssistantReal = {
         this.saveChats().catch(e => console.error('Failed to save chats:', e));
     },
 
-    closeChat(chatId) {
+    async closeChat(chatId) {
         const chat = this._chats.find(c => c.id === chatId);
+        // Abort any in-flight stream immediately — "close" should stop
+        // generation without waiting on the confirmation dialog.
         if (chat) {
             if (chat.abortController) chat.abortController.abort();
             chat._abortRequested = true;
+        }
+        const hasContent = chat && ((chat.messages?.length ?? 0) > 0);
+        if (hasContent) {
+            const confirmed = await Modal.confirm({
+                title: 'Delete this chat?',
+                message: `"${chat.title || 'Untitled chat'}" and its full history will be permanently removed.`,
+                confirmText: 'Delete Chat',
+                cancelText: 'Cancel'
+            });
+            if (!confirmed) return;
+        }
+        if (chat) {
             if (chat.diffEditorView) {
                 try { chat.diffEditorView.destroy(); } catch { /* cleanup */ }
             }

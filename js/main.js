@@ -3,7 +3,7 @@
  */
 
 const App = {
-    VERSION: '0.6.1',
+    VERSION: '0.7.0',
     isInitialized: false,
 
 
@@ -52,14 +52,18 @@ const App = {
     },
 
     async createBrowserVault() {
-        const name = window.prompt('Browser vault name:', 'Browser Vault');
+        const name = await Modal.prompt({
+            title: 'Create Browser Vault',
+            message: 'Name your new browser vault. Notes are stored privately inside this browser.',
+            placeholder: 'Browser Vault'
+        });
         if (!name) return;
         try {
             const container = document.getElementById('viewContainer');
             container.innerHTML = '<div class="loading">Loading notes...</div>';
             await Store.createOPFSVault(name);
             await this.completeInitialization();
-            this.setView('settings');
+            this.updateVaultSwitcherName();
         } catch (err) {
             this.showError(err.message || 'Failed to create browser vault');
         }
@@ -258,6 +262,7 @@ const App = {
             } finally {
                 this._initInProgress = false;
             }
+            SyncManager.startupPull().catch(() => {});
             return;
         }
         try {
@@ -288,6 +293,7 @@ const App = {
             if (window.Diagnostics) await Diagnostics.captureBootSummary({ phase: 'first' });
         } finally {
             this._initInProgress = false;
+            SyncManager.startupPull().catch(() => {});
         }
     },
 
@@ -1108,6 +1114,15 @@ const App = {
             requestedView: view,
             previousView
         });
+
+        // Flush any pending debounced editor saves before the view is torn down,
+        // so switching views can't race a pending auto-save timer.
+        if (previousView === 'document' && view !== 'document' &&
+            window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
+            DocumentView.flushAllPendingSaves().catch(err => {
+                console.warn('[App] flushAllPendingSaves on view switch failed:', err);
+            });
+        }
 
         // Leaving settings: restore sidebars
         if (previousView === 'settings' && view !== 'settings') {

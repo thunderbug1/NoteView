@@ -120,9 +120,16 @@ When `Store.saveBlock(block, options)` is called with `options.commit = true`:
 ```js
 if (commit) {
     const message = commitMessage || `Update ${fileName}`;
-    await GitStore.commitBlock(fileName, message);
+    try {
+        await GitStore.commitBlock(fileName, message);
+    } catch (e) {
+        Common.showToast('Saved, but the change could not be recorded in version history.');
+    }
+    if (window.SyncManager) SyncManager.onCommit();
 }
 ```
+
+`commitBlock` and `commitDeletion` throw on failure (so callers can react); `Store.saveBlock` and `Store.deleteBlock` catch and show a toast — the file save itself still succeeds, but the user is told the version won't appear in History/Timeline.
 
 ---
 
@@ -211,6 +218,18 @@ When `SyncManager.sync()` detects a non-fast-forward error (diverged histories),
 This avoids writing `<<<<<<<` conflict markers into note files. The merge commit preserves both histories.
 
 The same full-file viewer is used by `_showOverwriteHelp()` (the `CheckoutConflictError` / "Local Changes Detected" modal). There, the base version is fetched on the fly via `GitStore.getMergeBase()` + `GitStore.getFileAtCommit()` (local/remote content comes from the working tree and the remote tree respectively), and the base tabs are omitted if the merge base cannot be resolved. The shared rendering and event wiring live in `SyncManager._fullFileViewerHtml()` and `SyncManager._wireFullFileViewer()`.
+
+### Safe forced-pull recovery (dirty-tree conflicts)
+
+If `GitRemote.pull()` fails with `CheckoutConflictError` (a dirty working tree — typically leftover merged state from an interrupted earlier pull), it recovers by force-checking out the remote branch. Before resetting, it classifies the dirty state so unique local content is never silently destroyed:
+
+1. **Abort guard** (`SyncManager.sync()`): if the pre-sync auto-commit (`GitStore.commitAll`) fails with a real error, the sync aborts with a toast + Retry action instead of pulling on top of an uncertain working tree.
+2. **Classification** (`GitRemote._findUniqueDirtyFiles()`): dirty files are compared against both local HEAD and the fetched remote HEAD **by blob oid** (workdir content is hashed with `git.hashBlob`; commit trees are walked recursively, so subfolder notes compare correctly). Files matching either commit are junk state (safe to reset); deletions count as intentional. Any file type is eligible — not just `.md` — and content is handled as raw bytes so binaries are safe.
+3. **Stash** (`GitRemote._stashDirtyFiles()`): files with unique content are committed to a side ref `refs/noteview/recovery/<timestamp>` (isomorphic-git has no GC, so the objects persist), then the hard reset proceeds. Because `git.commit()` advances the current branch, the branch ref is captured before the stash commit and restored immediately after — if the process dies mid-stash, the branch is left on its original commit and the stash stays reachable only through the recovery ref. `.noteview/settings.json` is preserved as before.
+4. **Recovery**: a toast offers a **Recover** action → `SyncManager._recoverStash(ref)` restores the stashed files (raw-byte read/write, so binary files survive; missing files restored directly; files changed since the stash require a confirm before overwrite). The recovery ref is deleted only if every file was restored — on write failure it is kept so recovery can be retried. Stashes are also listed in Settings → Git Sync → Recovery Stashes (`SyncManager.listRecoveryStashes()`), which renders via `SettingsView._renderRecoveryStashes()`.
+5. **Manual escape hatch**: Settings → Git Sync → **Reset to Remote** discards all local state and matches the remote branch explicitly (with confirm), wiring into `SyncManager._hardResetToRemote()`.
+
+The fresh-clone checkout path (no local branch) still force-checks out unconditionally — it *is* the clone mechanism on a new device.
 
 ---
 

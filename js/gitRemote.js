@@ -234,16 +234,14 @@ const GitRemote = {
             Logger.log('Pull successful');
             return true;
         } catch (err) {
-            // If pull fails due to conflict or diverged history, try hard reset to remote
+            // If pull fails due to conflict or diverged history, recover by resetting to remote.
+            // Before resetting, classify the dirty state: files whose content differs from both
+            // local HEAD and the fetched remote HEAD are stashed to a recovery ref so nothing
+            // unique is silently destroyed. Junk state (merge leftovers matching a known commit)
+            // is safe to reset without stashing.
             if (err instanceof Error && (err.name === 'CheckoutConflictError' || err.code === 'CheckoutConflictError' || err.message?.includes('would be overwritten'))) {
-                Logger.log('Pull conflict detected, attempting hard reset to remote');
+                Logger.log('Pull conflict detected, classifying dirty state before reset');
                 try {
-                    // Preserve local settings before force checkout
-                    let localSettings = null;
-                    try {
-                        localSettings = await fs.readFile('.noteview/settings.json', { encoding: 'utf8' });
-                    } catch (e) { /* may not exist */ }
-
                     await git.fetch({
                         fs, dir,
                         http: window.GitHttp,
@@ -253,6 +251,25 @@ const GitRemote = {
                     });
                     const remoteRef = `refs/remotes/${remoteName}/${ref}`;
                     const commitOid = await git.resolveRef({ fs, dir, ref: remoteRef });
+
+                    let localOid = null;
+                    try {
+                        localOid = await git.resolveRef({ fs, dir, ref: `refs/heads/${ref}` });
+                    } catch (e) { /* no local HEAD */ }
+
+                    const uniqueFiles = await this._findUniqueDirtyFiles(localOid, commitOid);
+                    let stashRef = null;
+                    if (uniqueFiles.length > 0) {
+                        stashRef = await this._stashDirtyFiles(uniqueFiles, `noteview: recovery stash ${new Date().toISOString()}`, ref);
+                        Logger.log('Pull conflict: stashed unique local edits to', stashRef);
+                    }
+
+                    // Preserve local settings before force checkout
+                    let localSettings = null;
+                    try {
+                        localSettings = await fs.readFile('.noteview/settings.json', { encoding: 'utf8' });
+                    } catch (e) { /* may not exist */ }
+
                     await git.writeRef({ fs, dir, ref: `refs/heads/${ref}`, value: commitOid, force: true });
                     await git.checkout({ fs, dir, ref, force: true });
 
@@ -264,7 +281,7 @@ const GitRemote = {
                     }
 
                     Logger.log('Hard reset to remote successful');
-                    return true;
+                    return { recovered: true, stashed: !!stashRef, stashRef };
                 } catch (resetErr) {
                     console.error('Hard reset also failed:', resetErr);
                     throw resetErr;
@@ -273,6 +290,116 @@ const GitRemote = {
             Logger.log('Pull failed (caller will handle):', err.message);
             throw err;
         }
+    },
+
+    /**
+     * Find dirty working-tree files whose content differs from both local HEAD
+     * and the fetched remote HEAD — i.e. edits that a hard reset would destroy.
+     * Files matching either known commit are junk state (safe to reset), and
+     * deletions are treated as intentional (reset restores remote state).
+     * Comparison is done on blob oids (via git.hashBlob of the workdir content)
+     * so binary files are handled correctly and no content decoding is needed.
+     * @returns {Promise<string[]>} filepaths with unique local content
+     */
+    async _findUniqueDirtyFiles(localOid, remoteOid) {
+        const { git, fs, dir } = GitStore;
+        const unique = [];
+        try {
+            const matrix = await git.statusMatrix({ fs, dir, filepaths: ['.'] });
+
+            // Flat path → blob oid maps per commit, built once and cached.
+            // Recurses into subtrees so notes in subfolders compare correctly.
+            const treeMaps = {};
+            const getCommitTreeMap = async (commitOid) => {
+                if (!commitOid) return null;
+                if (treeMaps[commitOid]) return treeMaps[commitOid];
+                const map = {};
+                try {
+                    const commit = await git.readCommit({ fs, dir, oid: commitOid });
+                    const walk = async (treeOid, prefix) => {
+                        const { tree } = await git.readTree({ fs, dir, oid: treeOid });
+                        for (const entry of tree) {
+                            const path = prefix ? `${prefix}/${entry.path}` : entry.path;
+                            if (entry.type === 'tree') await walk(entry.oid, path);
+                            else if (entry.type === 'blob') map[path] = entry.oid;
+                        }
+                    };
+                    await walk(commit.commit.tree, '');
+                } catch (e) { /* treat as empty tree */ }
+                treeMaps[commitOid] = map;
+                return map;
+            };
+
+            for (const [filepath, head, workdir] of matrix) {
+                if (head === 1 && workdir === 1) continue;      // unchanged
+                if (workdir === 0) continue;                     // deleted locally — intentional
+
+                let workdirContent = null;
+                try {
+                    workdirContent = await fs.readFile(`${dir}/${filepath}`);
+                } catch (e) { continue; }
+
+                let workdirOid = null;
+                try {
+                    workdirOid = (await git.hashBlob({ object: workdirContent })).oid;
+                } catch (e) { continue; }
+
+                let matchesKnown = false;
+                for (const commitOid of [localOid, remoteOid]) {
+                    const map = await getCommitTreeMap(commitOid);
+                    if (map && map[filepath] === workdirOid) { matchesKnown = true; break; }
+                }
+                if (!matchesKnown) unique.push(filepath);
+            }
+        } catch (e) {
+            // If classification itself fails, assume everything dirty is unique — safest option
+            console.warn('[GitRemote] dirty-state classification failed, stashing conservatively:', e);
+            try {
+                const matrix = await git.statusMatrix({ fs, dir, filepaths: ['.'] });
+                for (const [filepath, head, workdir] of matrix) {
+                    if (workdir !== 0 && (head !== 1 || workdir !== 1)) unique.push(filepath);
+                }
+            } catch (e2) { /* nothing more we can do */ }
+        }
+        return unique;
+    },
+
+    /**
+     * Commit dirty files to a recovery ref (refs/noteview/recovery/<timestamp>)
+     * so they survive the hard reset that follows. isomorphic-git has no GC,
+     * so the objects remain readable until the ref is deleted after recovery.
+     *
+     * git.commit() advances the current branch to the stash commit, so the
+     * branch ref is captured and immediately restored afterwards — the stash
+     * stays reachable through the recovery ref. If anything crashes before the
+     * restore, the branch is left on its original commit (a clean state) rather
+     * than accidentally publishing the stash contents via a later pull/merge.
+     *
+     * @param {string[]} filepaths dirty files to preserve
+     * @param {string} message commit message for the stash
+     * @param {string} [branch] branch whose ref should be restored after the stash commit
+     * @returns {Promise<string>} the recovery ref name
+     */
+    async _stashDirtyFiles(filepaths, message, branch) {
+        const { git, fs, dir } = GitStore;
+        let branchOid = null;
+        if (branch) {
+            try { branchOid = await git.resolveRef({ fs, dir, ref: `refs/heads/${branch}` }); } catch (e) {}
+        }
+        for (const filepath of filepaths) {
+            await git.add({ fs, dir, filepath });
+        }
+        const sha = await git.commit({
+            fs, dir,
+            author: GitStore.author,
+            message
+        });
+        const ref = `refs/noteview/recovery/${Date.now()}`;
+        await git.writeRef({ fs, dir, ref, value: sha, force: true });
+        if (branchOid) {
+            await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: branchOid, force: true });
+        }
+        return ref;
     },
 
     async sync() {

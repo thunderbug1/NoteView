@@ -179,12 +179,17 @@ const SendToVault = {
         }
 
         if (action === 'move' && copied > 0) {
+            const deleteFailures = [];
             for (const blockId of idsToCopy.slice(0, copied)) {
                 try {
                     await App.deleteBlock(blockId, { showToast: false });
                 } catch (e) {
                     console.error('Failed to delete after move:', e);
+                    deleteFailures.push(blockId);
                 }
+            }
+            if (deleteFailures.length > 0) {
+                Common.showToast(`Note${deleteFailures.length !== 1 ? 's' : ''} copied to ${vaultName}, but the original${deleteFailures.length !== 1 ? 's' : ''} could not be deleted — duplicate${deleteFailures.length !== 1 ? 's' : ''} exist in both vaults.`, { duration: 8000 });
             }
         }
 

@@ -1423,7 +1423,22 @@ const Store = {
         }
     },
 
+    /**
+     * Guard against vault name collisions: vaults (and their remote configs)
+     * are keyed by name, so registering a new vault with an existing name
+     * would silently clobber the other vault's handle and settings.
+     */
+    async assertVaultNameAvailable(name) {
+        const list = await this.getVaultList();
+        const existing = list.find(v => v.name === name);
+        if (existing) {
+            const kind = existing.type === 'opfs' ? 'browser vault' : 'folder vault';
+            throw new Error(`A ${kind} named "${name}" already exists. Vault names must be unique — choose a different name.`);
+        }
+    },
+
     async createOPFSVault(name) {
+        await this.assertVaultNameAvailable(name);
         const opfsRoot = await navigator.storage.getDirectory();
         const vaultHandle = await opfsRoot.getDirectoryHandle(name, { create: true });
         
@@ -1514,6 +1529,7 @@ const Store = {
             if (window.SyncManager) SyncManager.onCommit();
         } catch (e) {
             console.error('Failed to commit deletion to git:', e);
+            Common.showToast('Note deleted, but the change could not be recorded in version history.', { duration: 6000 });
         }
 
         // Invalidate block cache entry
@@ -1987,7 +2003,12 @@ const Store = {
             // Commit block to git ONLY if requested
             if (commit) {
                 const message = commitMessage || `Update ${fileName}`;
-                await GitStore.commitBlock(fileName, message);
+                try {
+                    await GitStore.commitBlock(fileName, message);
+                } catch (e) {
+                    console.error('Failed to commit block to git:', e);
+                    Common.showToast('Saved, but the change could not be recorded in version history.', { duration: 6000 });
+                }
                 if (window.SyncManager) SyncManager.onCommit();
             }
         } finally {

@@ -7,6 +7,31 @@ const GitStore = {
         email: 'user@noteview.local'
     },
     _gitLoading: null,
+
+    /**
+     * Stable per-device identity for git commit authorship, so commits made
+     * on different devices are distinguishable in history and conflict views.
+     * Persisted in localStorage so the name stays constant per device.
+     */
+    _getDeviceIdentity() {
+        let name = null;
+        try {
+            name = localStorage.getItem('noteview-device-name');
+        } catch (e) { /* storage unavailable */ }
+        if (!name) {
+            const id = Math.random().toString(36).slice(2, 6).toUpperCase();
+            const ua = navigator.userAgent;
+            const os = /Android/i.test(ua) ? 'Android'
+                : /iPhone|iPad/i.test(ua) ? 'iOS'
+                : /Mac/i.test(ua) ? 'Mac'
+                : /Win/i.test(ua) ? 'Windows'
+                : /CrOS/i.test(ua) ? 'ChromeOS'
+                : 'Linux';
+            name = `${os}-${id}`;
+            try { localStorage.setItem('noteview-device-name', name); } catch (e) { /* ignore */ }
+        }
+        return name;
+    },
     
     async _loadGitLibs() {
         if (window.git && window.GitHttp) {
@@ -66,6 +91,13 @@ const GitStore = {
         }
         
         this.git = window.git;
+        
+        // Per-device commit authorship (see _getDeviceIdentity)
+        const deviceName = this._getDeviceIdentity();
+        this.author = {
+            name: deviceName,
+            email: `${deviceName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}@noteview.devices`
+        };
         
         // Initialize our FS wrapper
         const adapter = new window.GitFSAdapter(directoryHandle);
@@ -135,7 +167,7 @@ const GitStore = {
             return sha;
         } catch (err) {
             console.error(`Failed to commit ${filename}:`, err);
-            return null;
+            throw err;
         }
     },
 
@@ -154,7 +186,7 @@ const GitStore = {
             return sha;
         } catch (err) {
             console.error(`Failed to commit deletion of ${filename}:`, err);
-            return null;
+            throw err;
         }
     },
     
@@ -354,17 +386,17 @@ const GitStore = {
 
     async getAllFilesAtCommit(oid) {
         if (!this.git || !this.fs) return {};
-        
+
         try {
             const commit = await this.git.readCommit({
                 fs: this.fs,
                 dir: this.dir,
                 oid: oid
             });
-            
+
             const treeOid = commit.commit.tree;
             const tree = await this.git.readTree({ fs: this.fs, dir: this.dir, oid: treeOid });
-            
+
             const files = {};
             for (const entry of tree.tree) {
                 if (entry.path.endsWith('.md') && entry.type === 'blob') {
@@ -383,6 +415,41 @@ const GitStore = {
             return files;
         } catch (err) {
             console.warn('Failed to get files at commit:', err.message);
+            return null;
+        }
+    },
+
+    /**
+     * Like getAllFilesAtCommit but returns ALL files (any type, any depth) as
+     * raw Uint8Array content. Used by the recovery-stash restore path so
+     * binary files stashed before a forced reset survive intact.
+     * @returns {Promise<Object<string,Uint8Array>|null>} path → bytes, or null on failure
+     */
+    async getAllFilesAtCommitRaw(oid) {
+        if (!this.git || !this.fs) return {};
+        try {
+            const commit = await this.git.readCommit({ fs: this.fs, dir: this.dir, oid });
+            const files = {};
+            const walk = async (treeOid, prefix) => {
+                const { tree } = await this.git.readTree({ fs: this.fs, dir: this.dir, oid: treeOid });
+                for (const entry of tree.tree) {
+                    const path = prefix ? `${prefix}/${entry.path}` : entry.path;
+                    if (entry.type === 'tree') {
+                        await walk(entry.oid, path);
+                    } else if (entry.type === 'blob') {
+                        try {
+                            const { blob } = await this.git.readBlob({ fs: this.fs, dir: this.dir, oid: entry.oid });
+                            files[path] = blob;
+                        } catch (e) {
+                            // skip unreadable blobs
+                        }
+                    }
+                }
+            };
+            await walk(commit.commit.tree, '');
+            return files;
+        } catch (err) {
+            console.warn('Failed to get raw files at commit:', err.message);
             return null;
         }
     }

@@ -45,6 +45,50 @@ const SettingsView = {
         `).join('');
     },
 
+    /**
+     * Render the recovery stashes list (stashes created before a forced reset
+     * to remote). Hides the container entirely when there are none.
+     */
+    async _renderRecoveryStashes() {
+        const item = document.getElementById('recoveryStashesItem');
+        const list = document.getElementById('recoveryStashesList');
+        if (!item || !list) return;
+
+        let stashes = [];
+        try {
+            stashes = await SyncManager.listRecoveryStashes();
+        } catch (e) {
+            console.warn('Failed to list recovery stashes:', e);
+        }
+
+        if (!stashes.length) {
+            item.style.display = 'none';
+            list.innerHTML = '';
+            return;
+        }
+
+        item.style.display = '';
+        list.innerHTML = stashes.map(s => {
+            const d = new Date(s.date);
+            const label = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+            return `<div style="display:flex;align-items:center;gap:0.5rem">
+                <button class="settings-btn secondary recover-stash-btn" data-stash-ref="${escapeHtml(s.ref)}" title="${escapeHtml(s.message)}">${escapeHtml(label)}</button>
+            </div>`;
+        }).join('');
+
+        list.querySelectorAll('.recover-stash-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                btn.disabled = true;
+                try {
+                    await SyncManager._recoverStash(btn.dataset.stashRef);
+                } finally {
+                    btn.disabled = false;
+                }
+                this._renderRecoveryStashes();
+            });
+        });
+    },
+
     _renderSyncStatus() {
         const s = SyncManager.getStatus();
         const isOffline = !navigator.onLine || s.detail === 'Offline';
@@ -187,13 +231,23 @@ const SettingsView = {
                             </div>
                             <input type="number" id="syncThresholdInput" value="${SyncManager._config.commitThreshold || 5}" min="1" max="100" style="width:4rem;font-size:0.85rem;padding:0.4rem 0.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-secondary);color:var(--text);text-align:center">
                         </div>
-                        <div class="settings-item">
+                        <div class="settings-item" style="flex-wrap:wrap;gap:0.5rem">
                             <button id="syncNowBtn" class="settings-btn secondary">
                                 Sync Now
+                            </button>
+                            <button id="resetToRemoteBtn" class="settings-btn secondary" style="margin-left:0.5rem">
+                                Reset to Remote
                             </button>
                             <button id="commitForcePushBtn" class="settings-btn secondary" style="margin-left:0.5rem;color:var(--danger, #ef4444)">
                                 Commit All &amp; Force Push
                             </button>
+                        </div>
+                        <div class="settings-item" id="recoveryStashesItem" style="display:none">
+                            <div class="settings-item-info">
+                                <label>Recovery Stashes</label>
+                                <p class="settings-item-hint">Local edits that conflicted during sync and were saved before resetting to the remote. Recover them or discard.</p>
+                            </div>
+                            <div id="recoveryStashesList" style="display:flex;flex-direction:column;gap:0.5rem;min-width:220px"></div>
                         </div>
                     </div>
                 </div>
@@ -607,21 +661,11 @@ const SettingsView = {
         const commitForcePushBtn = document.getElementById('commitForcePushBtn');
         if (commitForcePushBtn) {
             commitForcePushBtn.addEventListener('click', async () => {
-                const confirmModal = Modal.create({
+                const confirmed = await Modal.confirm({
                     title: 'Overwrite Remote?',
-                    content: `
-                        <p style="margin-bottom:0.75rem;color:var(--text-secondary)">This will commit all local files and <strong>force push</strong> to the remote, completely replacing its history.</p>
-                        <p style="margin-bottom:1rem;color:var(--danger, #ef4444)">This cannot be undone. Any notes on the remote that are not in this vault will be lost.</p>
-                        <div style="display:flex;gap:0.5rem;justify-content:flex-end">
-                            <button class="modal-cancel-btn" style="padding:0.5rem 1rem;background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">Cancel</button>
-                            <button class="modal-confirm-btn" style="padding:0.5rem 1rem;background:var(--danger, #ef4444);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Overwrite Remote</button>
-                        </div>
-                    `
-                });
-                const confirmed = await new Promise(resolve => {
-                    confirmModal.querySelector('.modal-confirm-btn').addEventListener('click', () => { confirmModal.close(); resolve(true); });
-                    confirmModal.querySelector('.modal-cancel-btn').addEventListener('click', () => { confirmModal.close(); resolve(false); });
-                    confirmModal.addEventListener('close', () => resolve(false), { once: true });
+                    message: 'This will commit all local files and force push to the remote, completely replacing its history. This cannot be undone. Any notes on the remote that are not in this vault will be lost.',
+                    confirmText: 'Overwrite Remote',
+                    cancelText: 'Cancel'
                 });
                 if (!confirmed) return;
 
@@ -640,6 +684,38 @@ const SettingsView = {
                 }
             });
         }
+
+        // Reset to remote: discard all local changes and match the remote branch
+        const resetToRemoteBtn = document.getElementById('resetToRemoteBtn');
+        if (resetToRemoteBtn) {
+            resetToRemoteBtn.addEventListener('click', async () => {
+                const confirmed = await Modal.confirm({
+                    title: 'Reset to Remote?',
+                    message: 'This will discard ALL local changes in this vault and make it exactly match the remote branch. This cannot be undone. Consider force pushing first if your local notes are the copy you want to keep.',
+                    confirmText: 'Discard Local Changes',
+                    cancelText: 'Cancel'
+                });
+                if (!confirmed) return;
+
+                resetToRemoteBtn.disabled = true;
+                resetToRemoteBtn.textContent = 'Resetting...';
+                try {
+                    if (window.DocumentView && typeof DocumentView.flushAllPendingSaves === 'function') {
+                        await DocumentView.flushAllPendingSaves();
+                    }
+                    await SyncManager._hardResetToRemote();
+                    Common.showToast('Vault reset to remote branch.');
+                } catch (e) {
+                    Common.showToast('Reset failed: ' + (e.message || 'Unknown error'));
+                } finally {
+                    resetToRemoteBtn.disabled = false;
+                    resetToRemoteBtn.textContent = 'Reset to Remote';
+                }
+            });
+        }
+
+        // Recovery stashes list
+        this._renderRecoveryStashes();
 
         // Shortcut remapping (unified for all shortcuts)
         document.querySelectorAll('.shortcut-key[data-shortcut-key]').forEach(btn => {
@@ -740,7 +816,13 @@ const SettingsView = {
                     }
                 } else if (deleteBtn) {
                     const id = deleteBtn.dataset.profileId;
-                    if (confirm('Delete this model profile?')) {
+                    const profile = AIAssistant.profiles.find(p => p.id === id);
+                    const confirmed = await Modal.confirm({
+                        title: 'Delete model profile?',
+                        message: `"${profile?.name || id}" will be removed. Its API key is also deleted.`,
+                        confirmText: 'Delete'
+                    });
+                    if (confirmed) {
                         AIAssistant.deleteProfile(id).then(() => {
                             profileList.innerHTML = this._renderProfiles();
                         }).catch(() => {});
@@ -827,7 +909,12 @@ const SettingsView = {
                 this.openTagModal();
             } else if (btn.classList.contains('delete')) {
                 const count = Store.blocks.filter(b => b.tags?.includes(tag)).length;
-                if (confirm(`Remove "${tag}" from ${count} note${count !== 1 ? 's' : ''}?`)) {
+                const confirmed = await Modal.confirm({
+                    title: `Remove tag "${tag}"?`,
+                    message: `It will be removed from ${count} note${count !== 1 ? 's' : ''}.`,
+                    confirmText: 'Remove'
+                });
+                if (confirmed) {
                     btn.disabled = true;
                     btn.textContent = 'Deleting...';
                     await Store.deleteTag(tag);
@@ -867,7 +954,7 @@ const SettingsView = {
             }
             // Check for duplicate
             if (SelectionManager.getAllContextTags().includes(newTag)) {
-                alert(`Tag "${newTag}" already exists.`);
+                Common.showToast(`Tag "${newTag}" already exists.`);
                 input.focus();
                 return;
             }
@@ -956,7 +1043,7 @@ const SettingsView = {
             const model = container.querySelector('#aiProfileModel').value.trim() || 'gpt-4o';
 
             if (!name || !endpointUrl) {
-                alert('Name and Endpoint URL are required.');
+                Common.showToast('Name and Endpoint URL are required.');
                 return;
             }
 
@@ -966,14 +1053,14 @@ const SettingsView = {
                 try {
                     await AIAssistant.updateProfile(existingProfile.id, updates);
                 } catch (err) {
-                    alert('Failed to update profile: ' + (err.message || 'Unknown error'));
+                    Common.showToast('Failed to update profile: ' + (err.message || 'Unknown error'));
                     return;
                 }
             } else {
                 try {
                     await AIAssistant.createProfile({ name, endpointUrl, apiKey, model });
                 } catch (err) {
-                    alert('Failed to create profile: ' + (err.message || 'Unknown error'));
+                    Common.showToast('Failed to create profile: ' + (err.message || 'Unknown error'));
                     return;
                 }
             }
@@ -1016,7 +1103,7 @@ const SettingsView = {
         // Preset list delegation
         const list = modal.querySelector('.tag-editor-list');
         if (list) {
-            list.addEventListener('click', (e) => {
+            list.addEventListener('click', async (e) => {
                 const btn = e.target.closest('.tag-action-btn');
                 if (!btn) return;
                 const presetId = btn.dataset.presetId;
@@ -1026,6 +1113,12 @@ const SettingsView = {
                 if (btn.classList.contains('rename')) {
                     this._showPresetForm(modal, preset);
                 } else if (btn.classList.contains('delete')) {
+                    const confirmed = await Modal.confirm({
+                        title: 'Delete preset?',
+                        message: `"${preset.title}" will be removed.`,
+                        confirmText: 'Delete'
+                    });
+                    if (!confirmed) return;
                     AIAssistant.deletePreset(presetId).then(() => {
                         modal.close();
                         this._openPresetModal();
@@ -1067,7 +1160,7 @@ const SettingsView = {
             const title = container.querySelector('#presetTitle').value.trim();
             const instruction = container.querySelector('#presetInstruction').value.trim();
             if (!title || !instruction) {
-                alert('Title and instruction are required.');
+                Common.showToast('Title and instruction are required.');
                 return;
             }
             if (isEdit) {
@@ -1251,7 +1344,7 @@ const SettingsView = {
             const name = container.querySelector('#templateName').value.trim();
             const content = container.querySelector('#templateContent').value;
             if (!name) {
-                alert('Template name is required.');
+                Common.showToast('Template name is required.');
                 return;
             }
 
@@ -1350,6 +1443,7 @@ const SettingsView = {
                         </div>
                         <p class="settings-item-hint" style="margin-top:0.35rem">Needed for private repos or self-hosted git servers. Public GitHub repos work without a proxy.</p>
                     </div>
+                    <div id="remoteTestWarning" style="display:none;margin:0.75rem 0;padding:0.75rem;background:rgba(245,158,11,0.15);border-left:3px solid var(--color-warning,#f59e0b);border-radius:4px;color:var(--text-primary)"></div>
                     <div class="ai-form-actions">
                         ${cfg.url ? '<button class="ai-form-cancel" id="remoteRemoveBtn" style="margin-right:auto;color:var(--color-danger,#f44)">Remove Remote</button>' : ''}
                         <button class="ai-form-cancel" id="remoteCancelBtn">Cancel</button>
@@ -1386,7 +1480,12 @@ const SettingsView = {
         const removeBtn = modal.querySelector('#remoteRemoveBtn');
         if (removeBtn) {
             removeBtn.addEventListener('click', async () => {
-                if (!confirm('Remove the git remote configuration? Your local notes are not affected.')) return;
+                const confirmed = await Modal.confirm({
+                    title: 'Remove git remote?',
+                    message: 'The remote configuration will be removed from this vault. Your local notes are not affected, and notes will no longer sync.',
+                    confirmText: 'Remove'
+                });
+                if (!confirmed) return;
                 try {
                     await Store.saveRemoteConfig({});
                     GitRemote.config = null;
@@ -1394,7 +1493,7 @@ const SettingsView = {
                     await SyncManager.saveConfig({ autoSync: false });
                     SyncManager._setStatus('idle', 'No remote configured');
                 } catch (err) {
-                    alert('Failed to remove remote: ' + err.message);
+                    Common.showToast('Failed to remove remote: ' + err.message);
                     return;
                 }
                 modal.close();
@@ -1410,7 +1509,7 @@ const SettingsView = {
             const corsProxy = modal.querySelector('#remoteCorsInput').value.trim();
 
             if (!url) {
-                alert('Remote URL is required.');
+                Common.showToast('Remote URL is required.');
                 return;
             }
 
@@ -1434,15 +1533,52 @@ const SettingsView = {
                         onAuth: () => GitRemote.config.auth
                     });
                     saveBtn.textContent = 'Connected';
+                    Common.showToast('Remote configured and connected.');
+
+                    // First remote on this vault (or a fresh URL): offer an
+                    // immediate sync so existing remote notes are pulled without
+                    // the user having to discover "Sync Now" — this is what makes
+                    // "create folder vault, then configure remote" a working
+                    // clone-into-folder flow for a new device.
+                    if (!cfg.url) {
+                        setTimeout(() => modal.close(), 800);
+                        const syncNow = await Modal.confirm({
+                            title: 'Sync with remote now?',
+                            message: 'This will pull existing notes from the remote into this vault and push local ones. Recommended the first time you configure a remote.',
+                            confirmText: 'Sync Now',
+                            cancelText: 'Later'
+                        });
+                        if (syncNow) {
+                            SyncManager.sync().catch(() => {});
+                        }
+                    } else {
+                        setTimeout(() => modal.close(), 800);
+                    }
                 } catch (testErr) {
-                    saveBtn.textContent = 'Saved (connection test failed)';
                     console.warn('[Settings] Connection test failed:', testErr);
+                    // The config IS saved — keep the modal open and say so clearly,
+                    // instead of auto-closing and leaving a broken remote undiagnosed.
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save & Connect';
+                    let hint = testErr.message || 'Unknown error';
+                    const m = hint.toLowerCase();
+                    if (m.includes('401') || m.includes('unauthorized')) {
+                        hint = 'Authentication failed. Check your username and Personal Access Token.';
+                    } else if (m.includes('404') || m.includes('not found')) {
+                        hint = 'Repository not found. Check the HTTPS URL and token permissions.';
+                    } else if (m.includes('cors') || m.includes('networkerror') || m.includes('fetch')) {
+                        hint = 'Network or CORS error. Check the CORS proxy setting.';
+                    }
+                    const warnBox = modal.querySelector('#remoteTestWarning');
+                    if (warnBox) {
+                        warnBox.style.display = 'block';
+                        warnBox.innerHTML = `<p style="margin:0;font-size:0.85rem"><strong>Configuration saved, but the connection test failed.</strong><br>${escapeHtml(hint)} Syncs will fail until this is fixed.</p>`;
+                    }
                 }
-                setTimeout(() => modal.close(), 800);
             } catch (err) {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save & Connect';
-                alert('Failed to configure remote: ' + err.message);
+                Common.showToast('Failed to configure remote: ' + err.message);
             }
         });
     },
@@ -1494,7 +1630,7 @@ const SettingsView = {
             } catch (err) {
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Save';
-                alert('Failed to save default CORS proxy: ' + err.message);
+                Common.showToast('Failed to save default CORS proxy: ' + err.message);
             }
         });
     },
@@ -1551,6 +1687,13 @@ const SettingsView = {
 
         modal.querySelectorAll('.delete-profile-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
+                const profile = AIAssistant.profiles.find(p => p.id === btn.dataset.profileId);
+                const confirmed = await Modal.confirm({
+                    title: 'Delete model profile?',
+                    message: `"${profile?.name || btn.dataset.profileId}" will be removed. Its API key is also deleted.`,
+                    confirmText: 'Delete'
+                });
+                if (!confirmed) return;
                 await AIAssistant.deleteProfile(btn.dataset.profileId);
                 modal.close();
                 this.openAISettingsModal();

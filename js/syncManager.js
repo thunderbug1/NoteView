@@ -65,6 +65,38 @@ const SyncManager = {
         this._setStatus(this._status, this._statusDetail);
     },
 
+    /**
+     * One-shot pull-on-startup so a vault configured with a remote fetches
+     * remote notes without requiring any user interaction (e.g. resuming on
+     * a new device). Called after App.completeInitialization finishes, since
+     * sync() bails while App._initInProgress is true.
+     */
+    async startupPull() {
+        if (!GitRemote.config) return;
+        if (!this._isNetworkAvailable()) return;
+        // Skip the push half on boot: only bring the vault up to date.
+        if (!GitStore.git || !GitStore.fs) return;
+        const { git, fs, dir } = GitStore;
+        try {
+            await git.resolveRef({ fs, dir, ref: 'HEAD' });
+        } catch (e) {
+            // Unborn repo (e.g. brand-new vault with remote configured) — a full
+            // sync's pull handles the fresh checkout; leave it to explicit syncs.
+            return;
+        }
+        Logger.log('[SyncManager] startup pull');
+        try {
+            await GitRemote.pull();
+            await this._postSyncRender();
+            this._setStatus('idle', 'Synced');
+        } catch (err) {
+            // Full sync's error handling (toasts, conflict UI) covers these cases
+            // on the next trigger; keep boot quiet but surface state.
+            Logger.log('[SyncManager] startup pull failed:', err.message);
+            this._setStatus('error', err.message);
+        }
+    },
+
     // --- Config persistence ---
 
     async _loadConfig() {
@@ -134,16 +166,38 @@ const SyncManager = {
                 await DocumentView.flushAllPendingSaves();
             }
 
-            // Auto-stage and commit any other unstaged local files before sync
+            // Auto-stage and commit any other unstaged local files before sync.
+            // If this fails with a real error, abort: pulling on top of an uncertain
+            // working tree risks both data loss and pushing garbage content.
             if (window.GitStore && typeof GitStore.commitAll === 'function') {
                 try {
                     await GitStore.commitAll('Auto-commit local changes before sync');
                 } catch (commitErr) {
-                    console.warn('[SyncManager] Auto-commit skipped/failed (possibly nothing to commit):', commitErr);
+                    if (!/nothing to commit|no changes/i.test(commitErr.message || '')) {
+                        console.error('[SyncManager] Pre-sync commit failed, aborting sync:', commitErr);
+                        this._consecutiveErrors++;
+                        this._lastError = commitErr.message;
+                        this._lastErrorTime = new Date().toISOString();
+                        this._setStatus('error', 'Failed to save local changes — sync aborted');
+                        showToast('Sync aborted: failed to save local changes (guarding against data loss).', {
+                            actionLabel: 'Retry',
+                            action: () => this.sync()
+                        });
+                        await this._refreshPendingCount().catch(() => {});
+                        return false;
+                    }
+                    console.warn('[SyncManager] Auto-commit skipped (nothing to commit):', commitErr);
                 }
             }
 
-            await GitRemote.pull();
+            const pullResult = await GitRemote.pull();
+            if (pullResult && pullResult.stashed && pullResult.stashRef) {
+                const stashRef = pullResult.stashRef;
+                showToast('Sync reset to remote — conflicting local edits were saved to recovery.', {
+                    actionLabel: 'Recover',
+                    action: () => this._recoverStash(stashRef)
+                });
+            }
             await GitRemote.push();
             this._lastSyncTime = new Date().toISOString();
             this._lastError = null;
@@ -462,6 +516,138 @@ const SyncManager = {
         this._consecutiveErrors = 0;
         await this._refreshPendingCount().catch(() => {});
         await this._postSyncRender();
+    },
+
+    /**
+     * List existing recovery stashes created by the safe forced-pull path.
+     * @returns {Promise<Array<{ref: string, date: string, message: string}>>}
+     */
+    async listRecoveryStashes() {
+        if (!GitStore.git || !GitStore.fs) return [];
+        const { git, fs, dir } = GitStore;
+        try {
+            const refs = await git.listRefs({ fs, dir, ref: 'refs/noteview/recovery' });
+            const stashes = [];
+            for (const name of refs) {
+                const ref = `refs/noteview/recovery/${name}`;
+                try {
+                    const oid = await git.resolveRef({ fs, dir, ref });
+                    const commit = await git.readCommit({ fs, dir, oid });
+                    stashes.push({
+                        ref,
+                        date: new Date(commit.commit.author.timestamp * 1000).toISOString(),
+                        message: (commit.commit.message || '').trim()
+                    });
+                } catch (e) {
+                    console.warn('[SyncManager] unreadable recovery ref, skipping:', ref, e);
+                }
+            }
+            return stashes.sort((a, b) => b.date.localeCompare(a.date));
+        } catch (e) {
+            return [];
+        }
+    },
+
+    /**
+     * Restore files from a recovery stash (created before a forced reset).
+     * Missing files are restored directly; files that currently differ from
+     * the stashed content require explicit confirmation before overwriting.
+     * Content is handled as raw bytes so binary files survive intact. The
+     * recovery ref is only deleted if every file was restored successfully —
+     * otherwise it is kept so the recovery can be retried.
+     */
+    async _recoverStash(stashRef) {
+        if (!GitStore.git || !GitStore.fs || !stashRef) return;
+        const { git, fs, dir } = GitStore;
+        try {
+            let oid = stashRef;
+            try {
+                oid = await git.resolveRef({ fs, dir, ref: stashRef });
+            } catch (e) { /* may be a raw oid */ }
+
+            const stashedFiles = await GitStore.getAllFilesAtCommitRaw(oid);
+            if (!stashedFiles || Object.keys(stashedFiles).length === 0) {
+                showToast('Recovery failed: stash content is unreadable.');
+                return;
+            }
+
+            const bytesEqual = (a, b) => {
+                if (a === b) return true;
+                if (!a || !b || a.length !== b.length) return false;
+                for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+                return true;
+            };
+
+            const missing = [];
+            const conflicting = [];
+            for (const [filepath, content] of Object.entries(stashedFiles)) {
+                let current = null;
+                try {
+                    current = await fs.readFile(`${dir}/${filepath}`);
+                } catch (e) { /* missing */ }
+                if (current === null) missing.push(filepath);
+                else if (!bytesEqual(current, content)) conflicting.push(filepath);
+            }
+
+            const restoreFiles = async (entries) => {
+                let failures = 0;
+                for (const [filepath, content] of entries) {
+                    try {
+                        await fs.writeFile(`${dir}/${filepath}`, content);
+                    } catch (e) {
+                        failures++;
+                        console.error('[SyncManager] failed to restore recovered file:', filepath, e);
+                    }
+                }
+                if (failures > 0) {
+                    // Keep the recovery ref so this can be retried after fixing
+                    // whatever made the writes fail (permissions, disk, ...).
+                    showToast(`Recovered ${entries.length - failures} of ${entries.length} files — stash kept for retry.`, { duration: 8000 });
+                }
+                return failures;
+            };
+
+            const applyAll = async () => {
+                const entries = Object.entries(stashedFiles);
+                const failures = await restoreFiles(entries);
+                if (failures === 0) {
+                    try { await git.deleteRef({ fs, dir, ref: stashRef }); } catch (e) { /* best effort */ }
+                    showToast(`Recovered ${entries.length} file${entries.length !== 1 ? 's' : ''} from recovery stash.`);
+                }
+                await this._postSyncRender();
+            };
+
+            if (conflicting.length === 0) {
+                await applyAll();
+                return;
+            }
+
+            const confirmed = await Modal.confirm({
+                title: 'Recover conflicting files?',
+                message: `${conflicting.length} file${conflicting.length !== 1 ? 's' : ''} (${conflicting.join(', ')}) have been changed since the stash was created. Overwrite the current versions with the recovered ones?`,
+                confirmText: 'Overwrite',
+                cancelText: 'Skip Conflicts'
+            });
+            if (confirmed) {
+                await applyAll();
+            } else {
+                // Restore only the files that are currently missing
+                const entries = missing.map(filepath => [filepath, stashedFiles[filepath]]);
+                const failures = await restoreFiles(entries);
+                if (failures === 0 && entries.length > 0) {
+                    try { await git.deleteRef({ fs, dir, ref: stashRef }); } catch (e) { /* best effort */ }
+                }
+                await this._postSyncRender();
+                if (entries.length > 0) {
+                    showToast(`Recovered ${missing.length} missing file${missing.length !== 1 ? 's' : ''}; conflicting files were left untouched.`);
+                } else {
+                    showToast('No missing files to recover; conflicting files were left untouched.');
+                }
+            }
+        } catch (err) {
+            console.error('[SyncManager] stash recovery failed:', err);
+            showToast('Recovery failed: ' + (err.message || 'Unknown error'));
+        }
     },
 
     async _handleMergeConflict() {

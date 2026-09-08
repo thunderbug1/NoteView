@@ -16,7 +16,7 @@ Sync works identically in the browser PWA and in the Android app.
 
 ## How it works
 
-NoteView uses [`isomorphic-git`](https://isomorphic-git.org/) to push commits to a remote git repository over HTTPS. Every save creates a commit locally; `SyncManager` pushes those commits in the background (interval + on idle). Pull happens on app start and after network reconnect.
+NoteView uses [`isomorphic-git`](https://isomorphic-git.org/) to push commits to a remote git repository over HTTPS. Every save creates a commit locally; `SyncManager` pushes those commits in the background (interval + on idle). A one-shot **startup pull** runs on app start whenever a remote is configured, so a vault set up on a new device fetches existing notes without any interaction; further pulls happen on manual sync, idle syncs, and (with Auto-Sync on) tab visibility changes.
 
 - **HTTPS only** — browsers cannot do SSH
 - **HTTP basic auth** with a Personal Access Token (PAT) — token stored in IndexedDB, never written to git
@@ -43,6 +43,16 @@ NoteView uses [`isomorphic-git`](https://isomorphic-git.org/) to push commits to
 - Or use a classic PAT: https://github.com/settings/tokens/new → scope `repo` (full repo access)
 
 Treat the token like a password — anyone with it can read/write your repo. NoteView stores it locally in IndexedDB only; it is never sent to any server other than GitHub via the git smart-http protocol.
+
+## Setting up a new device (recommended flow)
+
+**Browser vault (recommended):** In **Manage Vaults** → **Create Browser Vault**, use the 3-step wizard: name the vault, enter the same git remote URL + PAT (and CORS proxy) as on your other device, and let the wizard verify — it pulls the remote's notes into the new vault automatically. The **Scan QR Code** option pre-fills the wizard from a QR generated on the original device (Settings → Generate QR Code). Note that the QR contains your tokens, so only share it with your own devices.
+
+**Folder vault:** Create/pick a folder for the vault (Manage Vaults → Pick Folder), then Settings → **Configure Git Remote** with the same URL + PAT. After a successful connection test, NoteView offers **Sync Now** — accept it and the remote's notes are pulled into the folder.
+
+In both cases a **startup pull** also runs on every app launch while a remote is configured, keeping the vault up to date without interaction.
+
+If a sync ever resets the vault to the remote state while local edits were in conflict, the edits are not lost: they are stashed to `refs/noteview/recovery/*` in the vault's git store and a toast offers **Recover**. Stashes are also listed under Settings → Git Sync → **Recovery Stashes** (see [git-integration.md](git-integration.md) → "Safe forced-pull recovery").
 
 ### 3. Configure NoteView
 
